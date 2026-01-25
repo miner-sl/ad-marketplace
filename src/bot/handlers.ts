@@ -683,7 +683,55 @@ export class BotHandlers {
       switch (action) {
         case 'accept':
           await DealFlowService.acceptDeal(dealId, user.id, ctx.from!.id);
-          await ctx.reply('✅ Deal accepted! Payment instructions sent to advertiser.');
+          
+          // Get updated deal with escrow address
+          const acceptedDeal = await DealModel.findById(dealId);
+          if (!acceptedDeal || !acceptedDeal.escrow_address) {
+            return ctx.reply('Error: Deal or escrow address not found');
+          }
+
+          // Get advertiser
+          const advertiser = await UserModel.findById(acceptedDeal.advertiser_id);
+          if (!advertiser) {
+            return ctx.reply('Error: Advertiser not found');
+          }
+
+          // Get channel info
+          const channelInfo = await db.query(
+            'SELECT title, username FROM channels WHERE id = $1',
+            [acceptedDeal.channel_id]
+          );
+          const channelData = channelInfo.rows[0];
+          const channelName = channelData?.title || channelData?.username || `Channel #${acceptedDeal.channel_id}`;
+
+          // Send payment invoice to advertiser
+          const invoiceMessage = 
+            `💰 Payment Invoice for Deal #${dealId}\n\n` +
+            `Channel: ${channelName}\n` +
+            `Format: ${acceptedDeal.ad_format}\n` +
+            `Amount: ${acceptedDeal.price_ton} TON\n\n` +
+            `Please send ${acceptedDeal.price_ton} TON to the escrow address:\n\n` +
+            `\`${acceptedDeal.escrow_address}\`\n\n` +
+            `After sending payment, click "✅ Confirm Payment" below.\n\n` +
+            `This is a system-managed escrow wallet. Funds will be held until the post is published and verified.`;
+
+          const invoiceButtons = {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '💳 Copy Escrow Address', callback_data: `copy_escrow_${dealId}` },
+                  { text: '📋 View Deal Details', callback_data: `deal_details_${dealId}` }
+                ],
+                [
+                  { text: '✅ Confirm Payment', callback_data: `confirm_payment_${dealId}` }
+                ]
+              ]
+            }
+          };
+
+          await TelegramService.bot.sendMessage(advertiser.telegram_id, invoiceMessage, invoiceButtons);
+
+          await ctx.reply('✅ Deal accepted! Payment invoice sent to advertiser.');
           break;
         case 'submit_creative':
           this.pendingCreativeDrafts.set(ctx.from!.id, { dealId, userId: user.id });
@@ -1358,12 +1406,23 @@ export class BotHandlers {
         // Notify channel owner
         const channelOwner = await UserModel.findById(deal.channel_owner_id);
         if (channelOwner) {
+          const ownerNotificationButtons = {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '📋 View Deal', callback_data: `deal_details_${dealId}` }
+                ]
+              ]
+            }
+          };
+
           await TelegramService.bot.sendMessage(
             channelOwner.telegram_id,
             `✅ Payment received for Deal #${dealId}!\n\n` +
             `Amount: ${deal.price_ton} TON\n` +
-            `You can now submit the creative.\n\n` +
-            `Use /deal ${dealId} to view details.`
+            `You can now publish the post.\n\n` +
+            `Use the button below to view deal details.`,
+            ownerNotificationButtons
           );
         }
 

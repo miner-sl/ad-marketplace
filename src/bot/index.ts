@@ -239,6 +239,20 @@ bot.on('callback_query', async (ctx) => {
     return;
   }
 
+  // Handle confirm payment button
+  if (data.startsWith('confirm_payment_')) {
+    const dealId = parseInt(data.split('_')[2]);
+    await BotHandlers.handleConfirmPaymentButton(ctx, dealId);
+    return;
+  }
+
+  // Handle copy escrow address button
+  if (data.startsWith('copy_escrow_')) {
+    const dealId = parseInt(data.split('_')[2]);
+    await BotHandlers.handleCopyEscrowAddress(ctx, dealId);
+    return;
+  }
+
   // Handle draft creative button
   if (data.startsWith('draft_creative_')) {
     const dealId = parseInt(data.split('_')[2]);

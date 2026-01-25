@@ -127,7 +127,7 @@ export class CronJobs {
    * Runs every 5 minutes
    */
   private static startAutoPostJob() {
-    const job = cron.schedule('*/1 * * * *', async () => {
+    const job = cron.schedule('*/5 * * * *', async () => {
       try {
         console.log('📤 Checking for scheduled posts...');
 
@@ -136,8 +136,9 @@ export class CronJobs {
            WHERE status IN ('scheduled', 'paid', 'creative_approved')
            AND scheduled_post_time IS NOT NULL
            AND scheduled_post_time <= NOW()
-           ORDER BY scheduled_post_time ASC`
-        );
+           ORDER BY scheduled_post_time ASC
+           LIMIT  20
+       `);
 
         for (const deal of deals.rows) {
           console.log({ deal });

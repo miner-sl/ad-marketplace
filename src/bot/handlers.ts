@@ -594,6 +594,17 @@ export class BotHandlers {
     // Add action buttons based on deal status and user role
     const buttons: any[] = [];
 
+    // Add View Post button if post is published
+    if ((deal.status === 'posted' || deal.status === 'completed') && deal.post_message_id && channel) {
+      const channelLinkData = this.getChannelLink(channel);
+      if (channelLinkData?.channelLink) {
+        const postLink = `${channelLinkData.channelLink}/${deal.post_message_id}`;
+        buttons.push([
+          Markup.button.url('🔗 View Post', postLink)
+        ]);
+      }
+    }
+
     if (deal.status === 'pending' && isChannelOwner) {
       buttons.push([
         Markup.button.callback('✅ Accept', `deal_action_${deal.id}_accept_${user.id}`),
@@ -620,16 +631,6 @@ export class BotHandlers {
 
     // Show confirm publication button for advertiser when post is published
     if (deal.status === 'posted' && isAdvertiser) {
-      const channelLinkData = this.getChannelLink(channel);
-      
-      // Add View Post button if post_message_id exists
-      if (deal.post_message_id && channelLinkData?.channelLink) {
-        const postLink = `${channelLinkData.channelLink}/${deal.post_message_id}`;
-        buttons.push([
-          Markup.button.url('🔗 View Post', postLink)
-        ]);
-      }
-      
       buttons.push([
         Markup.button.callback('✅ Confirm Publication', `confirm_publication_${deal.id}`)
       ]);
@@ -1818,24 +1819,20 @@ export class BotHandlers {
       return ctx.reply(`Cannot publish post. Deal status: ${deal.status}`);
     }
 
-    // Get creative (any status, prefer approved or submitted)
-    const creative = await db.query(
-      `SELECT * FROM creatives 
+    // Get text from deal_messages (brief from advertiser)
+    const messages = await db.query(
+      `SELECT message_text FROM deal_messages 
        WHERE deal_id = $1 
-       ORDER BY 
-         CASE status 
-           WHEN 'approved' THEN 1
-           WHEN 'submitted' THEN 2
-           ELSE 3
-         END,
-         created_at DESC 
+       ORDER BY created_at ASC 
        LIMIT 1`,
       [deal.id]
     );
 
-    if (creative.rows.length === 0) {
-      return ctx.reply('No creative found. Please submit a creative first.');
+    if (messages.rows.length === 0) {
+      return ctx.reply('No brief found in deal messages. Cannot publish post.');
     }
+
+    const postText = messages.rows[0].message_text;
 
     // Get channel info
     const channel = await db.query(
@@ -1848,22 +1845,14 @@ export class BotHandlers {
     }
 
     const channelId = channel.rows[0].telegram_channel_id;
-    const creativeData = creative.rows[0].content_data;
 
     try {
       // Publish post to channel
-      let messageId: number | undefined;
-      
-      if (creativeData.text) {
-        const sentMessage = await TelegramService.bot.sendMessage(
-          channelId,
-          creativeData.text,
-          { parse_mode: creativeData.parse_mode || undefined }
-        );
-        messageId = sentMessage.message_id;
-      } else {
-        return ctx.reply('Creative has no text content to publish.');
-      }
+      const sentMessage = await TelegramService.bot.sendMessage(
+        channelId,
+        postText
+      );
+      const messageId = sentMessage.message_id;
 
       if (messageId) {
         // Record post

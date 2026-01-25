@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: ad-marketplace-db
+    environment:
+      POSTGRES_USER: admarketplace
+      POSTGRES_PASSWORD: admarketplace123
+      POSTGRES_DB: ad_marketplace
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # Note: Schema will be initialized via migration script, not init script
+    # This allows for better control and error handling
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admarketplace"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ad-marketplace-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ad-marketplace-app
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://admarketplace:admarketplace123@postgres:5432/ad_marketplace
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-}
+      TON_NETWORK: ${TON_NETWORK:-testnet}
+      TON_API_KEY: ${TON_API_KEY}
+      TON_WALLET_MNEMONIC: ${TON_WALLET_MNEMONIC:-}
+      DEAL_TIMEOUT_HOURS: ${DEAL_TIMEOUT_HOURS:-72}
+      MIN_POST_DURATION_HOURS: ${MIN_POST_DURATION_HOURS:-24}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+      - ./dist:/app/dist
+      - /app/node_modules
+    networks:
+      - ad-marketplace-network
+    command: npm run dev
+
+volumes:
+  postgres_data:
+
+networks:
+  ad-marketplace-network:
+    driver: bridge

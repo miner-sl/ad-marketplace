@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: ad-marketplace-db-prod
+    environment:
+      POSTGRES_USER: ${DB_USER:-admarketplace}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-ad_marketplace}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-admarketplace}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ad-marketplace-network-prod
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ad-marketplace-app-prod
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${DB_USER:-admarketplace}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-ad_marketplace}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL}
+      TON_NETWORK: ${TON_NETWORK:-mainnet}
+      TON_API_KEY: ${TON_API_KEY}
+      TON_WALLET_MNEMONIC: ${TON_WALLET_MNEMONIC}
+      DEAL_TIMEOUT_HOURS: ${DEAL_TIMEOUT_HOURS:-72}
+      MIN_POST_DURATION_HOURS: ${MIN_POST_DURATION_HOURS:-24}
+    ports:
+      - "${PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ad-marketplace-network-prod
+    restart: unless-stopped
+
+volumes:
+  postgres_data_prod:
+
+networks:
+  ad-marketplace-network-prod:
+    driver: bridge

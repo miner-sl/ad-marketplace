@@ -1,0 +1,16 @@
+node_modules
+dist
+.env
+*.log
+.DS_Store
+.git
+.gitignore
+README.md
+ARCHITECTURE.md
+EXAMPLES.md
+PROJECT_OVERVIEW.md
+.vscode
+.idea
+coverage
+*.swp
+*.swo

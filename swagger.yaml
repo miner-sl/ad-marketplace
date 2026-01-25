@@ -1,0 +1,859 @@
+openapi: 3.0.0
+info:
+  title: Ad Marketplace API
+  description: API для маркетплейса рекламы в Telegram
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost:3000/api
+    description: Development server
+  - url: https://api.example.com/api
+    description: Production server
+
+tags:
+  - name: Channels
+    description: Управление каналами
+  - name: Deals
+    description: Управление сделками
+  - name: Campaigns
+    description: Управление кампаниями
+  - name: Health
+    description: Проверка работоспособности
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      responses:
+        '200':
+          description: Сервис работает
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /channels:
+    get:
+      tags: [Channels]
+      summary: Список каналов
+      parameters:
+        - name: min_subscribers
+          in: query
+          schema:
+            type: integer
+        - name: max_subscribers
+          in: query
+          schema:
+            type: integer
+        - name: min_price
+          in: query
+          schema:
+            type: number
+        - name: max_price
+          in: query
+          schema:
+            type: number
+        - name: ad_format
+          in: query
+          schema:
+            type: string
+            enum: [post, forward, story]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Список каналов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Channel'
+
+    post:
+      tags: [Channels]
+      summary: Зарегистрировать канал
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChannelRequest'
+      responses:
+        '200':
+          description: Канал создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Channel'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /channels/{id}:
+    get:
+      tags: [Channels]
+      summary: Информация о канале
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Информация о канале
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChannelDetails'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Channels]
+      summary: Обновить статистику канала
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Статистика обновлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChannelStats'
+
+  /channels/{id}/pricing:
+    post:
+      tags: [Channels]
+      summary: Установить цену
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ad_format, price_ton]
+              properties:
+                ad_format:
+                  type: string
+                  enum: [post, forward, story]
+                price_ton:
+                  type: number
+      responses:
+        '200':
+          description: Цена установлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChannelPricing'
+
+  /deals:
+    get:
+      tags: [Deals]
+      summary: Список сделок
+      parameters:
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, negotiating, approved, payment_pending, paid, creative_submitted, creative_approved, scheduled, posted, verified, completed, cancelled, refunded]
+        - name: deal_type
+          in: query
+          schema:
+            type: string
+            enum: [listing, campaign]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Список сделок
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Deal'
+
+    post:
+      tags: [Deals]
+      summary: Создать сделку
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDealRequest'
+      responses:
+        '200':
+          description: Сделка создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DealResponse'
+
+  /deals/{id}:
+    get:
+      tags: [Deals]
+      summary: Информация о сделке
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Информация о сделке
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DealDetails'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /deals/{id}/accept:
+    post:
+      tags: [Deals]
+      summary: Принять сделку
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channel_owner_id]
+              properties:
+                channel_owner_id:
+                  type: integer
+      responses:
+        '200':
+          description: Сделка принята
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deal'
+
+  /deals/{id}/payment:
+    post:
+      tags: [Deals]
+      summary: Подтвердить оплату
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tx_hash]
+              properties:
+                tx_hash:
+                  type: string
+      responses:
+        '200':
+          description: Оплата подтверждена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deal'
+
+  /deals/{id}/creative:
+    post:
+      tags: [Deals]
+      summary: Отправить креатив
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitCreativeRequest'
+      responses:
+        '200':
+          description: Креатив отправлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Creative'
+
+  /deals/{id}/creative/approve:
+    post:
+      tags: [Deals]
+      summary: Утвердить креатив
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [advertiser_id]
+              properties:
+                advertiser_id:
+                  type: integer
+      responses:
+        '200':
+          description: Креатив утвержден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deal'
+
+  /deals/{id}/creative/revision:
+    post:
+      tags: [Deals]
+      summary: Запросить правки креатива
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [advertiser_id, notes]
+              properties:
+                advertiser_id:
+                  type: integer
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: Правки запрошены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deal'
+
+  /deals/{id}/schedule:
+    post:
+      tags: [Deals]
+      summary: Запланировать публикацию
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [post_time]
+              properties:
+                post_time:
+                  type: string
+                  format: date-time
+      responses:
+        '200':
+          description: Публикация запланирована
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deal'
+
+  /deals/{id}/cancel:
+    post:
+      tags: [Deals]
+      summary: Отменить сделку
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Сделка отменена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deal'
+
+  /campaigns:
+    get:
+      tags: [Campaigns]
+      summary: Список кампаний
+      parameters:
+        - name: advertiser_id
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, active, closed, completed]
+        - name: min_budget
+          in: query
+          schema:
+            type: number
+        - name: max_budget
+          in: query
+          schema:
+            type: number
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Список кампаний
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Campaign'
+
+    post:
+      tags: [Campaigns]
+      summary: Создать кампанию
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCampaignRequest'
+      responses:
+        '200':
+          description: Кампания создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Campaign'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /campaigns/{id}:
+    get:
+      tags: [Campaigns]
+      summary: Информация о кампании
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Информация о кампании
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Campaign'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Campaigns]
+      summary: Обновить кампанию
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCampaignRequest'
+      responses:
+        '200':
+          description: Кампания обновлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Campaign'
+
+components:
+  schemas:
+    Channel:
+      type: object
+      properties:
+        id:
+          type: integer
+        owner_id:
+          type: integer
+        telegram_channel_id:
+          type: integer
+        username:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        is_verified:
+          type: boolean
+        is_active:
+          type: boolean
+        subscribers_count:
+          type: integer
+        average_views:
+          type: integer
+        price_ton:
+          type: number
+        ad_format:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    ChannelDetails:
+      allOf:
+        - $ref: '#/components/schemas/Channel'
+        - type: object
+          properties:
+            pricing:
+              type: array
+              items:
+                $ref: '#/components/schemas/ChannelPricing'
+
+    ChannelPricing:
+      type: object
+      properties:
+        id:
+          type: integer
+        channel_id:
+          type: integer
+        ad_format:
+          type: string
+        price_ton:
+          type: number
+        currency:
+          type: string
+        is_active:
+          type: boolean
+
+    ChannelStats:
+      type: object
+      properties:
+        id:
+          type: integer
+        channel_id:
+          type: integer
+        subscribers_count:
+          type: integer
+        average_views:
+          type: integer
+        average_reach:
+          type: integer
+        stats_date:
+          type: string
+          format: date-time
+
+    CreateChannelRequest:
+      type: object
+      required: [telegram_id, telegram_channel_id, bot_token]
+      properties:
+        telegram_id:
+          type: integer
+        telegram_channel_id:
+          type: integer
+        username:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        bot_token:
+          type: string
+
+    Deal:
+      type: object
+      properties:
+        id:
+          type: integer
+        deal_type:
+          type: string
+          enum: [listing, campaign]
+        channel_id:
+          type: integer
+        channel_owner_id:
+          type: integer
+        advertiser_id:
+          type: integer
+        ad_format:
+          type: string
+        price_ton:
+          type: number
+        status:
+          type: string
+        escrow_address:
+          type: string
+        payment_tx_hash:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    DealDetails:
+      allOf:
+        - $ref: '#/components/schemas/Deal'
+        - type: object
+          properties:
+            messages:
+              type: array
+              items:
+                $ref: '#/components/schemas/DealMessage'
+            creative:
+              $ref: '#/components/schemas/Creative'
+
+    DealMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        deal_id:
+          type: integer
+        sender_id:
+          type: integer
+        message_text:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    CreateDealRequest:
+      type: object
+      required: [deal_type, channel_id, channel_owner_id, advertiser_id, ad_format, price_ton]
+      properties:
+        deal_type:
+          type: string
+          enum: [listing, campaign]
+        listing_id:
+          type: integer
+        campaign_id:
+          type: integer
+        channel_id:
+          type: integer
+        channel_owner_id:
+          type: integer
+        advertiser_id:
+          type: integer
+        ad_format:
+          type: string
+        price_ton:
+          type: number
+
+    DealResponse:
+      type: object
+      properties:
+        deal:
+          $ref: '#/components/schemas/Deal'
+        escrowAddress:
+          type: string
+
+    Creative:
+      type: object
+      properties:
+        id:
+          type: integer
+        deal_id:
+          type: integer
+        submitted_by:
+          type: integer
+        content_type:
+          type: string
+        content_data:
+          type: object
+        status:
+          type: string
+        revision_notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    SubmitCreativeRequest:
+      type: object
+      required: [channel_owner_id, content_type, content_data]
+      properties:
+        channel_owner_id:
+          type: integer
+        content_type:
+          type: string
+          enum: [text, photo, video, document]
+        content_data:
+          type: object
+
+    Campaign:
+      type: object
+      properties:
+        id:
+          type: integer
+        advertiser_id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        budget_ton:
+          type: number
+        target_subscribers_min:
+          type: integer
+        target_subscribers_max:
+          type: integer
+        target_views_min:
+          type: integer
+        target_languages:
+          type: array
+          items:
+            type: string
+        preferred_formats:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateCampaignRequest:
+      type: object
+      required: [telegram_id, title]
+      properties:
+        telegram_id:
+          type: integer
+        title:
+          type: string
+          maxLength: 500
+        description:
+          type: string
+        budget_ton:
+          type: number
+        target_subscribers_min:
+          type: integer
+        target_subscribers_max:
+          type: integer
+        target_views_min:
+          type: integer
+        target_languages:
+          type: array
+          items:
+            type: string
+        preferred_formats:
+          type: array
+          items:
+            type: string
+
+    UpdateCampaignRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        budget_ton:
+          type: number
+        target_subscribers_min:
+          type: integer
+        target_subscribers_max:
+          type: integer
+        status:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+
+  responses:
+    BadRequest:
+      description: Неверный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    InternalServerError:
+      description: Внутренняя ошибка сервера
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

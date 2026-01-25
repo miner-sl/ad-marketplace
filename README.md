@@ -3,6 +3,7 @@
 A Node.js backend for a Telegram Mini App marketplace connecting channel owners and advertisers with TON blockchain escrow functionality.
 
 ## Features
+- [ ] deploy to vps workflow
 - [ ] telegrma post analytics
 - [ ] refunds in ton
 - [ ] Release funds to channel owner check transaction really exist

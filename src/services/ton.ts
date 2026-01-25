@@ -1,8 +1,40 @@
 import { Address, fromNano, toNano } from '@ton/ton';
 import * as dotenv from 'dotenv';
 import {mockTx} from "./mockTx";
+import logger from '../utils/logger';
 
 dotenv.config();
+
+/**
+ * Retry utility function
+ */
+async function retry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  delayMs: number = 1000,
+  backoff: number = 2
+): Promise<T> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      
+      if (attempt < maxRetries - 1) {
+        const waitTime = delayMs * Math.pow(backoff, attempt);
+        logger.warn(`Retry attempt ${attempt + 1}/${maxRetries} after ${waitTime}ms`, {
+          error: error.message,
+          attempt: attempt + 1,
+        });
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+  }
+  
+  throw lastError || new Error('Retry failed');
+}
 
 export interface EscrowWallet {
   address: string;
@@ -75,16 +107,22 @@ export class TONService {
       }
 
       const url = `${this.providerUrl}/getAddressInformation?address=${encodeURIComponent(formattedAddress)}${this.apiKey ? `&api_key=${this.apiKey}` : ''}`;
-      const response = await fetch(url);
-      const data = await response.json() as { 
-        ok?: boolean;
-        result?: { balance?: string };
-        error?: string;
-      };
+      
+      const data = await retry(async () => {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return await response.json() as { 
+          ok?: boolean;
+          result?: { balance?: string };
+          error?: string;
+        };
+      }, 3, 1000, 2);
       
       // Check for API errors
       if (data.ok === false || data.error) {
-        console.warn('Balance check API error:', {
+        logger.warn('Balance check API error', {
           error: data.error,
           address: formattedAddress
         });
@@ -92,8 +130,8 @@ export class TONService {
       }
       
       return data?.result?.balance || '0';
-    } catch (error) {
-      console.error('Failed to get balance:', error);
+    } catch (error: any) {
+      logger.error('Failed to get balance', { error: error.message, address, stack: error.stack });
       return '0';
     }
   }

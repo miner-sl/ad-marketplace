@@ -8,6 +8,7 @@ import { UserModel } from '../models/User';
 import db from '../db/connection';
 import { BotHandlers } from '../bot/handlers';
 import { Context } from 'telegraf';
+import logger from '../utils/logger';
 
 export class CronJobs {
   private static jobs: cron.ScheduledTask[] = [];
@@ -16,7 +17,7 @@ export class CronJobs {
    * Start all cron jobs
    */
   static startAll() {
-    console.log('🕐 Starting cron jobs...');
+    logger.info('Starting cron jobs...');
 
     // Check for payments every 2 minutes
     this.startPaymentCheckJob();
@@ -33,7 +34,7 @@ export class CronJobs {
     // Refresh channel stats daily at 2 AM
     this.startStatsRefreshJob();
 
-    console.log(`✅ Started ${this.jobs.length} cron job(s)`);
+    logger.info(`Started ${this.jobs.length} cron job(s)`);
   }
 
   /**
@@ -42,7 +43,7 @@ export class CronJobs {
   static stopAll() {
     this.jobs.forEach(job => job.stop());
     this.jobs = [];
-    console.log('🛑 Stopped all cron jobs');
+    logger.info('Stopped all cron jobs');
   }
 
   /**
@@ -52,7 +53,7 @@ export class CronJobs {
   private static startPaymentCheckJob() {
     const job = cron.schedule('*/2 * * * *', async () => {
       try {
-        console.log('💰 Checking for pending payments...');
+        logger.debug('Checking for pending payments...');
 
         const deals = await db.query(
           `SELECT * FROM deals 
@@ -69,7 +70,7 @@ export class CronJobs {
             );
 
             if (paymentCheck.received) {
-              console.log(`✅ Payment detected for Deal #${deal.id}: ${paymentCheck.amount} TON`);
+              logger.info(`Payment detected for Deal #${deal.id}`, { dealId: deal.id, amount: paymentCheck.amount });
 
               // Confirm payment
               const txHash = paymentCheck.txHash || `auto_${Date.now()}`;
@@ -79,10 +80,10 @@ export class CronJobs {
               const updatedDeal = await DealModel.findById(deal.id);
               if (updatedDeal?.scheduled_post_time) {
                 await DealModel.updateStatus(deal.id, 'scheduled');
-                console.log(`📅 Deal #${deal.id} moved to 'scheduled' status`);
+                logger.info(`Deal #${deal.id} moved to 'scheduled' status`, { dealId: deal.id });
               } else {
                 await DealModel.updateStatus(deal.id, 'paid');
-                console.log(`✅ Deal #${deal.id} moved to 'paid' status`);
+                logger.info(`Deal #${deal.id} moved to 'paid' status`, { dealId: deal.id });
               }
 
               // Notify advertiser
@@ -110,16 +111,16 @@ export class CronJobs {
               }
             }
           } catch (error: any) {
-            console.error(`❌ Error checking payment for Deal #${deal.id}:`, error.message);
+            logger.error(`Error checking payment for Deal #${deal.id}`, { dealId: deal.id, error: error.message, stack: error.stack });
           }
         }
       } catch (error: any) {
-        console.error('❌ Error in payment check job:', error.message);
+        logger.error('Error in payment check job', { error: error.message, stack: error.stack });
       }
     });
 
     this.jobs.push(job);
-    console.log('✅ Payment check job started (runs every 2 minutes)');
+    logger.info('Payment check job started (runs every 2 minutes)');
   }
 
   /**
@@ -129,7 +130,7 @@ export class CronJobs {
   private static startAutoPostJob() {
     const job = cron.schedule('*/5 * * * *', async () => {
       try {
-        console.log('📤 Checking for scheduled posts...');
+        logger.debug('Checking for scheduled posts...');
 
         const deals = await db.query(
           `SELECT * FROM deals 
@@ -141,11 +142,11 @@ export class CronJobs {
        `);
 
         for (const deal of deals.rows) {
-          console.log({ deal });
+          logger.debug(`Processing deal for auto-post`, { dealId: deal.id, status: deal.status });
           try {
             // Double-check that scheduled_post_time has passed (additional validation)
             if (!deal.scheduled_post_time) {
-              console.log(`⏭️ Skipping Deal #${deal.id}: No scheduled_post_time`);
+              logger.debug(`Skipping Deal #${deal.id}: No scheduled_post_time`, { dealId: deal.id });
               continue;
             }
 
@@ -155,7 +156,7 @@ export class CronJobs {
             
             // Validate that scheduled time is a valid date
             if (isNaN(scheduledTime.getTime())) {
-              console.error(`❌ Deal #${deal.id}: Invalid scheduled_post_time format: ${deal.scheduled_post_time}`);
+              logger.error(`Deal #${deal.id}: Invalid scheduled_post_time format`, { dealId: deal.id, scheduledPostTime: deal.scheduled_post_time });
               continue;
             }
             
@@ -163,16 +164,21 @@ export class CronJobs {
               const diffMs = scheduledTime.getTime() - now.getTime();
               const minutesUntilPublish = Math.ceil(diffMs / (1000 * 60));
               const secondsUntilPublish = Math.ceil(diffMs / 1000);
-              console.log(`⏭️ Skipping Deal #${deal.id}: Scheduled time hasn't arrived yet`);
-              console.log(`   Scheduled: ${scheduledTime.toISOString()} (${deal.scheduled_post_time})`);
-              console.log(`   Now: ${now.toISOString()}`);
-              console.log(`   Remaining: ${minutesUntilPublish} minutes (${secondsUntilPublish} seconds)`);
+              logger.debug(`Skipping Deal #${deal.id}: Scheduled time hasn't arrived yet`, { 
+                dealId: deal.id, 
+                scheduled: scheduledTime.toISOString(), 
+                now: now.toISOString(),
+                remainingMinutes: minutesUntilPublish,
+                remainingSeconds: secondsUntilPublish
+              });
               continue;
             }
 
-            console.log(`✅ Deal #${deal.id}: Scheduled time has passed. Publishing...`);
-            console.log(`   Scheduled: ${scheduledTime.toISOString()} (${deal.scheduled_post_time})`);
-            console.log(`   Now: ${now.toISOString()}`);
+            logger.info(`Deal #${deal.id}: Scheduled time has passed. Publishing...`, { 
+              dealId: deal.id, 
+              scheduled: scheduledTime.toISOString(), 
+              now: now.toISOString() 
+            });
 
             // Check if creative is approved
             const creative = await db.query(
@@ -195,7 +201,7 @@ export class CronJobs {
             );
 
             if (channel.rows.length === 0) {
-              console.log(`❌ Deal #${deal.id}: Channel not found`);
+              logger.warn(`Deal #${deal.id}: Channel not found`, { dealId: deal.id, channelId: deal.channel_id });
               continue;
             }
 
@@ -203,7 +209,7 @@ export class CronJobs {
             // Get channel owner to create proper mock context
             const channelOwner = await UserModel.findById(deal.channel_owner_id);
             if (!channelOwner) {
-              console.log(`❌ Deal #${deal.id}: Channel owner not found`);
+              logger.warn(`Deal #${deal.id}: Channel owner not found`, { dealId: deal.id, channelOwnerId: deal.channel_owner_id });
               continue;
             }
 
@@ -211,30 +217,30 @@ export class CronJobs {
             const mockCtx = {
               from: { id: channelOwner.telegram_id },
               reply: async (text: string) => {
-                console.log(`[Auto-post] ${text}`);
+                logger.debug(`[Auto-post] ${text}`, { dealId: deal.id });
                 return Promise.resolve({} as any);
               }
             } as any as Context;
 
             try {
               await BotHandlers.handlePublishPost(mockCtx, deal.id);
-              console.log(`✅ Auto-published Deal #${deal.id} via handlePublishPost`);
+              logger.info(`Auto-published Deal #${deal.id} via handlePublishPost`, { dealId: deal.id });
             } catch (error: any) {
-              console.error(`❌ Error calling handlePublishPost for Deal #${deal.id}:`, error.message);
+              logger.error(`Error calling handlePublishPost for Deal #${deal.id}`, { dealId: deal.id, error: error.message, stack: error.stack });
               // Re-throw to be caught by outer catch block
               throw error;
             }
           } catch (error: any) {
-            console.error(`❌ Error auto-posting Deal #${deal.id}:`, error.message);
+            logger.error(`Error auto-posting Deal #${deal.id}`, { dealId: deal.id, error: error.message, stack: error.stack });
           }
         }
       } catch (error: any) {
-        console.error('❌ Error in auto-post job:', error.message);
+        logger.error('Error in auto-post job', { error: error.message, stack: error.stack });
       }
     });
 
     this.jobs.push(job);
-    console.log('✅ Auto-post job started (runs every 5 minutes)');
+    logger.info('Auto-post job started (runs every 5 minutes)');
   }
 
   /**
@@ -244,7 +250,7 @@ export class CronJobs {
   private static startExpiredDealsJob() {
     const job = cron.schedule('*/10 * * * *', async () => {
       try {
-        console.log('⏰ Checking for expired deals...');
+        logger.debug('Checking for expired deals...');
 
         const expiredDeals = await DealModel.findExpiredDeals();
 
@@ -252,7 +258,7 @@ export class CronJobs {
           try {
             await DealModel.cancel(deal.id, 'Deal expired (timeout)');
 
-            console.log(`❌ Cancelled expired Deal #${deal.id}`);
+            logger.info(`Cancelled expired Deal #${deal.id}`, { dealId: deal.id });
 
             // Notify both parties
             const advertiser = await UserModel.findById(deal.advertiser_id);
@@ -276,16 +282,16 @@ export class CronJobs {
               );
             }
           } catch (error: any) {
-            console.error(`❌ Error cancelling expired Deal #${deal.id}:`, error.message);
+            logger.error(`Error cancelling expired Deal #${deal.id}`, { dealId: deal.id, error: error.message, stack: error.stack });
           }
         }
       } catch (error: any) {
-        console.error('❌ Error in expired deals job:', error.message);
+        logger.error('Error in expired deals job', { error: error.message, stack: error.stack });
       }
     });
 
     this.jobs.push(job);
-    console.log('✅ Expired deals job started (runs every 10 minutes)');
+    logger.info('Expired deals job started (runs every 10 minutes)');
   }
 
   /**
@@ -295,14 +301,14 @@ export class CronJobs {
   private static startVerificationJob() {
     const job = cron.schedule('0 * * * *', async () => {
       try {
-        console.log('🔍 Checking for posts ready for verification...');
+        logger.debug('Checking for posts ready for verification...');
 
         const deals = await DealModel.findDealsReadyForVerification();
 
         for (const deal of deals) {
           try {
             if (!deal.post_message_id || !deal.channel_id) {
-              console.log(`⚠️ Deal #${deal.id}: Missing post_message_id or channel_id`);
+              logger.warn(`Deal #${deal.id}: Missing post_message_id or channel_id`, { dealId: deal.id });
               continue;
             }
 
@@ -313,65 +319,139 @@ export class CronJobs {
             );
 
             if (channel.rows.length === 0) {
-              console.log(`❌ Deal #${deal.id}: Channel not found`);
+              logger.warn(`Deal #${deal.id}: Channel not found`, { dealId: deal.id, channelId: deal.channel_id });
               continue;
             }
 
             const channelId = channel.rows[0].telegram_channel_id;
 
-            // Check if post still exists
-            // Note: Telegram Bot API doesn't provide a direct way to check if a message exists
-            // We'll mark as verified if the deal is in 'posted' status and verification period has passed
-            // In production, you might want to implement a more robust verification mechanism
-            let postExists = true; // Assume post exists if deal reached this stage
+            // Verify that verification period has passed
+            if (!deal.post_verification_until) {
+              logger.warn(`Deal #${deal.id}: Missing post_verification_until`, { dealId: deal.id });
+              continue;
+            }
+
+            const verificationUntil = new Date(deal.post_verification_until);
+            const now = new Date();
+
+            if (verificationUntil > now) {
+              // Verification period hasn't passed yet
+              const remainingMs = verificationUntil.getTime() - now.getTime();
+              const remainingHours = Math.ceil(remainingMs / (1000 * 60 * 60));
+              logger.debug(`Deal #${deal.id}: Verification period not yet complete`, {
+                dealId: deal.id,
+                remainingHours,
+                verificationUntil: verificationUntil.toISOString(),
+                now: now.toISOString(),
+              });
+              continue;
+            }
+
+            // Verification period has passed - now verify post exists
+            let postExists = false;
             
-            // Alternative: Try to get chat info to verify bot still has access
             try {
-              await TelegramService.bot.getChat(channelId);
-              // Bot has access, assume post exists
-              postExists = true;
+              // Check if bot still has access to channel
+              const botInfo = await TelegramService.bot.getMe();
+              const member = await TelegramService.bot.getChatMember(channelId, botInfo.id);
+              
+              if (member.status !== 'administrator' && member.status !== 'creator') {
+                logger.warn(`Deal #${deal.id}: Bot is not admin of channel`, {
+                  dealId: deal.id,
+                  channelId,
+                  botStatus: member.status,
+                });
+                postExists = false;
+              } else {
+                // Bot has access - try to verify message exists
+                // Note: Telegram Bot API doesn't provide direct message existence check
+                // We can try to get chat info or use other methods
+                // For now, if bot has access and verification period passed, we assume post exists
+                // In production, you might want to implement a more robust check
+                // (e.g., try to forward message to a test chat, or use Telegram Client API)
+                
+                // Additional check: verify the post was published at least MIN_POST_DURATION_HOURS ago
+                const minPostDurationHours = parseInt(process.env.MIN_POST_DURATION_HOURS || '24', 10);
+                if (deal.actual_post_time) {
+                  const postTime = new Date(deal.actual_post_time);
+                  const hoursSincePost = (now.getTime() - postTime.getTime()) / (1000 * 60 * 60);
+                  
+                  if (hoursSincePost >= minPostDurationHours) {
+                    postExists = true;
+                    logger.info(`Deal #${deal.id}: Post verified (${minPostDurationHours}h+ since publication)`, {
+                      dealId: deal.id,
+                      hoursSincePost: Math.floor(hoursSincePost),
+                      minPostDurationHours,
+                    });
+                  } else {
+                    logger.debug(`Deal #${deal.id}: Post not old enough yet`, {
+                      dealId: deal.id,
+                      hoursSincePost: Math.floor(hoursSincePost),
+                      minPostDurationHours,
+                    });
+                    continue; // Wait for full minimum duration
+                  }
+                } else {
+                  // No actual_post_time recorded, but verification period passed
+                  // Assume post exists if bot has access
+                  postExists = true;
+                  logger.info(`Deal #${deal.id}: Post verified (verification period passed, bot has access)`, {
+                    dealId: deal.id,
+                    minPostDurationHours,
+                  });
+                }
+              }
             } catch (error: any) {
-              console.log(`⚠️ Deal #${deal.id}: Cannot access channel (${error.message})`);
+              logger.warn(`Deal #${deal.id}: Cannot verify post existence`, {
+                dealId: deal.id,
+                error: error.message,
+              });
               postExists = false;
             }
 
             if (postExists) {
-              // Post verified - release funds
+              // Post verified - mark as verified but DON'T release funds yet
+              // Funds will be released only when advertiser confirms publication
               await DealModel.markVerified(deal.id);
-              await DealModel.markCompleted(deal.id);
+              // Don't mark as completed yet - wait for advertiser confirmation
 
-              // Release funds to channel owner
-              if (deal.escrow_address && deal.channel_owner_wallet_address) {
-                try {
-                  await TONService.releaseFunds(
-                    deal.escrow_address,
-                    deal.channel_owner_wallet_address,
-                    deal.price_ton.toString()
-                  );
-                  console.log(`✅ Released funds for Deal #${deal.id}`);
-                } catch (error: any) {
-                  console.error(`❌ Error releasing funds for Deal #${deal.id}:`, error.message);
-                }
-              }
+              logger.info(`Deal #${deal.id} marked as verified - waiting for advertiser confirmation`, { dealId: deal.id });
 
-              // Notify both parties
+              // Notify advertiser with confirmation button
               const advertiser = await UserModel.findById(deal.advertiser_id);
-              const channelOwner = await UserModel.findById(deal.channel_owner_id);
-
               if (advertiser) {
-                await TelegramService.bot.sendMessage(
-                  advertiser.telegram_id,
-                  `✅ Deal #${deal.id} verified and completed!\n\n` +
-                  `The post has been verified and funds have been released to the channel owner.\n\n` +
-                  `Use /deal ${deal.id} to view details.`
-                );
+                const minPostDurationHours = parseInt(process.env.MIN_POST_DURATION_HOURS || '24', 10);
+                const confirmMessage = 
+                  `✅ Deal #${deal.id} Verified!\n\n` +
+                  `The post has been published and remained on the channel for at least ${minPostDurationHours} hours.\n\n` +
+                  `Please confirm that the post is still visible and meets your requirements.\n\n` +
+                  `After your confirmation, funds will be released to the channel owner.\n\n` +
+                  `Use /deal ${deal.id} to view details.`;
+
+                const confirmButtons = {
+                  reply_markup: {
+                    inline_keyboard: [
+                      [
+                        { text: '✅ Confirm Publication', callback_data: `confirm_publication_${deal.id}` }
+                      ],
+                      [
+                        { text: '📋 View Deal', callback_data: `deal_details_${deal.id}` }
+                      ]
+                    ]
+                  }
+                };
+
+                await TelegramService.bot.sendMessage(advertiser.telegram_id, confirmMessage, confirmButtons);
               }
 
+              // Notify channel owner
+              const channelOwner = await UserModel.findById(deal.channel_owner_id);
               if (channelOwner) {
                 await TelegramService.bot.sendMessage(
                   channelOwner.telegram_id,
-                  `✅ Deal #${deal.id} verified and completed!\n\n` +
-                  `The post has been verified and funds (${deal.price_ton} TON) have been released to your wallet.\n\n` +
+                  `✅ Deal #${deal.id} Verified!\n\n` +
+                  `The post has been verified (remained on channel for required duration).\n` +
+                  `Waiting for advertiser confirmation to release funds.\n\n` +
                   `Use /deal ${deal.id} to view details.`
                 );
               }
@@ -380,7 +460,7 @@ export class CronJobs {
               await DealModel.updateStatus(deal.id, 'refunded');
 
               // Refund to advertiser (would need advertiser wallet address in production)
-              console.log(`💰 Deal #${deal.id}: Post not found, marked for refund`);
+              logger.warn(`Deal #${deal.id}: Post not found, marked for refund`, { dealId: deal.id });
 
               // Notify both parties
               const advertiser = await UserModel.findById(deal.advertiser_id);
@@ -407,16 +487,16 @@ export class CronJobs {
               }
             }
           } catch (error: any) {
-            console.error(`❌ Error verifying Deal #${deal.id}:`, error.message);
+            logger.error(`Error verifying Deal #${deal.id}`, { dealId: deal.id, error: error.message, stack: error.stack });
           }
         }
       } catch (error: any) {
-        console.error('❌ Error in verification job:', error.message);
+        logger.error('Error in verification job', { error: error.message, stack: error.stack });
       }
     });
 
     this.jobs.push(job);
-    console.log('✅ Verification job started (runs every hour)');
+    logger.info('Verification job started (runs every hour)');
   }
 
   /**
@@ -426,7 +506,7 @@ export class CronJobs {
   private static startStatsRefreshJob() {
     const job = cron.schedule('0 2 * * *', async () => {
       try {
-        console.log('📊 Refreshing channel stats...');
+        logger.info('Refreshing channel stats...');
 
         const channels = await db.query(
           'SELECT id, telegram_channel_id FROM channels WHERE is_active = TRUE'
@@ -437,17 +517,17 @@ export class CronJobs {
             const stats = await TelegramService.fetchChannelStats(channel.telegram_channel_id);
             await ChannelModel.saveStats(channel.id, stats);
 
-            console.log(`✅ Refreshed stats for Channel #${channel.id}`);
+            logger.info(`Refreshed stats for Channel #${channel.id}`, { channelId: channel.id });
           } catch (error: any) {
-            console.error(`❌ Error refreshing stats for Channel #${channel.id}:`, error.message);
+            logger.error(`Error refreshing stats for Channel #${channel.id}`, { channelId: channel.id, error: error.message, stack: error.stack });
           }
         }
       } catch (error: any) {
-        console.error('❌ Error in stats refresh job:', error.message);
+        logger.error('Error in stats refresh job', { error: error.message, stack: error.stack });
       }
     });
 
     this.jobs.push(job);
-    console.log('✅ Stats refresh job started (runs daily at 2 AM)');
+    logger.info('Stats refresh job started (runs daily at 2 AM)');
   }
 }

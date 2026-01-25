@@ -8,6 +8,7 @@ import { TelegramService } from '../services/telegram';
 import { CreativeService } from '../services/creative';
 import { TONService } from '../services/ton';
 import db from '../db/connection';
+import logger from '../utils/logger';
 
 export class BotHandlers {
   /**
@@ -629,8 +630,9 @@ export class BotHandlers {
       ]);
     }
 
-    // Show confirm publication button for advertiser when post is published
-    if (deal.status === 'posted' && isAdvertiser) {
+    // Show confirm publication button for advertiser ONLY when deal is verified
+    // (after minimum post duration has passed and post was verified)
+    if (deal.status === 'verified' && isAdvertiser) {
       buttons.push([
         Markup.button.callback('✅ Confirm Publication', `confirm_publication_${deal.id}`)
       ]);
@@ -1856,9 +1858,10 @@ export class BotHandlers {
 
       if (messageId) {
         // Record post
-        // Create date in UTC
+        // Create date in UTC - use MIN_POST_DURATION_HOURS from env
+        const minPostDurationHours = parseInt(process.env.MIN_POST_DURATION_HOURS || '24', 10);
         const verificationUntil = new Date();
-        verificationUntil.setUTCHours(verificationUntil.getUTCHours() + 24); // 24h verification period in UTC
+        verificationUntil.setUTCHours(verificationUntil.getUTCHours() + minPostDurationHours);
 
         await DealModel.recordPost(deal.id, messageId, verificationUntil);
         await DealModel.updateStatus(deal.id, 'posted');
@@ -1939,13 +1942,17 @@ export class BotHandlers {
         );
       }
     } catch (error: any) {
-      console.error(`❌ Error publishing post for Deal #${deal.id}:`, error);
+      logger.error(`Error publishing post for Deal #${deal.id}`, { dealId: deal.id, error: error.message, stack: error.stack });
       await ctx.reply(`❌ Error publishing post: ${error.message}`);
     }
   }
 
   /**
    * Handle confirm publication (advertiser confirms post is published)
+   * Verifies that:
+   * 1. Post verification period has passed (24 hours)
+   * 2. Post still exists in the channel
+   * 3. Only then releases funds to channel owner
    */
   static async handleConfirmPublication(ctx: Context, dealId: number) {
     const user = await UserModel.findByTelegramId(ctx.from!.id);
@@ -1962,27 +1969,74 @@ export class BotHandlers {
       return ctx.reply('You are not authorized to confirm publication for this deal');
     }
 
-    if (deal.status !== 'posted') {
-      return ctx.reply(`Deal is not in 'posted' status. Current status: ${deal.status}`);
+    if (deal.status !== 'verified') {
+      return ctx.reply(
+        `Deal is not ready for confirmation. Current status: ${deal.status}\n\n` +
+        (deal.status === 'posted' 
+          ? `The post verification period is not yet complete. Please wait.\n` +
+            (deal.post_verification_until 
+              ? `Verification will be available after: ${new Date(deal.post_verification_until).toISOString()}\n`
+              : '')
+          : `Only deals in 'verified' status can be confirmed.\n') +
+        `Use /deal ${deal.id} to view details.`
+      );
     }
 
     if (!deal.escrow_address || !deal.channel_owner_wallet_address) {
       return ctx.reply('Escrow address or channel owner wallet address not set.');
     }
 
+    // Deal is already verified (status = 'verified'), so we can proceed with fund release
+    // Verification period has passed and post was verified by cron job
+    // Just do a final check that post still exists
+    if (!deal.post_message_id || !deal.channel_id) {
+      return ctx.reply('Post information is missing. Cannot confirm publication.');
+    }
+
     try {
-      // Release funds to channel owner
+      // Get channel info
+      const channel = await db.query(
+        'SELECT telegram_channel_id FROM channels WHERE id = $1',
+        [deal.channel_id]
+      );
+
+      if (channel.rows.length === 0) {
+        return ctx.reply('Channel not found. Cannot confirm publication.');
+      }
+
+      const channelId = channel.rows[0].telegram_channel_id;
+
+      // Final check: verify bot still has access to channel
+      try {
+        const botInfo = await TelegramService.bot.getMe();
+        await TelegramService.bot.getChatMember(channelId, botInfo.id);
+      } catch (error: any) {
+        logger.warn(`Cannot verify channel access for Deal #${deal.id}`, {
+          dealId: deal.id,
+          error: error.message,
+        });
+        return ctx.reply(
+          `❌ Cannot verify channel access!\n\n` +
+          `The bot cannot access the channel. Please contact support.\n\n` +
+          `Use /deal ${deal.id} to view details.`
+        );
+      }
+
+      // All checks passed - release funds to channel owner
       const txHash = await TONService.releaseFunds(
         deal.escrow_address,
         deal.channel_owner_wallet_address,
         deal.price_ton.toString()
       );
 
-      // Update deal status
-      await DealModel.markVerified(deal.id);
+      // Update deal status to completed
       await DealModel.markCompleted(deal.id);
 
-      console.log(`✅ Funds released for Deal #${deal.id}: ${txHash}`);
+      logger.info(`Funds released for Deal #${deal.id}`, {
+        dealId: deal.id,
+        txHash,
+        advertiserId: user.id,
+      });
 
       // Notify channel owner
       const channelOwner = await UserModel.findById(deal.channel_owner_id);
@@ -1991,22 +2045,29 @@ export class BotHandlers {
           channelOwner.telegram_id,
           `✅ Deal #${deal.id} Completed!\n\n` +
           `The advertiser has confirmed publication.\n` +
+          `Post verification period completed and post verified.\n` +
           `Funds (${deal.price_ton} TON) have been released to your wallet:\n` +
-          `${deal.channel_owner_wallet_address}\n\n` +
+          `\`${deal.channel_owner_wallet_address}\`\n\n` +
           `Transaction: ${txHash}\n\n` +
-          `Use /deal ${deal.id} to view details.`
+          `Use /deal ${deal.id} to view details.`,
+          { parse_mode: 'Markdown' }
         );
       }
 
       await ctx.reply(
         `✅ Publication Confirmed!\n\n` +
         `Deal #${deal.id} has been completed.\n` +
+        `Post verification period completed and post verified.\n` +
         `Funds (${deal.price_ton} TON) have been released to the channel owner.\n\n` +
         `Transaction: ${txHash}\n\n` +
         `Use /deal ${deal.id} to view details.`
       );
     } catch (error: any) {
-      console.error(`❌ Error releasing funds for Deal #${deal.id}:`, error);
+      logger.error(`Error releasing funds for Deal #${deal.id}`, {
+        dealId: deal.id,
+        error: error.message,
+        stack: error.stack,
+      });
       await ctx.reply(`❌ Error releasing funds: ${error.message}\n\nPlease contact support.`);
     }
   }

@@ -267,6 +267,20 @@ bot.on('callback_query', async (ctx) => {
     return;
   }
 
+  // Handle publish post button
+  if (data.startsWith('publish_post_')) {
+    const dealId = parseInt(data.split('_')[2]);
+    await BotHandlers.handlePublishPost(ctx, dealId);
+    return;
+  }
+
+  // Handle confirm publication button
+  if (data.startsWith('confirm_publication_')) {
+    const dealId = parseInt(data.split('_')[2]);
+    await BotHandlers.handleConfirmPublication(ctx, dealId);
+    return;
+  }
+
   // Handle channel actions
   if (data.startsWith('refresh_stats_')) {
     const channelId = parseInt(data.split('_')[2]);

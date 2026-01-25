@@ -574,8 +574,16 @@ export class BotHandlers {
     }
 
     if (deal.status === 'paid' && isChannelOwner) {
+      // Show publish post button when deal is paid
       buttons.push([
-        Markup.button.callback('📝 Submit Creative', `deal_action_${deal.id}_submit_creative_${user.id}`)
+        Markup.button.callback('📤 Publish Post', `publish_post_${deal.id}`)
+      ]);
+    }
+
+    // Show confirm publication button for advertiser when post is published
+    if (deal.status === 'posted' && isAdvertiser) {
+      buttons.push([
+        Markup.button.callback('✅ Confirm Publication', `confirm_publication_${deal.id}`)
       ]);
     }
 
@@ -1484,5 +1492,191 @@ export class BotHandlers {
 
     await CampaignModel.update(campaignId, { status: 'active' });
     await ctx.reply('▶️ Campaign reactivated.');
+  }
+
+  /**
+   * Handle publish post (channel owner publishes approved creative)
+   */
+  static async handlePublishPost(ctx: Context, dealId: number) {
+    const user = await UserModel.findByTelegramId(ctx.from!.id);
+    if (!user) {
+      return ctx.reply('Please use /start first');
+    }
+
+    const deal = await DealModel.findById(dealId);
+    if (!deal) {
+      return ctx.reply('Deal not found');
+    }
+
+    if (deal.channel_owner_id !== user.id) {
+      return ctx.reply('You are not authorized to publish post for this deal');
+    }
+
+    if (deal.status !== 'paid') {
+      return ctx.reply(`Cannot publish post. Deal status: ${deal.status}`);
+    }
+
+    // Get creative (any status, prefer approved or submitted)
+    const creative = await db.query(
+      `SELECT * FROM creatives 
+       WHERE deal_id = $1 
+       ORDER BY 
+         CASE status 
+           WHEN 'approved' THEN 1
+           WHEN 'submitted' THEN 2
+           ELSE 3
+         END,
+         created_at DESC 
+       LIMIT 1`,
+      [deal.id]
+    );
+
+    if (creative.rows.length === 0) {
+      return ctx.reply('No creative found. Please submit a creative first.');
+    }
+
+    // Get channel info
+    const channel = await db.query(
+      'SELECT telegram_channel_id FROM channels WHERE id = $1',
+      [deal.channel_id]
+    );
+
+    if (channel.rows.length === 0) {
+      return ctx.reply('Channel not found');
+    }
+
+    const channelId = channel.rows[0].telegram_channel_id;
+    const creativeData = creative.rows[0].content_data;
+
+    try {
+      // Publish post to channel
+      let messageId: number | undefined;
+      
+      if (creativeData.text) {
+        const sentMessage = await TelegramService.bot.sendMessage(
+          channelId,
+          creativeData.text,
+          { parse_mode: creativeData.parse_mode || undefined }
+        );
+        messageId = sentMessage.message_id;
+      } else {
+        return ctx.reply('Creative has no text content to publish.');
+      }
+
+      if (messageId) {
+        // Record post
+        const verificationUntil = new Date();
+        verificationUntil.setHours(verificationUntil.getHours() + 24); // 24h verification period
+
+        await DealModel.recordPost(deal.id, messageId, verificationUntil);
+        await DealModel.updateStatus(deal.id, 'posted');
+
+        console.log(`✅ Post published for Deal #${deal.id} to channel ${channelId}`);
+
+        // Notify advertiser to confirm publication
+        const advertiser = await UserModel.findById(deal.advertiser_id);
+        if (advertiser) {
+          const confirmMessage = 
+            `📤 Post Published for Deal #${deal.id}!\n\n` +
+            `The channel owner has published the post.\n\n` +
+            `Please verify that the post is visible in the channel and click "✅ Confirm Publication" below.\n\n` +
+            `After your confirmation, funds will be released to the channel owner.\n\n` +
+            `Use /deal ${deal.id} to view details.`;
+
+          const confirmButtons = {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '✅ Confirm Publication', callback_data: `confirm_publication_${deal.id}` }
+                ],
+                [
+                  { text: '📋 View Deal', callback_data: `deal_details_${deal.id}` }
+                ]
+              ]
+            }
+          };
+
+          await TelegramService.bot.sendMessage(advertiser.telegram_id, confirmMessage, confirmButtons);
+        }
+
+        await ctx.reply(
+          `✅ Post published successfully!\n\n` +
+          `Deal #${deal.id} post has been published to the channel.\n` +
+          `Waiting for advertiser confirmation...\n\n` +
+          `After advertiser confirms, funds will be released to your wallet.\n\n` +
+          `Use /deal ${deal.id} to view details.`
+        );
+      }
+    } catch (error: any) {
+      console.error(`❌ Error publishing post for Deal #${deal.id}:`, error);
+      await ctx.reply(`❌ Error publishing post: ${error.message}`);
+    }
+  }
+
+  /**
+   * Handle confirm publication (advertiser confirms post is published)
+   */
+  static async handleConfirmPublication(ctx: Context, dealId: number) {
+    const user = await UserModel.findByTelegramId(ctx.from!.id);
+    if (!user) {
+      return ctx.reply('Please use /start first');
+    }
+
+    const deal = await DealModel.findById(dealId);
+    if (!deal) {
+      return ctx.reply('Deal not found');
+    }
+
+    if (deal.advertiser_id !== user.id) {
+      return ctx.reply('You are not authorized to confirm publication for this deal');
+    }
+
+    if (deal.status !== 'posted') {
+      return ctx.reply(`Deal is not in 'posted' status. Current status: ${deal.status}`);
+    }
+
+    if (!deal.escrow_address || !deal.channel_owner_wallet_address) {
+      return ctx.reply('Escrow address or channel owner wallet address not set.');
+    }
+
+    try {
+      // Release funds to channel owner
+      const txHash = await TONService.releaseFunds(
+        deal.escrow_address,
+        deal.channel_owner_wallet_address,
+        deal.price_ton.toString()
+      );
+
+      // Update deal status
+      await DealModel.markVerified(deal.id);
+      await DealModel.markCompleted(deal.id);
+
+      console.log(`✅ Funds released for Deal #${deal.id}: ${txHash}`);
+
+      // Notify channel owner
+      const channelOwner = await UserModel.findById(deal.channel_owner_id);
+      if (channelOwner) {
+        await TelegramService.bot.sendMessage(
+          channelOwner.telegram_id,
+          `✅ Deal #${deal.id} Completed!\n\n` +
+          `The advertiser has confirmed publication.\n` +
+          `Funds (${deal.price_ton} TON) have been released to your wallet:\n` +
+          `${deal.channel_owner_wallet_address}\n\n` +
+          `Transaction: ${txHash}\n\n` +
+          `Use /deal ${deal.id} to view details.`
+        );
+      }
+
+      await ctx.reply(
+        `✅ Publication Confirmed!\n\n` +
+        `Deal #${deal.id} has been completed.\n` +
+        `Funds (${deal.price_ton} TON) have been released to the channel owner.\n\n` +
+        `Transaction: ${txHash}\n\n` +
+        `Use /deal ${deal.id} to view details.`
+      );
+    } catch (error: any) {
+      console.error(`❌ Error releasing funds for Deal #${deal.id}:`, error);
+      await ctx.reply(`❌ Error releasing funds: ${error.message}\n\nPlease contact support.`);
+    }
   }
 }

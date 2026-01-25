@@ -28,6 +28,7 @@ interface EnvConfig {
   // Deal Settings
   DEAL_TIMEOUT_HOURS: number;
   MIN_POST_DURATION_HOURS: number;
+  VERIFIED_TIMEOUT_HOURS: number;
   
   // Logging
   LOG_LEVEL?: string;
@@ -77,6 +78,7 @@ export const env: EnvConfig = {
   
   DEAL_TIMEOUT_HOURS: getNumberEnvVar('DEAL_TIMEOUT_HOURS', false, 72),
   MIN_POST_DURATION_HOURS: getNumberEnvVar('MIN_POST_DURATION_HOURS', false, 24),
+  VERIFIED_TIMEOUT_HOURS: getNumberEnvVar('VERIFIED_TIMEOUT_HOURS', false, 168), // 7 days default
   
   LOG_LEVEL: getEnvVar('LOG_LEVEL', false),
   LOG_DIR: getEnvVar('LOG_DIR', false, 'logs'),

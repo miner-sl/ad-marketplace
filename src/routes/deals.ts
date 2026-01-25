@@ -123,7 +123,7 @@ router.post('/:id/creative', validate(submitCreativeSchema), async (req, res) =>
     const creative = await DealFlowService.submitCreative(
       parseInt(req.params.id),
       channel_owner_id,
-      { content_type, content_data }
+      { contentType: content_type, contentData: content_data }
     );
     res.json(creative);
   } catch (error: any) {

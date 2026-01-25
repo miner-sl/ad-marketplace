@@ -9,6 +9,7 @@ import { CreativeService } from '../services/creative';
 import { TONService } from '../services/ton';
 import db from '../db/connection';
 import logger from '../utils/logger';
+import { withTx } from '../utils/transaction';
 
 export class BotHandlers {
   /**
@@ -1972,14 +1973,14 @@ export class BotHandlers {
     if (deal.status !== 'verified') {
       return ctx.reply(
         `Deal is not ready for confirmation. Current status: ${deal.status}\n\n` +
-        (deal.status === 'posted' 
+        (deal.status === 'posted'
           ? `The post verification period is not yet complete. Please wait.\n` +
-            (deal.post_verification_until 
+            (deal.post_verification_until
               ? `Verification will be available after: ${new Date(deal.post_verification_until).toISOString()}\n`
               : '')
-          : `Only deals in 'verified' status can be confirmed.\n') +
+          : `Only deals in 'verified' status can be confirmed.\n')` +
         `Use /deal ${deal.id} to view details.`
-      );
+      ));
     }
 
     if (!deal.escrow_address || !deal.channel_owner_wallet_address) {
@@ -2022,15 +2023,41 @@ export class BotHandlers {
         );
       }
 
-      // All checks passed - release funds to channel owner
+      // Use transaction to prevent double release
+      await withTx(async (client) => {
+        // Lock deal row and check status atomically
+        const dealCheck = await client.query(
+          `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
+          [deal.id]
+        );
+
+        if (dealCheck.rows.length === 0) {
+          throw new Error('Deal not found');
+        }
+
+        const currentDeal = dealCheck.rows[0];
+        if (currentDeal.status !== 'verified') {
+          throw new Error(`Deal is not in verified status. Current status: ${currentDeal.status}`);
+        }
+
+        // Update status first (before blockchain operation)
+        // If blockchain operation fails, we can retry
+        await client.query(
+          `UPDATE deals 
+           SET status = 'completed', updated_at = CURRENT_TIMESTAMP
+           WHERE id = $1 AND status = 'verified'
+           RETURNING *`,
+          [deal.id]
+        );
+      });
+
+      // Release funds AFTER status update (idempotent operation)
+      // If this fails, status is already 'completed', so we can retry release
       const txHash = await TONService.releaseFunds(
         deal.escrow_address,
         deal.channel_owner_wallet_address,
         deal.price_ton.toString()
       );
-
-      // Update deal status to completed
-      await DealModel.markCompleted(deal.id);
 
       logger.info(`Funds released for Deal #${deal.id}`, {
         dealId: deal.id,

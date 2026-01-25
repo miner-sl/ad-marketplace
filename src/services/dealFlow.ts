@@ -2,99 +2,172 @@ import { DealModel } from '../models/Deal';
 import { ChannelModel } from '../models/Channel';
 import { TONService } from './ton';
 import { CreativeService } from './creative';
-import db from '../db/connection';
+import { withTx } from '../utils/transaction';
 
 export class DealFlowService {
   /**
-   * Accept deal (channel owner accepts advertiser request)
+   * Initialize/create a new deal
    */
-  static async acceptDeal(dealId: number, channelOwnerId: number, telegramUserId?: number): Promise<any> {
-    const deal = await DealModel.findById(dealId);
-    if (!deal || deal.channel_owner_id !== channelOwnerId) {
-      throw new Error('Deal not found or unauthorized');
-    }
-
-    // Verify user is still admin of the channel (for financial operations)
-    if (telegramUserId) {
-      const isAdmin = await ChannelModel.verifyAdminStatus(
-        deal.channel_id,
-        channelOwnerId,
-        telegramUserId
-      );
-      if (!isAdmin) {
-        throw new Error('You are no longer an admin of this channel');
-      }
-    }
-
-    if (deal.status !== 'pending' && deal.status !== 'negotiating') {
-      throw new Error(`Cannot accept deal in status: ${deal.status}`);
-    }
-
-    // Get channel owner wallet address
-    const channelOwner = await db.query('SELECT wallet_address FROM users WHERE id = $1', [channelOwnerId]);
-    const ownerWalletAddress = channelOwner.rows[0]?.wallet_address;
-
-    if (!ownerWalletAddress) {
-      throw new Error('Channel owner wallet address not set. Please set your wallet address first.');
-    }
-
-    // Generate escrow address for this deal
-    const escrowAddress = await TONService.generateEscrowAddress(dealId);
-
-    // Update deal with escrow address and owner wallet address
-    await db.query(
-      `UPDATE deals 
-       SET escrow_address = $1, channel_owner_wallet_address = $2, status = 'payment_pending', updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3
-       RETURNING *`,
-      [escrowAddress, ownerWalletAddress, dealId]
-    );
-
-    const updated = await DealModel.findById(dealId);
-    
-    await db.query(
-      `INSERT INTO deal_messages (deal_id, sender_id, message_text)
-       VALUES ($1, $2, $3)`,
-      [dealId, channelOwnerId, 'Deal accepted. Waiting for payment.']
-    );
-
-    return updated;
+  static async initializeDeal(data: {
+    deal_type: 'listing' | 'campaign';
+    listing_id?: number;
+    campaign_id?: number;
+    channel_id: number;
+    channel_owner_id: number;
+    advertiser_id: number;
+    ad_format: string;
+    price_ton: number;
+    timeout_hours?: number;
+  }): Promise<any> {
+    return await DealModel.create(data);
   }
 
   /**
-   * Advertiser confirms payment (manual confirmation)
+   * Schedule post for a deal
    */
-  static async confirmPayment(dealId: number, txHash: string): Promise<any> {
+  static async schedulePost(dealId: number, postTime: Date): Promise<any> {
     const deal = await DealModel.findById(dealId);
     if (!deal) {
       throw new Error('Deal not found');
     }
 
-    // Verify payment on blockchain
-    if (deal.escrow_address) {
-      const paymentCheck = await TONService.checkPayment(
-        deal.escrow_address,
-        deal.price_ton.toString()
-      );
-      
-      if (!paymentCheck.received) {
-        throw new Error('Payment not confirmed on blockchain');
-      }
+    if (deal.status !== 'paid' && deal.status !== 'scheduled') {
+      throw new Error(`Cannot schedule post in status: ${deal.status}`);
     }
 
-    const updated = await DealModel.confirmPayment(dealId, txHash);
-    
-    // Update status: if scheduled_post_time is set, move to 'scheduled', otherwise 'paid'
-    const finalStatus = updated.scheduled_post_time ? 'scheduled' : 'paid';
-    await DealModel.updateStatus(dealId, finalStatus);
+    return await DealModel.schedulePost(dealId, postTime);
+  }
 
-    await db.query(
-      `INSERT INTO deal_messages (deal_id, sender_id, message_text)
-       VALUES ($1, $2, $3)`,
-      [dealId, deal.advertiser_id, `Payment confirmed: ${txHash}`]
-    );
+  /**
+   * Accept deal (channel owner accepts advertiser request)
+   * Uses transaction to ensure atomicity
+   */
+  static async acceptDeal(dealId: number, channelOwnerId: number, telegramUserId?: number): Promise<any> {
+    return await withTx(async (client) => {
+      // Lock deal row to prevent race conditions
+      const dealResult = await client.query(
+        `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
+        [dealId]
+      );
+      
+      const deal = dealResult.rows[0];
+      if (!deal || deal.channel_owner_id !== channelOwnerId) {
+        throw new Error('Deal not found or unauthorized');
+      }
 
-    return updated;
+      // Verify user is still admin of the channel (for financial operations)
+      if (telegramUserId) {
+        const isAdmin = await ChannelModel.verifyAdminStatus(
+          deal.channel_id,
+          channelOwnerId,
+          telegramUserId
+        );
+        if (!isAdmin) {
+          throw new Error('You are no longer an admin of this channel');
+        }
+      }
+
+      // Check status atomically within transaction
+      if (deal.status !== 'pending' && deal.status !== 'negotiating') {
+        throw new Error(`Cannot accept deal in status: ${deal.status}`);
+      }
+
+      // Get channel owner wallet address
+      const channelOwner = await client.query('SELECT wallet_address FROM users WHERE id = $1', [channelOwnerId]);
+      const ownerWalletAddress = channelOwner.rows[0]?.wallet_address;
+
+      if (!ownerWalletAddress) {
+        throw new Error('Channel owner wallet address not set. Please set your wallet address first.');
+      }
+
+      // Generate escrow address for this deal
+      const escrowAddress = await TONService.generateEscrowAddress(dealId);
+
+      // Update deal with escrow address and owner wallet address (atomic)
+      const updateResult = await client.query(
+        `UPDATE deals 
+         SET escrow_address = $1, channel_owner_wallet_address = $2, status = 'payment_pending', updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3 AND status IN ('pending', 'negotiating')
+         RETURNING *`,
+        [escrowAddress, ownerWalletAddress, dealId]
+      );
+
+      if (updateResult.rows.length === 0) {
+        throw new Error('Deal status changed during processing');
+      }
+
+      const updated = updateResult.rows[0];
+      
+      // Insert message in same transaction
+      await client.query(
+        `INSERT INTO deal_messages (deal_id, sender_id, message_text)
+         VALUES ($1, $2, $3)`,
+        [dealId, channelOwnerId, 'Deal accepted. Waiting for payment.']
+      );
+
+      return updated;
+    });
+  }
+
+  /**
+   * Advertiser confirms payment (manual confirmation)
+   * Uses atomic UPDATE to prevent race conditions and double processing
+   */
+  static async confirmPayment(dealId: number, txHash: string): Promise<any> {
+    return await withTx(async (client) => {
+      // Lock deal row to prevent race conditions
+      const dealResult = await client.query(
+        `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
+        [dealId]
+      );
+      
+      const deal = dealResult.rows[0];
+      if (!deal) {
+        throw new Error('Deal not found');
+      }
+
+      // Check status atomically
+      if (deal.status !== 'payment_pending') {
+        throw new Error(`Cannot confirm payment in status: ${deal.status}`);
+      }
+
+      // Verify payment on blockchain
+      if (deal.escrow_address) {
+        const paymentCheck = await TONService.checkPayment(
+          deal.escrow_address,
+          deal.price_ton.toString()
+        );
+        
+        if (!paymentCheck.received) {
+          throw new Error('Payment not confirmed on blockchain');
+        }
+      }
+
+      // Atomic update: set payment info and status in one query
+      const finalStatus = deal.scheduled_post_time ? 'scheduled' : 'paid';
+      const updateResult = await client.query(
+        `UPDATE deals 
+         SET status = $1, payment_tx_hash = $2, payment_confirmed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3 AND status = 'payment_pending'
+         RETURNING *`,
+        [finalStatus, txHash, dealId]
+      );
+
+      if (updateResult.rows.length === 0) {
+        throw new Error('Payment already confirmed or deal status changed');
+      }
+
+      const updated = updateResult.rows[0];
+
+      // Insert message in same transaction
+      await client.query(
+        `INSERT INTO deal_messages (deal_id, sender_id, message_text)
+         VALUES ($1, $2, $3)`,
+        [dealId, deal.advertiser_id, `Payment confirmed: ${txHash}`]
+      );
+
+      return updated;
+    });
   }
 
   /**
@@ -104,81 +177,139 @@ export class DealFlowService {
     contentType: string;
     contentData: Record<string, any>;
   }): Promise<any> {
-    const deal = await DealModel.findById(dealId);
-    if (!deal) {
-      throw new Error('Deal not found');
-    }
+    return await withTx(async (client) => {
+      // Lock deal row
+      const dealResult = await client.query(
+        `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
+        [dealId]
+      );
 
-    if (deal.status !== 'paid') {
-      throw new Error(`Cannot submit creative in status: ${deal.status}`);
-    }
+      const deal = dealResult.rows[0];
+      if (!deal) {
+        throw new Error('Deal not found');
+      }
 
-    await CreativeService.create({
-      deal_id: dealId,
-      submitted_by: submittedBy,
-      content_type: content.contentType,
-      content_data: content.contentData
+      if (deal.status !== 'paid') {
+        throw new Error(`Cannot submit creative in status: ${deal.status}`);
+      }
+
+      // Create creative (this should also use transaction, but for now we'll do it here)
+      await CreativeService.create({
+        deal_id: dealId,
+        submitted_by: submittedBy,
+        content_type: content.contentType,
+        content_data: content.contentData
+      });
+
+      await CreativeService.submit(dealId);
+      
+      // Update deal status atomically
+      const updateResult = await client.query(
+        `UPDATE deals 
+         SET status = 'creative_submitted', updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 AND status = 'paid'
+         RETURNING *`,
+        [dealId]
+      );
+
+      if (updateResult.rows.length === 0) {
+        throw new Error('Deal status changed during creative submission');
+      }
+
+      return updateResult.rows[0];
     });
-
-    await CreativeService.submit(dealId);
-    await DealModel.updateStatus(dealId, 'creative_submitted');
-
-    return await DealModel.findById(dealId);
   }
 
   /**
    * Advertiser approves creative
    */
   static async approveCreative(dealId: number, advertiserId: number): Promise<any> {
-    const deal = await DealModel.findById(dealId);
-    if (!deal || deal.advertiser_id !== advertiserId) {
-      throw new Error('Deal not found or unauthorized');
-    }
+    return await withTx(async (client) => {
+      // Lock deal row
+      const dealResult = await client.query(
+        `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
+        [dealId]
+      );
 
-    if (deal.status !== 'creative_submitted') {
-      throw new Error(`Cannot approve creative in status: ${deal.status}`);
-    }
+      const deal = dealResult.rows[0];
+      if (!deal || deal.advertiser_id !== advertiserId) {
+        throw new Error('Deal not found or unauthorized');
+      }
 
-    await CreativeService.approve(dealId);
-    
-    // Check if payment was already confirmed by checking payment_confirmed_at
-    // If payment confirmed, keep paid status, otherwise move to creative_approved
-    if (deal.payment_confirmed_at) {
-      // Payment already confirmed, keep paid status
-      await DealModel.updateStatus(dealId, 'paid');
-    } else {
-      // Payment not yet confirmed, move to creative_approved
-      await DealModel.updateStatus(dealId, 'creative_approved');
-    }
+      if (deal.status !== 'creative_submitted') {
+        throw new Error(`Cannot approve creative in status: ${deal.status}`);
+      }
 
-    await db.query(
-      `INSERT INTO deal_messages (deal_id, sender_id, message_text)
-       VALUES ($1, $2, $3)`,
-      [dealId, advertiserId, 'Creative approved']
-    );
+      await CreativeService.approve(dealId);
+      
+      // Check if payment was already confirmed by checking payment_confirmed_at
+      // If payment confirmed, keep paid status, otherwise move to creative_approved
+      const finalStatus = deal.payment_confirmed_at ? 'paid' : 'creative_approved';
+      
+      // Atomic update
+      const updateResult = await client.query(
+        `UPDATE deals 
+         SET status = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2 AND status = 'creative_submitted'
+         RETURNING *`,
+        [finalStatus, dealId]
+      );
 
-    return await DealModel.findById(dealId);
+      if (updateResult.rows.length === 0) {
+        throw new Error('Deal status changed during creative approval');
+      }
+
+      // Insert message in same transaction
+      await client.query(
+        `INSERT INTO deal_messages (deal_id, sender_id, message_text)
+         VALUES ($1, $2, $3)`,
+        [dealId, advertiserId, 'Creative approved']
+      );
+
+      return updateResult.rows[0];
+    });
   }
 
   /**
    * Request revision of creative
    */
   static async requestRevision(dealId: number, requestedBy: number, notes: string): Promise<any> {
-    const deal = await DealModel.findById(dealId);
-    if (!deal) {
-      throw new Error('Deal not found');
-    }
+    return await withTx(async (client) => {
+      // Lock deal row
+      const dealResult = await client.query(
+        `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
+        [dealId]
+      );
 
-    await CreativeService.requestRevision(dealId, notes);
-    await DealModel.updateStatus(dealId, 'negotiating');
+      const deal = dealResult.rows[0];
+      if (!deal) {
+        throw new Error('Deal not found');
+      }
 
-    await db.query(
-      `INSERT INTO deal_messages (deal_id, sender_id, message_text)
-       VALUES ($1, $2, $3)`,
-      [dealId, requestedBy, `Revision requested: ${notes}`]
-    );
+      await CreativeService.requestRevision(dealId, notes);
+      
+      // Atomic update
+      const updateResult = await client.query(
+        `UPDATE deals 
+         SET status = 'negotiating', updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1
+         RETURNING *`,
+        [dealId]
+      );
 
-    return await DealModel.findById(dealId);
+      if (updateResult.rows.length === 0) {
+        throw new Error(`Deal #${dealId} not found`);
+      }
+
+      // Insert message in same transaction
+      await client.query(
+        `INSERT INTO deal_messages (deal_id, sender_id, message_text)
+         VALUES ($1, $2, $3)`,
+        [dealId, requestedBy, `Revision requested: ${notes}`]
+      );
+
+      return updateResult.rows[0];
+    });
   }
 
   /**

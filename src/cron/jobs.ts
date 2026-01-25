@@ -9,6 +9,7 @@ import db from '../db/connection';
 import { BotHandlers } from '../bot/handlers';
 import { Context } from 'telegraf';
 import logger from '../utils/logger';
+import { withTx } from '../utils/transaction';
 
 export class CronJobs {
   private static jobs: cron.ScheduledTask[] = [];
@@ -33,6 +34,9 @@ export class CronJobs {
 
     // Refresh channel stats daily at 2 AM
     this.startStatsRefreshJob();
+
+    // Auto-release funds for verified deals (buyer didn't confirm)
+    this.startAutoReleaseJob();
 
     logger.info(`Started ${this.jobs.length} cron job(s)`);
   }
@@ -64,6 +68,22 @@ export class CronJobs {
 
         for (const deal of deals.rows) {
           try {
+            // Use atomic UPDATE to prevent double processing
+            // Check if deal is still in payment_pending status
+            const dealCheck = await db.query(
+              `SELECT status FROM deals WHERE id = $1`,
+              [deal.id]
+            );
+
+            if (dealCheck.rows.length === 0 || dealCheck.rows[0].status !== 'payment_pending') {
+              // Already processed by another process
+              logger.debug(`Deal #${deal.id} already processed, skipping`, { 
+                dealId: deal.id, 
+                currentStatus: dealCheck.rows[0]?.status 
+              });
+              continue;
+            }
+
             const paymentCheck = await TONService.checkPayment(
               deal.escrow_address,
               deal.price_ton.toString()
@@ -72,18 +92,18 @@ export class CronJobs {
             if (paymentCheck.received) {
               logger.info(`Payment detected for Deal #${deal.id}`, { dealId: deal.id, amount: paymentCheck.amount });
 
-              // Confirm payment
+              // Confirm payment (atomic operation with status check inside)
               const txHash = paymentCheck.txHash || `auto_${Date.now()}`;
-              await DealFlowService.confirmPayment(deal.id, txHash);
-
-              // Update status: if scheduled_post_time is set, move to 'scheduled', otherwise 'paid'
-              const updatedDeal = await DealModel.findById(deal.id);
-              if (updatedDeal?.scheduled_post_time) {
-                await DealModel.updateStatus(deal.id, 'scheduled');
-                logger.info(`Deal #${deal.id} moved to 'scheduled' status`, { dealId: deal.id });
-              } else {
-                await DealModel.updateStatus(deal.id, 'paid');
-                logger.info(`Deal #${deal.id} moved to 'paid' status`, { dealId: deal.id });
+              try {
+                await DealFlowService.confirmPayment(deal.id, txHash);
+                logger.info(`Deal #${deal.id} payment confirmed`, { dealId: deal.id, txHash });
+              } catch (error: any) {
+                // If already confirmed, skip
+                if (error.message.includes('already confirmed') || error.message.includes('status changed')) {
+                  logger.debug(`Deal #${deal.id} payment already confirmed`, { dealId: deal.id });
+                  continue;
+                }
+                throw error;
               }
 
               // Notify advertiser
@@ -529,5 +549,108 @@ export class CronJobs {
 
     this.jobs.push(job);
     logger.info('Stats refresh job started (runs daily at 2 AM)');
+  }
+
+  /**
+   * Auto-release funds for verified deals where buyer didn't confirm
+   * Runs every 6 hours
+   * If buyer doesn't confirm within VERIFIED_TIMEOUT_HOURS (default 7 days),
+   * automatically release funds to seller
+   */
+  private static startAutoReleaseJob() {
+    const job = cron.schedule('0 */6 * * *', async () => {
+      try {
+        logger.debug('Checking for verified deals requiring auto-release...');
+
+        const deals = await DealModel.findVerifiedDealsForAutoRelease();
+
+        for (const deal of deals) {
+          try {
+            if (!deal.escrow_address || !deal.channel_owner_wallet_address) {
+              logger.warn(`Deal #${deal.id}: Missing escrow or wallet address`, { dealId: deal.id });
+              continue;
+            }
+
+            // Use atomic UPDATE to prevent double processing
+            try {
+              await withTx(async (client) => {
+                // Lock and check status
+                const dealCheck = await client.query(
+                  `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
+                  [deal.id]
+                );
+
+                if (dealCheck.rows.length === 0 || dealCheck.rows[0].status !== 'verified') {
+                  logger.debug(`Deal #${deal.id} already processed`, { dealId: deal.id });
+                  // Return early - transaction will be rolled back
+                  return;
+                }
+
+                // Update status first
+                await client.query(
+                  `UPDATE deals 
+                   SET status = 'completed', updated_at = CURRENT_TIMESTAMP
+                   WHERE id = $1 AND status = 'verified'
+                   RETURNING *`,
+                  [deal.id]
+                );
+              });
+
+              // Release funds
+              const txHash = await TONService.releaseFunds(
+                deal.escrow_address,
+                deal.channel_owner_wallet_address,
+                deal.price_ton.toString()
+              );
+
+              logger.info(`Auto-released funds for Deal #${deal.id}`, {
+                dealId: deal.id,
+                txHash,
+                reason: 'Buyer did not confirm within timeout period',
+              });
+
+              // Notify both parties
+              const advertiser = await UserModel.findById(deal.advertiser_id);
+              const channelOwner = await UserModel.findById(deal.channel_owner_id);
+
+              if (advertiser) {
+                await TelegramService.bot.sendMessage(
+                  advertiser.telegram_id,
+                  `⏰ Deal #${deal.id} Auto-Completed\n\n` +
+                  `You did not confirm publication within the timeout period.\n` +
+                  `Funds have been automatically released to the channel owner.\n\n` +
+                  `Use /deal ${deal.id} to view details.`
+                );
+              }
+
+              if (channelOwner) {
+                await TelegramService.bot.sendMessage(
+                  channelOwner.telegram_id,
+                  `✅ Deal #${deal.id} Auto-Completed\n\n` +
+                  `The advertiser did not confirm publication within the timeout period.\n` +
+                  `Funds (${deal.price_ton} TON) have been automatically released to your wallet.\n\n` +
+                  `Transaction: ${txHash}\n\n` +
+                  `Use /deal ${deal.id} to view details.`
+                );
+              }
+            } catch (dbError: any) {
+              // Transaction already handled by withTx
+              throw dbError;
+            }
+          } catch (error: any) {
+            logger.error(`Error auto-releasing funds for Deal #${deal.id}`, {
+              dealId: deal.id,
+              error: error.message,
+              stack: error.stack,
+            });
+          }
+        }
+      } catch (error: any) {
+        logger.error('Error in auto-release job', { error: error.message, stack: error.stack });
+      }
+    });
+
+    this.jobs.push(job);
+    logger.info('Auto-release job started (runs every 6 hours)');
   }
 }

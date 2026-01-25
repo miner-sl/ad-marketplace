@@ -1,4 +1,5 @@
 import db from '../db/connection';
+import { withTx } from '../utils/transaction';
 
 export interface Channel {
   id: number;
@@ -71,13 +72,20 @@ export class ChannelModel {
   }
 
   static async updateBotAdmin(channelId: number, botAdminId: number): Promise<Channel> {
-    const result = await db.query(
-      `UPDATE channels SET bot_admin_id = $1, is_verified = TRUE, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2
-       RETURNING *`,
-      [botAdminId, channelId]
-    );
-    return result.rows[0];
+    return await withTx(async (client) => {
+      const result = await client.query(
+        `UPDATE channels SET bot_admin_id = $1, is_verified = TRUE, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2
+         RETURNING *`,
+        [botAdminId, channelId]
+      );
+      
+      if (result.rows.length === 0) {
+        throw new Error(`Channel #${channelId} not found`);
+      }
+      
+      return result.rows[0];
+    });
   }
 
   static async saveStats(channelId: number, stats: {
@@ -115,15 +123,22 @@ export class ChannelModel {
   }
 
   static async setPricing(channelId: number, format: string, priceTon: number): Promise<ChannelPricing> {
-    const result = await db.query(
-      `INSERT INTO channel_pricing (channel_id, ad_format, price_ton)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (channel_id, ad_format) 
-       DO UPDATE SET price_ton = $3, updated_at = CURRENT_TIMESTAMP
-       RETURNING *`,
-      [channelId, format, priceTon]
-    );
-    return result.rows[0];
+    return await withTx(async (client) => {
+      const result = await client.query(
+        `INSERT INTO channel_pricing (channel_id, ad_format, price_ton)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (channel_id, ad_format) 
+         DO UPDATE SET price_ton = $3, updated_at = CURRENT_TIMESTAMP
+         RETURNING *`,
+        [channelId, format, priceTon]
+      );
+      
+      if (result.rows.length === 0) {
+        throw new Error(`Failed to set pricing for Channel #${channelId}, format: ${format}`);
+      }
+      
+      return result.rows[0];
+    });
   }
 
   static async getPricing(channelId: number): Promise<ChannelPricing[]> {

@@ -55,8 +55,11 @@ export class DealModel {
     timeout_hours?: number;
   }): Promise<Deal> {
     const timeoutHours = data.timeout_hours || 72;
+    // Create date in UTC
     const timeoutAt = new Date();
-    timeoutAt.setHours(timeoutAt.getHours() + timeoutHours);
+    timeoutAt.setUTCHours(timeoutAt.getUTCHours() + timeoutHours);
+    // Convert to ISO string to ensure UTC format
+    const utcTimeoutAt = new Date(timeoutAt.toISOString());
 
     const result = await db.query(
       `INSERT INTO deals (
@@ -74,7 +77,7 @@ export class DealModel {
         data.ad_format,
         data.price_ton,
         data.escrow_address,
-        timeoutAt,
+        utcTimeoutAt,
       ]
     );
     return result.rows[0];
@@ -117,24 +120,28 @@ export class DealModel {
   }
 
   static async schedulePost(id: number, postTime: Date): Promise<Deal> {
+    // Ensure date is in UTC (convert to ISO string and back to ensure UTC)
+    const utcDate = new Date(postTime.toISOString());
     const result = await db.query(
       `UPDATE deals 
        SET status = 'scheduled', scheduled_post_time = $1, updated_at = CURRENT_TIMESTAMP
        WHERE id = $2
        RETURNING *`,
-      [postTime, id]
+      [utcDate, id]
     );
     return result.rows[0];
   }
 
   static async recordPost(id: number, messageId: number, verificationUntil: Date): Promise<Deal> {
+    // Ensure date is in UTC (convert to ISO string and back to ensure UTC)
+    const utcDate = new Date(verificationUntil.toISOString());
     const result = await db.query(
       `UPDATE deals 
        SET status = 'posted', actual_post_time = CURRENT_TIMESTAMP, 
            post_message_id = $1, post_verification_until = $2, updated_at = CURRENT_TIMESTAMP
        WHERE id = $3
        RETURNING *`,
-      [messageId, verificationUntil, id]
+      [messageId, utcDate, id]
     );
     return result.rows[0];
   }

@@ -6,6 +6,8 @@ import { DealFlowService } from '../services/dealFlow';
 import { ChannelModel } from '../models/Channel';
 import { UserModel } from '../models/User';
 import db from '../db/connection';
+import { BotHandlers } from '../bot/handlers';
+import { Context } from 'telegraf';
 
 export class CronJobs {
   private static jobs: cron.ScheduledTask[] = [];
@@ -125,7 +127,7 @@ export class CronJobs {
    * Runs every 5 minutes
    */
   private static startAutoPostJob() {
-    const job = cron.schedule('*/5 * * * *', async () => {
+    const job = cron.schedule('*/1 * * * *', async () => {
       try {
         console.log('📤 Checking for scheduled posts...');
 
@@ -133,12 +135,44 @@ export class CronJobs {
           `SELECT * FROM deals 
            WHERE status IN ('scheduled', 'paid', 'creative_approved')
            AND scheduled_post_time IS NOT NULL
-           AND scheduled_post_time <= CURRENT_TIMESTAMP
+           AND scheduled_post_time <= NOW()
            ORDER BY scheduled_post_time ASC`
         );
 
         for (const deal of deals.rows) {
+          console.log({ deal });
           try {
+            // Double-check that scheduled_post_time has passed (additional validation)
+            if (!deal.scheduled_post_time) {
+              console.log(`⏭️ Skipping Deal #${deal.id}: No scheduled_post_time`);
+              continue;
+            }
+
+            // Parse scheduled_post_time (format: 2026-01-25 07:10:27.000000)
+            const scheduledTime = new Date(deal.scheduled_post_time);
+            const now = new Date();
+            
+            // Validate that scheduled time is a valid date
+            if (isNaN(scheduledTime.getTime())) {
+              console.error(`❌ Deal #${deal.id}: Invalid scheduled_post_time format: ${deal.scheduled_post_time}`);
+              continue;
+            }
+            
+            if (scheduledTime > now) {
+              const diffMs = scheduledTime.getTime() - now.getTime();
+              const minutesUntilPublish = Math.ceil(diffMs / (1000 * 60));
+              const secondsUntilPublish = Math.ceil(diffMs / 1000);
+              console.log(`⏭️ Skipping Deal #${deal.id}: Scheduled time hasn't arrived yet`);
+              console.log(`   Scheduled: ${scheduledTime.toISOString()} (${deal.scheduled_post_time})`);
+              console.log(`   Now: ${now.toISOString()}`);
+              console.log(`   Remaining: ${minutesUntilPublish} minutes (${secondsUntilPublish} seconds)`);
+              continue;
+            }
+
+            console.log(`✅ Deal #${deal.id}: Scheduled time has passed. Publishing...`);
+            console.log(`   Scheduled: ${scheduledTime.toISOString()} (${deal.scheduled_post_time})`);
+            console.log(`   Now: ${now.toISOString()}`);
+
             // Check if creative is approved
             const creative = await db.query(
               `SELECT * FROM creatives 
@@ -148,10 +182,10 @@ export class CronJobs {
               [deal.id]
             );
 
-            if (creative.rows.length === 0) {
-              console.log(`⏭️ Skipping Deal #${deal.id}: No approved creative`);
-              continue;
-            }
+            // if (creative.rows.length === 0) {
+            //   console.log(`⏭️ Skipping Deal #${deal.id}: No approved creative`);
+            //   continue;
+            // }
 
             // Get channel info
             const channel = await db.query(
@@ -164,60 +198,30 @@ export class CronJobs {
               continue;
             }
 
-            const channelId = channel.rows[0].telegram_channel_id;
-            const creativeData = creative.rows[0].content_data;
-
-            // Post creative to channel
-            let messageId: number | undefined;
-            try {
-              if (creativeData.text) {
-                const sentMessage = await TelegramService.bot.sendMessage(
-                  channelId,
-                  creativeData.text,
-                  { parse_mode: creativeData.parse_mode || undefined }
-                );
-                messageId = sentMessage.message_id;
-              } else {
-                console.log(`⚠️ Deal #${deal.id}: Creative has no text content`);
-                continue;
-              }
-            } catch (error: any) {
-              console.error(`❌ Error posting Deal #${deal.id}:`, error.message);
+            // Call handlePublishPost for this deal
+            // Get channel owner to create proper mock context
+            const channelOwner = await UserModel.findById(deal.channel_owner_id);
+            if (!channelOwner) {
+              console.log(`❌ Deal #${deal.id}: Channel owner not found`);
               continue;
             }
 
-            if (messageId) {
-              // Record post
-              const verificationUntil = new Date();
-              verificationUntil.setHours(verificationUntil.getHours() + 24); // 24h verification period
-
-              await DealModel.recordPost(deal.id, messageId, verificationUntil);
-
-              console.log(`✅ Posted Deal #${deal.id} to channel ${channelId}`);
-
-              // Notify both parties
-              const advertiser = await UserModel.findById(deal.advertiser_id);
-              const channelOwner = await UserModel.findById(deal.channel_owner_id);
-
-              if (advertiser) {
-                await TelegramService.bot.sendMessage(
-                  advertiser.telegram_id,
-                  `📤 Post published for Deal #${deal.id}!\n\n` +
-                  `The post will be verified for 24 hours.\n` +
-                  `After verification, funds will be released.\n\n` +
-                  `Use /deal ${deal.id} to view details.`
-                );
+            // Create a minimal mock context for the handler
+            const mockCtx = {
+              from: { id: channelOwner.telegram_id },
+              reply: async (text: string) => {
+                console.log(`[Auto-post] ${text}`);
+                return Promise.resolve({} as any);
               }
+            } as any as Context;
 
-              if (channelOwner) {
-                await TelegramService.bot.sendMessage(
-                  channelOwner.telegram_id,
-                  `📤 Post published for Deal #${deal.id}!\n\n` +
-                  `The post will be verified for 24 hours.\n` +
-                  `After verification, funds will be released to you.\n\n` +
-                  `Use /deal ${deal.id} to view details.`
-                );
-              }
+            try {
+              await BotHandlers.handlePublishPost(mockCtx, deal.id);
+              console.log(`✅ Auto-published Deal #${deal.id} via handlePublishPost`);
+            } catch (error: any) {
+              console.error(`❌ Error calling handlePublishPost for Deal #${deal.id}:`, error.message);
+              // Re-throw to be caught by outer catch block
+              throw error;
             }
           } catch (error: any) {
             console.error(`❌ Error auto-posting Deal #${deal.id}:`, error.message);

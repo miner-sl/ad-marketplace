@@ -595,7 +595,7 @@ export class BotHandlers {
     const buttons: any[] = [];
 
     // Add View Post button if post is published
-    if ((deal.status === 'posted' || deal.status === 'completed') && deal.post_message_id && channel) {
+    if ((deal.status === 'posted' || deal.status === 'verified') && deal.post_message_id && channel) {
       const channelLinkData = this.getChannelLink(channel);
       if (channelLinkData?.channelLink) {
         const postLink = `${channelLinkData.channelLink}/${deal.post_message_id}`;
@@ -1856,8 +1856,9 @@ export class BotHandlers {
 
       if (messageId) {
         // Record post
+        // Create date in UTC
         const verificationUntil = new Date();
-        verificationUntil.setHours(verificationUntil.getHours() + 24); // 24h verification period
+        verificationUntil.setUTCHours(verificationUntil.getUTCHours() + 24); // 24h verification period in UTC
 
         await DealModel.recordPost(deal.id, messageId, verificationUntil);
         await DealModel.updateStatus(deal.id, 'posted');

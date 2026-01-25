@@ -281,6 +281,13 @@ bot.on('callback_query', async (ctx) => {
     return;
   }
 
+  // Handle send to draft button
+  if (data.startsWith('send_to_draft_')) {
+    const dealId = parseInt(data.split('_')[3]);
+    await BotHandlers.handleSendToDraft(ctx, dealId);
+    return;
+  }
+
   // Handle channel actions
   if (data.startsWith('refresh_stats_')) {
     const channelId = parseInt(data.split('_')[2]);
@@ -446,6 +453,12 @@ bot.on('text', async (ctx) => {
   // Check if user is waiting to submit revision notes
   if (BotHandlers.isWaitingForRevisionNotes(ctx.from!.id)) {
     await BotHandlers.handleRevisionNotesSubmission(ctx, text);
+    return;
+  }
+
+  // Check if user is waiting to submit draft comment
+  if (BotHandlers.isWaitingForDraftComment(ctx.from!.id)) {
+    await BotHandlers.handleDraftCommentSubmission(ctx, text);
     return;
   }
 

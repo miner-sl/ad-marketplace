@@ -353,6 +353,12 @@ export class BotHandlers {
     userId: number;
   }>();
 
+  // Store pending draft comments (for send to draft)
+  private static pendingDraftComments = new Map<number, {
+    dealId: number;
+    userId: number;
+  }>();
+
   /**
    * Check if user is waiting for brief submission
    */
@@ -375,6 +381,13 @@ export class BotHandlers {
   }
 
   /**
+   * Check if user is waiting for draft comment submission
+   */
+  static isWaitingForDraftComment(telegramUserId: number): boolean {
+    return this.pendingDraftComments.has(telegramUserId);
+  }
+
+  /**
    * Handle cancel pending request
    */
   static async handleCancelPendingRequest(ctx: Context) {
@@ -392,6 +405,9 @@ export class BotHandlers {
     } else if (this.pendingRevisionNotes.has(ctx.from!.id)) {
       this.pendingRevisionNotes.delete(ctx.from!.id);
       await ctx.reply('❌ Revision notes cancelled.');
+    } else if (this.pendingDraftComments.has(ctx.from!.id)) {
+      this.pendingDraftComments.delete(ctx.from!.id);
+      await ctx.reply('❌ Draft comment cancelled.');
     } else {
       await ctx.reply('No pending operation to cancel.');
     }
@@ -537,13 +553,35 @@ export class BotHandlers {
     
     dealInfo += `\n💬 Messages: ${messages.rows.length}\n`;
 
-    if (creative.rows[0]) {
-      dealInfo += `\n📝 Creative: ${creative.rows[0].status}\n`;
+    // Show brief (first message) if available
+    if (messages.rows.length > 0) {
+      const briefMessage = messages.rows[0];
+      const briefText = briefMessage.message_text;
+      const briefPreviewLength = 300;
+      const briefPreview = briefText.length > briefPreviewLength 
+        ? briefText.substring(0, briefPreviewLength) + '...' 
+        : briefText;
+      dealInfo += `\n📄 Brief:\n${this.escapeMarkdown(briefPreview)}\n`;
     }
 
+    console.log(creative.rows);
+    if (creative.rows[0]) {
+      const creativeData = creative.rows[0].content_data;
+      dealInfo += `\n📝 Creative Status: ${creative.rows[0].status}\n`;
+      
+      // Show creative text if available
+      if (creativeData && creativeData.text) {
+        const creativeText = creativeData.text;
+        const previewLength = 200;
+        const creativePreview = creativeText.length > previewLength 
+          ? creativeText.substring(0, previewLength) + '...' 
+          : creativeText;
+        dealInfo += `\n📄 Creative Text:\n${this.escapeMarkdown(creativePreview)}\n`;
+      }
+    }
     // Show recent messages
     if (messages.rows.length > 0) {
-      dealInfo += `\n📨 Recent messages: ${messages.rows.length}\n`;
+      // dealInfo += `\n📨 Recent messages: ${messages.rows.length}\n`;
     //   messages.rows.slice(-3).forEach((msg: any) => {
     //     const sender = msg.sender_id === deal.channel_owner_id ? 'Channel Owner' : 'Advertiser';
     //     // Escape user content to prevent Markdown parsing errors
@@ -558,7 +596,11 @@ export class BotHandlers {
 
     if (deal.status === 'pending' && isChannelOwner) {
       buttons.push([
-        Markup.button.callback('✅ Accept Deal', `deal_action_${deal.id}_accept_${user.id}`)
+        Markup.button.callback('✅ Accept', `deal_action_${deal.id}_accept_${user.id}`),
+        Markup.button.callback('📝 Draft', `send_to_draft_${deal.id}`)
+      ]);
+      buttons.push([
+        Markup.button.callback('❌ Decline', `decline_request_${deal.id}`)
       ]);
     }
 
@@ -737,6 +779,53 @@ export class BotHandlers {
     );
 
     this.pendingDealRequests.delete(ctx.from!.id);
+
+    // Notify channel owner about new request
+    const channelOwner = await UserModel.findById(deal.channel_owner_id);
+    if (channelOwner) {
+      // Get channel info
+      const channelInfo = await db.query(
+        'SELECT title, username FROM channels WHERE id = $1',
+        [deal.channel_id]
+      );
+      const channelData = channelInfo.rows[0];
+      const channelName = channelData?.title || channelData?.username || `Channel #${deal.channel_id}`;
+
+      // Get brief preview
+      const briefPreview = briefText.substring(0, 200);
+      const briefTextDisplay = briefText.length > 200 ? `${briefPreview}...` : briefPreview;
+
+      const notificationMessage = 
+        `📨 New Ad Request for Deal #${deal.id}!\n\n` +
+        `📺 Channel: ${channelName}\n` +
+        `💰 Price: ${deal.price_ton} TON\n` +
+        `📝 Format: ${deal.ad_format}\n\n` +
+        `📄 Brief:\n${briefTextDisplay}\n\n` +
+        `Please review and accept or decline the request.`;
+
+      const notificationButtons = {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '✅ Accept', callback_data: `accept_request_${deal.id}` },
+              { text: '❌ Decline', callback_data: `decline_request_${deal.id}` }
+            ],
+            [
+              { text: '📝 Send to Draft', callback_data: `send_to_draft_${deal.id}` }
+            ],
+            [
+              { text: '📋 View Deal', callback_data: `deal_details_${deal.id}` }
+            ]
+          ]
+        }
+      };
+
+      await TelegramService.bot.sendMessage(
+        channelOwner.telegram_id,
+        notificationMessage,
+        notificationButtons
+      );
+    }
 
     await ctx.reply(
       `✅ Request submitted!\n\n` +
@@ -1133,12 +1222,48 @@ export class BotHandlers {
 
     await DealModel.updateStatus(dealId, 'cancelled');
 
+    // Save cancellation message
+    await db.query(
+      `INSERT INTO deal_messages (deal_id, sender_id, message_text)
+       VALUES ($1, $2, $3)`,
+      [dealId, user.id, 'Deal declined by channel owner']
+    );
+
     // Notify advertiser
     const advertiser = await UserModel.findById(deal.advertiser_id);
     if (advertiser) {
+      // Get channel info for notification
+      const channelInfo = await db.query(
+        'SELECT title, username FROM channels WHERE id = $1',
+        [deal.channel_id]
+      );
+      const channelData = channelInfo.rows[0];
+      const channelName = channelData?.title || channelData?.username || `Channel #${deal.channel_id}`;
+
+      const notificationMessage = 
+        `❌ Deal #${dealId} Declined\n\n` +
+        `The channel owner has declined your ad request.\n\n` +
+        `📺 Channel: ${channelName}\n` +
+        `💰 Price: ${deal.price_ton} TON\n` +
+        `📝 Format: ${deal.ad_format}\n\n` +
+        `You can browse other channels or create a new request.\n\n` +
+        `Use /deal ${dealId} to view details.`;
+
+      const notificationButtons = {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '📋 View Deal', callback_data: `deal_details_${dealId}` },
+              { text: '📺 Browse Channels', callback_data: 'browse_channels' }
+            ]
+          ]
+        }
+      };
+
       await TelegramService.bot.sendMessage(
         advertiser.telegram_id,
-        `❌ Deal #${dealId} has been declined by the channel owner.\n\nUse /deal ${dealId} to view details.`
+        notificationMessage,
+        notificationButtons
       );
     }
 
@@ -1512,6 +1637,104 @@ export class BotHandlers {
 
     await CampaignModel.update(campaignId, { status: 'active' });
     await ctx.reply('▶️ Campaign reactivated.');
+  }
+
+  /**
+   * Handle send to draft (channel owner sends request back to advertiser with comments)
+   */
+  static async handleSendToDraft(ctx: Context, dealId: number) {
+    const user = await UserModel.findByTelegramId(ctx.from!.id);
+    if (!user) {
+      return ctx.reply('Please use /start first');
+    }
+
+    const deal = await DealModel.findById(dealId);
+    if (!deal) {
+      return ctx.reply('Deal not found');
+    }
+
+    if (deal.channel_owner_id !== user.id) {
+      return ctx.reply('You are not authorized to send this deal to draft');
+    }
+
+    if (deal.status !== 'pending') {
+      return ctx.reply(`Cannot send to draft. Deal status: ${deal.status}`);
+    }
+
+    // Set pending state for draft comment
+    this.pendingDraftComments.set(ctx.from!.id, { dealId, userId: user.id });
+
+    await ctx.reply(
+      `📝 Send to Draft for Deal #${dealId}\n\n` +
+      `Please send your comments/feedback for the advertiser:\n\n` +
+      `Or type /cancel to cancel.`
+    );
+  }
+
+  /**
+   * Handle draft comment submission
+   */
+  static async handleDraftCommentSubmission(ctx: Context, commentText: string) {
+    const user = await UserModel.findByTelegramId(ctx.from!.id);
+    if (!user) {
+      return ctx.reply('Please use /start first');
+    }
+
+    const pending = this.pendingDraftComments.get(ctx.from!.id);
+    if (!pending) {
+      return ctx.reply('No pending draft comment found.');
+    }
+
+    const deal = await DealModel.findById(pending.dealId);
+    if (!deal) {
+      return ctx.reply('Deal not found');
+    }
+
+    // Update deal status to negotiating
+    await DealModel.updateStatus(pending.dealId, 'negotiating');
+
+    // Save comment as message
+    await db.query(
+      `INSERT INTO deal_messages (deal_id, sender_id, message_text)
+       VALUES ($1, $2, $3)`,
+      [pending.dealId, pending.userId, `📝 Draft feedback: ${commentText}`]
+    );
+
+    this.pendingDraftComments.delete(ctx.from!.id);
+
+    // Notify advertiser
+    const advertiser = await UserModel.findById(deal.advertiser_id);
+    if (advertiser) {
+      const notificationMessage = 
+        `📝 Deal #${pending.dealId} Sent to Draft\n\n` +
+        `The channel owner has sent your request back for revision.\n\n` +
+        `💬 Feedback:\n${commentText}\n\n` +
+        `Please review the feedback and update your brief if needed.\n\n` +
+        `Use /deal ${pending.dealId} to view details and edit your brief.`;
+
+      const notificationButtons = {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '📋 View Deal', callback_data: `deal_details_${pending.dealId}` }
+            ]
+          ]
+        }
+      };
+
+      await TelegramService.bot.sendMessage(
+        advertiser.telegram_id,
+        notificationMessage,
+        notificationButtons
+      );
+    }
+
+    await ctx.reply(
+      `✅ Request sent to draft!\n\n` +
+      `Deal #${pending.dealId} has been sent back to the advertiser with your feedback.\n` +
+      `The advertiser will review your comments and can update their brief.\n\n` +
+      `Use /deal ${pending.dealId} to view details.`
+    );
   }
 
   /**

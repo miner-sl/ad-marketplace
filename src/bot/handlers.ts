@@ -497,18 +497,14 @@ export class BotHandlers {
     
     // Add channel link
     if (channel) {
-      const channelName = channel.title || channel.username || `Channel #${channel.id}`;
-      let channelLink = '';
-      if (channel.username) {
-        channelLink = `https://t.me/${channel.username.replace('@', '')}`;
-      } else if (channel.telegram_channel_id) {
-        channelLink = `https://t.me/c/${channel.telegram_channel_id.toString().replace('-100', '')}`;
-      }
-      
-      if (channelLink) {
-        dealInfo += `📺 Channel: <a href="${channelLink}">${channelName}</a>\n`;
-      } else {
-        dealInfo += `📺 Channel: ${channelName}\n`;
+      const channelLinkData = this.getChannelLink(channel);
+      if (channelLinkData) {
+        const {channelName, channelLink} = channelLinkData;
+        if (channelLink) {
+          dealInfo += `📺 Channel: <a href="${channelLink}">${channelName}</a>\n`;
+        } else {
+          dealInfo += `📺 Channel: ${channelName}\n`;
+        }
       }
     }
     
@@ -547,14 +543,14 @@ export class BotHandlers {
 
     // Show recent messages
     if (messages.rows.length > 0) {
-      dealInfo += `\n📨 Recent messages:\n`;
-      messages.rows.slice(-3).forEach((msg: any) => {
-        const sender = msg.sender_id === deal.channel_owner_id ? 'Channel Owner' : 'Advertiser';
-        // Escape user content to prevent Markdown parsing errors
-        const messagePreview = msg.message_text.substring(0, 50);
-        const escapedMessage = this.escapeMarkdown(messagePreview);
-        dealInfo += `\n${sender}: ${escapedMessage}${msg.message_text.length > 50 ? '...' : ''}`;
-      });
+      dealInfo += `\n📨 Recent messages: ${messages.rows.length}\n`;
+    //   messages.rows.slice(-3).forEach((msg: any) => {
+    //     const sender = msg.sender_id === deal.channel_owner_id ? 'Channel Owner' : 'Advertiser';
+    //     // Escape user content to prevent Markdown parsing errors
+    //     const messagePreview = msg.message_text.substring(0, 50);
+    //     const escapedMessage = this.escapeMarkdown(messagePreview);
+    //     dealInfo += `\n${sender}: ${escapedMessage}${msg.message_text.length > 50 ? '...' : ''}`;
+    //   });
     }
 
     // Add action buttons based on deal status and user role
@@ -582,6 +578,16 @@ export class BotHandlers {
 
     // Show confirm publication button for advertiser when post is published
     if (deal.status === 'posted' && isAdvertiser) {
+      const channelLinkData = this.getChannelLink(channel);
+      
+      // Add View Post button if post_message_id exists
+      if (deal.post_message_id && channelLinkData?.channelLink) {
+        const postLink = `${channelLinkData.channelLink}/${deal.post_message_id}`;
+        buttons.push([
+          Markup.button.url('🔗 View Post', postLink)
+        ]);
+      }
+      
       buttons.push([
         Markup.button.callback('✅ Confirm Publication', `confirm_publication_${deal.id}`)
       ]);
@@ -601,11 +607,25 @@ export class BotHandlers {
 
     // Use HTML parse mode if channel link is present
     const parseMode = channel && (channel.username || channel.telegram_channel_id) ? 'HTML' : undefined;
-    
+
     await ctx.reply(dealInfo, {
       ...Markup.inlineKeyboard(buttons),
       parse_mode: parseMode
     });
+  }
+
+  private static getChannelLink(channel: any): {channelName: string; channelLink: string} | undefined {
+    if (!channel) {
+      return undefined;
+    }
+    const channelName = channel.title || channel.username || `Channel #${channel.id}`;
+    let channelLink = '';
+    if (channel.username) {
+      channelLink = `https://t.me/${channel.username.replace('@', '')}`;
+    } else if (channel.telegram_channel_id) {
+      channelLink = `https://t.me/c/${channel.telegram_channel_id.toString().replace('-100', '')}`;
+    }
+    return {channelName, channelLink};
   }
 
   /**
@@ -1573,12 +1593,30 @@ export class BotHandlers {
 
         console.log(`✅ Post published for Deal #${deal.id} to channel ${channelId}`);
 
+        // Get channel info for link
+        const channelInfo = await db.query(
+          'SELECT username, telegram_channel_id FROM channels WHERE id = $1',
+          [deal.channel_id]
+        );
+        const channelData = channelInfo.rows[0];
+        
+        // Build post link
+        let postLink = '';
+        if (channelData?.username) {
+          postLink = `https://t.me/${channelData.username.replace('@', '')}/${messageId}`;
+        } else if (channelData?.telegram_channel_id) {
+          // Convert channel ID format: -1001234567890 -> 1234567890
+          const channelIdStr = channelData.telegram_channel_id.toString().replace('-100', '');
+          postLink = `https://t.me/c/${channelIdStr}/${messageId}`;
+        }
+
         // Notify advertiser to confirm publication
         const advertiser = await UserModel.findById(deal.advertiser_id);
         if (advertiser) {
           const confirmMessage = 
             `📤 Post Published for Deal #${deal.id}!\n\n` +
             `The channel owner has published the post.\n\n` +
+            (postLink ? `🔗 View Post: <a href="${postLink}">Click here</a>\n\n` : '') +
             `Please verify that the post is visible in the channel and click "✅ Confirm Publication" below.\n\n` +
             `After your confirmation, funds will be released to the channel owner.\n\n` +
             `Use /deal ${deal.id} to view details.`;
@@ -1593,18 +1631,39 @@ export class BotHandlers {
                   { text: '📋 View Deal', callback_data: `deal_details_${deal.id}` }
                 ]
               ]
-            }
+            },
+            parse_mode: 'HTML' as const
           };
 
           await TelegramService.bot.sendMessage(advertiser.telegram_id, confirmMessage, confirmButtons);
         }
 
+        // Build post link for channel owner
+        let ownerPostLink = '';
+        if (channelData?.username) {
+          ownerPostLink = `https://t.me/${channelData.username.replace('@', '')}/${messageId}`;
+        } else if (channelData?.telegram_channel_id) {
+          const channelIdStr = channelData.telegram_channel_id.toString().replace('-100', '');
+          ownerPostLink = `https://t.me/c/${channelIdStr}/${messageId}`;
+        }
+
+        const ownerButtons: any[] = [];
+        if (ownerPostLink) {
+          ownerButtons.push([
+            Markup.button.url('🔗 View Post', ownerPostLink)
+          ]);
+        }
+        ownerButtons.push([
+          Markup.button.callback('📋 View Deal', `deal_details_${deal.id}`)
+        ]);
+
         await ctx.reply(
           `✅ Post published successfully!\n\n` +
-          `Deal #${deal.id} post has been published to the channel.\n` +
+          `Deal #${deal.id} post has been published to the channel.\n\n` +
           `Waiting for advertiser confirmation...\n\n` +
           `After advertiser confirms, funds will be released to your wallet.\n\n` +
-          `Use /deal ${deal.id} to view details.`
+          `Use /deal ${deal.id} to view details.`,
+          Markup.inlineKeyboard(ownerButtons)
         );
       }
     } catch (error: any) {

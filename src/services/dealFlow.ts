@@ -2,7 +2,9 @@ import { DealModel } from '../models/Deal';
 import { ChannelModel } from '../models/Channel';
 import { TONService } from './ton';
 import { CreativeService } from './creative';
+import { PostService } from './post';
 import { withTx } from '../utils/transaction';
+import db from '../db/connection';
 
 export class DealFlowService {
   /**
@@ -310,6 +312,279 @@ export class DealFlowService {
 
       return updateResult.rows[0];
     });
+  }
+
+  /**
+   * Create deal with brief message
+   */
+  static async createDealWithBrief(data: {
+    deal_type: 'listing' | 'campaign';
+    listing_id?: number;
+    campaign_id?: number;
+    channel_id: number;
+    channel_owner_id: number;
+    advertiser_id: number;
+    ad_format: string;
+    price_ton: number;
+    timeout_hours?: number;
+    briefText: string;
+  }): Promise<any> {
+    return await withTx(async (client) => {
+      // Create deal
+      const timeoutHours = data.timeout_hours || 72;
+      const timeoutAt = new Date();
+      timeoutAt.setUTCHours(timeoutAt.getUTCHours() + timeoutHours);
+      const utcTimeoutAt = new Date(timeoutAt.toISOString());
+
+      const dealResult = await client.query(
+        `INSERT INTO deals (
+          deal_type, listing_id, campaign_id, channel_id, channel_owner_id,
+          advertiser_id, ad_format, price_ton, timeout_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING *`,
+        [
+          data.deal_type,
+          data.listing_id,
+          data.campaign_id,
+          data.channel_id,
+          data.channel_owner_id,
+          data.advertiser_id,
+          data.ad_format,
+          data.price_ton,
+          utcTimeoutAt,
+        ]
+      );
+
+      const deal = dealResult.rows[0];
+
+      // Save brief as first message
+      await client.query(
+        `INSERT INTO deal_messages (deal_id, sender_id, message_text)
+         VALUES ($1, $2, $3)`,
+        [deal.id, data.advertiser_id, data.briefText]
+      );
+
+      return deal;
+    });
+  }
+
+  /**
+   * Publish post for deal
+   */
+  static async publishPost(dealId: number, channelOwnerId: number): Promise<{
+    messageId: number;
+    postLink: string;
+  }> {
+    const deal = await DealModel.findById(dealId);
+    if (!deal) {
+      throw new Error('Deal not found');
+    }
+
+    if (deal.channel_owner_id !== channelOwnerId) {
+      throw new Error('Unauthorized');
+    }
+
+    if (deal.status !== 'paid') {
+      throw new Error(`Cannot publish post in status: ${deal.status}`);
+    }
+
+    // Get post text from deal messages
+    const postText = await PostService.getPostTextFromDeal(dealId);
+
+    // Publish post
+    const result = await PostService.publishPost(dealId, deal.channel_id, postText);
+
+    return result;
+  }
+
+  /**
+   * Confirm publication and release funds
+   */
+  static async confirmPublication(dealId: number, advertiserId: number): Promise<{
+    txHash: string;
+  }> {
+    const deal = await DealModel.findById(dealId);
+    if (!deal) {
+      throw new Error('Deal not found');
+    }
+
+    if (deal.advertiser_id !== advertiserId) {
+      throw new Error('Unauthorized');
+    }
+
+    if (deal.status !== 'verified') {
+      throw new Error(`Deal is not in verified status. Current status: ${deal.status}`);
+    }
+
+    if (!deal.escrow_address || !deal.channel_owner_wallet_address) {
+      throw new Error('Escrow address or channel owner wallet address not set');
+    }
+
+    if (!deal.post_message_id || !deal.channel_id) {
+      throw new Error('Post information is missing');
+    }
+
+    // Verify channel access
+    const hasAccess = await PostService.verifyChannelAccess(deal.channel_id);
+    if (!hasAccess) {
+      throw new Error('Cannot verify channel access. The bot cannot access the channel.');
+    }
+
+    // Update status atomically
+    await withTx(async (client) => {
+      const dealCheck = await client.query(
+        `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
+        [deal.id]
+      );
+
+      if (dealCheck.rows.length === 0) {
+        throw new Error('Deal not found');
+      }
+
+      const currentDeal = dealCheck.rows[0];
+      if (currentDeal.status !== 'verified') {
+        throw new Error(`Deal is not in verified status. Current status: ${currentDeal.status}`);
+      }
+
+      await client.query(
+        `UPDATE deals 
+         SET status = 'completed', updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 AND status = 'verified'
+         RETURNING *`,
+        [deal.id]
+      );
+    });
+
+    // Release funds
+    const txHash = await TONService.releaseFunds(
+      deal.escrow_address,
+      deal.channel_owner_wallet_address,
+      deal.price_ton.toString()
+    );
+
+    return { txHash };
+  }
+
+  /**
+   * Decline deal
+   */
+  static async declineDeal(dealId: number, channelOwnerId: number): Promise<any> {
+    return await withTx(async (client) => {
+      const dealResult = await client.query(
+        `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
+        [dealId]
+      );
+
+      const deal = dealResult.rows[0];
+      if (!deal || deal.channel_owner_id !== channelOwnerId) {
+        throw new Error('Deal not found or unauthorized');
+      }
+
+      await client.query(
+        `UPDATE deals 
+         SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 AND status = 'pending'
+         RETURNING *`,
+        [dealId]
+      );
+
+      await client.query(
+        `INSERT INTO deal_messages (deal_id, sender_id, message_text)
+         VALUES ($1, $2, $3)`,
+        [dealId, channelOwnerId, 'Deal declined by channel owner']
+      );
+
+      return dealResult.rows[0];
+    });
+  }
+
+  /**
+   * Send deal to draft with comment
+   */
+  static async sendToDraft(dealId: number, channelOwnerId: number, commentText: string): Promise<any> {
+    return await withTx(async (client) => {
+      const dealResult = await client.query(
+        `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
+        [dealId]
+      );
+
+      const deal = dealResult.rows[0];
+      if (!deal || deal.channel_owner_id !== channelOwnerId) {
+        throw new Error('Deal not found or unauthorized');
+      }
+
+      if (deal.status !== 'pending') {
+        throw new Error(`Cannot send to draft in status: ${deal.status}`);
+      }
+
+      await client.query(
+        `UPDATE deals 
+         SET status = 'negotiating', updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1 AND status = 'pending'
+         RETURNING *`,
+        [dealId]
+      );
+
+      await client.query(
+        `INSERT INTO deal_messages (deal_id, sender_id, message_text)
+         VALUES ($1, $2, $3)`,
+        [dealId, channelOwnerId, `📝 Draft feedback: ${commentText}`]
+      );
+
+      return dealResult.rows[0];
+    });
+  }
+
+  /**
+   * Add message to deal
+   */
+  static async addDealMessage(dealId: number, senderId: number, messageText: string): Promise<void> {
+    const deal = await DealModel.findById(dealId);
+    if (!deal) {
+      throw new Error('Deal not found');
+    }
+
+    if (deal.channel_owner_id !== senderId && deal.advertiser_id !== senderId) {
+      throw new Error('Unauthorized');
+    }
+
+    await db.query(
+      `INSERT INTO deal_messages (deal_id, sender_id, message_text)
+       VALUES ($1, $2, $3)`,
+      [dealId, senderId, messageText]
+    );
+  }
+
+  /**
+   * Get channel info for deal
+   */
+  static async getChannelInfoForDeal(dealId: number): Promise<{
+    channelId: number;
+    channelName: string;
+    channelUsername?: string;
+    telegramChannelId?: number;
+  }> {
+    const deal = await DealModel.findById(dealId);
+    if (!deal) {
+      throw new Error('Deal not found');
+    }
+
+    const channelResult = await db.query(
+      'SELECT id, title, username, telegram_channel_id FROM channels WHERE id = $1',
+      [deal.channel_id]
+    );
+
+    if (channelResult.rows.length === 0) {
+      throw new Error('Channel not found');
+    }
+
+    const channel = channelResult.rows[0];
+    return {
+      channelId: channel.id,
+      channelName: channel.title || channel.username || `Channel #${channel.id}`,
+      channelUsername: channel.username,
+      telegramChannelId: channel.telegram_channel_id,
+    };
   }
 
   /**

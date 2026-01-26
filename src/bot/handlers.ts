@@ -7,9 +7,11 @@ import { CampaignModel } from '../models/Campaign';
 import { TelegramService } from '../services/telegram';
 import { CreativeService } from '../services/creative';
 import { TONService } from '../services/ton';
-import db from '../db/connection';
+import { NotificationService } from '../services/notification';
+import { ChannelRepository } from '../repositories/ChannelRepository';
+import { DealRepository } from '../repositories/DealRepository';
+import { CreativeRepository } from '../repositories/CreativeRepository';
 import logger from '../utils/logger';
-import { withTx } from '../utils/transaction';
 
 export class BotHandlers {
   /**
@@ -232,21 +234,15 @@ export class BotHandlers {
     }
 
     // Get all active channels with pricing
-    const channels = await db.query(
-      `SELECT DISTINCT c.* FROM channels c
-       INNER JOIN channel_pricing p ON c.id = p.channel_id
-       WHERE c.is_active = TRUE AND p.is_active = TRUE
-       ORDER BY c.created_at DESC
-       LIMIT 20`
-    );
+    const channels = await ChannelRepository.findWithPricing(20);
 
-    if (channels.rows.length === 0) {
+    if (channels.length === 0) {
       return ctx.reply('No channels available at the moment.');
     }
 
-    let message = `📺 Available Channels (${channels.rows.length}):\n\n`;
+    let message = `📺 Available Channels (${channels.length}):\n\n`;
 
-    for (const channel of channels.rows) {
+    for (const channel of channels) {
       const stats = await ChannelModel.getLatestStats(channel.id);
       const pricing = await ChannelModel.getPricing(channel.id);
 
@@ -285,38 +281,28 @@ export class BotHandlers {
     }
 
     // Get pending deals for user's channels
-    const deals = await db.query(
-      `SELECT d.* FROM deals d
-       INNER JOIN channels c ON d.channel_id = c.id
-       WHERE c.owner_id = $1 AND d.status = 'pending'
-       ORDER BY d.created_at DESC
-       LIMIT 20`,
-      [user.id]
-    );
+    const deals = await DealRepository.findPendingForChannelOwner(user.id, 20);
 
-    if (deals.rows.length === 0) {
+    if (deals.length === 0) {
       return ctx.reply('No pending requests at the moment.');
     }
 
-    let message = `📨 Incoming Requests (${deals.rows.length}):\n\n`;
+    let message = `📨 Incoming Requests (${deals.length}):\n\n`;
 
-    for (const deal of deals.rows) {
-      const channel = await db.query('SELECT title, username FROM channels WHERE id = $1', [deal.channel_id]);
-      const channelName = channel.rows[0]?.title || channel.rows[0]?.username || `Channel #${deal.channel_id}`;
-      
+    for (const deal of deals) {
+      const channel = await ChannelRepository.getBasicInfo(deal.channel_id);
+      const channelName = channel?.title || channel?.username || `Channel #${deal.channel_id}`;
+
       // Get brief message
-      const brief = await db.query(
-        `SELECT message_text FROM deal_messages WHERE deal_id = $1 ORDER BY created_at ASC LIMIT 1`,
-        [deal.id]
-      );
+      const briefText = await DealRepository.getBrief(deal.id);
 
       message += `📋 Deal #${deal.id}\n`;
       message += `📺 Channel: ${channelName}\n`;
       message += `💰 Price: ${deal.price_ton} TON\n`;
       message += `📝 Format: ${deal.ad_format}\n`;
-      if (brief.rows[0]) {
-        const briefText = brief.rows[0].message_text.substring(0, 100);
-        message += `📄 Brief: ${briefText}${brief.rows[0].message_text.length > 100 ? '...' : ''}\n`;
+      if (briefText) {
+        const briefPreview = briefText.substring(0, 100);
+        message += `📄 Brief: ${briefPreview}${briefText.length > 100 ? '...' : ''}\n`;
       }
       message += `\n`;
 
@@ -487,23 +473,13 @@ export class BotHandlers {
     }
 
     // Get messages
-    const messages = await db.query(
-      'SELECT * FROM deal_messages WHERE deal_id = $1 ORDER BY created_at ASC',
-      [deal.id]
-    );
+    const messages = await DealRepository.getMessages(deal.id);
 
     // Get creative if exists
-    const creative = await db.query(
-      'SELECT * FROM creatives WHERE deal_id = $1 ORDER BY created_at DESC LIMIT 1',
-      [deal.id]
-    );
+    const creative = await CreativeRepository.findByDeal(deal.id);
 
     // Get channel information
-    const channelResult = await db.query(
-      'SELECT id, title, username, telegram_channel_id FROM channels WHERE id = $1',
-      [deal.channel_id]
-    );
-    const channel = channelResult.rows[0];
+    const channel = await DealRepository.getChannelInfoForDeal(deal.id);
 
     // Determine user role
     const isChannelOwner = deal.channel_owner_id === user.id;
@@ -512,7 +488,7 @@ export class BotHandlers {
     let dealInfo = `📋 Deal #${deal.id}\n\n`;
     dealInfo += `Status: ${this.formatDealStatus(deal.status)}\n`;
     dealInfo += `Type: ${deal.deal_type}\n`;
-    
+
     // Add channel link
     if (channel) {
       const channelLinkData = this.getChannelLink(channel);
@@ -525,10 +501,10 @@ export class BotHandlers {
         }
       }
     }
-    
+
     dealInfo += `Price: ${deal.price_ton} TON\n`;
     dealInfo += `Format: ${deal.ad_format}\n`;
-    
+
     // Show scheduled publish date if set
     if (deal.scheduled_post_time) {
       const scheduledDate = new Date(deal.scheduled_post_time);
@@ -542,7 +518,7 @@ export class BotHandlers {
       });
       dealInfo += `📅 Scheduled Publish: ${formattedDate}\n`;
     }
-    
+
     // Show payment information for advertiser when payment is pending
     if (deal.status === 'payment_pending' && isAdvertiser && deal.escrow_address) {
       dealInfo += `\n💰 Payment Required:\n`;
@@ -552,39 +528,38 @@ export class BotHandlers {
     } else if (deal.escrow_address) {
       dealInfo += `Escrow: ${deal.escrow_address.substring(0, 20)}...\n`;
     }
-    
-    dealInfo += `\n💬 Messages: ${messages.rows.length}\n`;
+
+    dealInfo += `\n💬 Messages: ${messages.length}\n`;
 
     // Show brief (first message) if available
-    if (messages.rows.length > 0) {
-      const briefMessage = messages.rows[0];
+    if (messages.length > 0) {
+      const briefMessage = messages[0];
       const briefText = briefMessage.message_text;
       const briefPreviewLength = 300;
-      const briefPreview = briefText.length > briefPreviewLength 
-        ? briefText.substring(0, briefPreviewLength) + '...' 
+      const briefPreview = briefText.length > briefPreviewLength
+        ? briefText.substring(0, briefPreviewLength) + '...'
         : briefText;
       dealInfo += `\n📄 Brief:\n${this.escapeMarkdown(briefPreview)}\n`;
     }
 
-    console.log(creative.rows);
-    if (creative.rows[0]) {
-      const creativeData = creative.rows[0].content_data;
-      dealInfo += `\n📝 Creative Status: ${creative.rows[0].status}\n`;
-      
+    if (creative) {
+      const creativeData = creative.content_data;
+      dealInfo += `\n📝 Creative Status: ${creative.status}\n`;
+
       // Show creative text if available
       if (creativeData && creativeData.text) {
         const creativeText = creativeData.text;
         const previewLength = 200;
-        const creativePreview = creativeText.length > previewLength 
-          ? creativeText.substring(0, previewLength) + '...' 
+        const creativePreview = creativeText.length > previewLength
+          ? creativeText.substring(0, previewLength) + '...'
           : creativeText;
         dealInfo += `\n📄 Creative Text:\n${this.escapeMarkdown(creativePreview)}\n`;
       }
     }
     // Show recent messages
-    if (messages.rows.length > 0) {
-      // dealInfo += `\n📨 Recent messages: ${messages.rows.length}\n`;
-    //   messages.rows.slice(-3).forEach((msg: any) => {
+    if (messages.length > 0) {
+      // dealInfo += `\n📨 Recent messages: ${messages.length}\n`;
+    //   messages.slice(-3).forEach((msg: any) => {
     //     const sender = msg.sender_id === deal.channel_owner_id ? 'Channel Owner' : 'Advertiser';
     //     // Escape user content to prevent Markdown parsing errors
     //     const messagePreview = msg.message_text.substring(0, 50);
@@ -687,53 +662,22 @@ export class BotHandlers {
       switch (action) {
         case 'accept':
           await DealFlowService.acceptDeal(dealId, user.id, ctx.from!.id);
-          
-          // Get updated deal with escrow address
+
           const acceptedDeal = await DealModel.findById(dealId);
           if (!acceptedDeal || !acceptedDeal.escrow_address) {
             return ctx.reply('Error: Deal or escrow address not found');
           }
 
-          // Get advertiser
-          const advertiser = await UserModel.findById(acceptedDeal.advertiser_id);
-          if (!advertiser) {
-            return ctx.reply('Error: Advertiser not found');
-          }
+          const channelInfo = await DealFlowService.getChannelInfoForDeal(dealId);
 
-          // Get channel info
-          const channelInfo = await db.query(
-            'SELECT title, username FROM channels WHERE id = $1',
-            [acceptedDeal.channel_id]
-          );
-          const channelData = channelInfo.rows[0];
-          const channelName = channelData?.title || channelData?.username || `Channel #${acceptedDeal.channel_id}`;
-
-          // Send payment invoice to advertiser
-          const invoiceMessage = 
-            `💰 Payment Invoice for Deal #${dealId}\n\n` +
-            `Channel: ${channelName}\n` +
-            `Format: ${acceptedDeal.ad_format}\n` +
-            `Amount: ${acceptedDeal.price_ton} TON\n\n` +
-            `Please send ${acceptedDeal.price_ton} TON to the escrow address:\n\n` +
-            `\`${acceptedDeal.escrow_address}\`\n\n` +
-            `After sending payment, click "✅ Confirm Payment" below.\n\n` +
-            `This is a system-managed escrow wallet. Funds will be held until the post is published and verified.`;
-
-          const invoiceButtons = {
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  { text: '💳 Copy Escrow Address', callback_data: `copy_escrow_${dealId}` },
-                  { text: '📋 View Deal Details', callback_data: `deal_details_${dealId}` }
-                ],
-                [
-                  { text: '✅ Confirm Payment', callback_data: `confirm_payment_${dealId}` }
-                ]
-              ]
-            }
-          };
-
-          await TelegramService.bot.sendMessage(advertiser.telegram_id, invoiceMessage, invoiceButtons);
+          await NotificationService.notifyPaymentInvoice(dealId, acceptedDeal.advertiser_id, {
+            dealId,
+            channelId: channelInfo.channelId,
+            channelName: channelInfo.channelName,
+            priceTon: acceptedDeal.price_ton,
+            adFormat: acceptedDeal.ad_format,
+            escrowAddress: acceptedDeal.escrow_address,
+          });
 
           await ctx.reply('✅ Deal accepted! Payment invoice sent to advertiser.');
           break;
@@ -775,21 +719,10 @@ export class BotHandlers {
       return ctx.reply('You are not authorized to message this deal');
     }
 
-    await db.query(
-      `INSERT INTO deal_messages (deal_id, sender_id, message_text)
-       VALUES ($1, $2, $3)`,
-      [dealId, user.id, messageText]
-    );
+    await DealFlowService.addDealMessage(dealId, user.id, messageText);
 
-    // Notify other party
     const otherUserId = deal.channel_owner_id === user.id ? deal.advertiser_id : deal.channel_owner_id;
-    const otherUser = await UserModel.findById(otherUserId);
-    if (otherUser) {
-      await TelegramService.bot.sendMessage(
-        otherUser.telegram_id,
-        `💬 New message in Deal #${dealId}:\n\n${messageText}\n\nUse /deal ${dealId} to view.`
-      );
-    }
+    await NotificationService.notifyDealMessage(dealId, user.id, otherUserId, messageText);
 
     await ctx.reply('✅ Message sent!');
   }
@@ -808,76 +741,35 @@ export class BotHandlers {
       return ctx.reply('No pending request found.');
     }
 
-    // Create deal
-    const channel = await db.query('SELECT owner_id FROM channels WHERE id = $1', [pending.channelId]);
-    if (channel.rows.length === 0) {
+    const ownerId = await ChannelRepository.getOwnerId(pending.channelId);
+    if (!ownerId) {
       return ctx.reply('Channel not found');
     }
 
-    const deal = await DealModel.create({
+    const deal = await DealFlowService.createDealWithBrief({
       deal_type: 'campaign',
       channel_id: pending.channelId,
-      channel_owner_id: channel.rows[0].owner_id,
+      channel_owner_id: ownerId,
       advertiser_id: pending.userId,
       ad_format: pending.adFormat,
-      price_ton: pending.priceTon
+      price_ton: pending.priceTon,
+      briefText,
     });
-
-    // Save brief as first message
-    await db.query(
-      `INSERT INTO deal_messages (deal_id, sender_id, message_text)
-       VALUES ($1, $2, $3)`,
-      [deal.id, pending.userId, briefText]
-    );
 
     this.pendingDealRequests.delete(ctx.from!.id);
 
-    // Notify channel owner about new request
-    const channelOwner = await UserModel.findById(deal.channel_owner_id);
-    if (channelOwner) {
-      // Get channel info
-      const channelInfo = await db.query(
-        'SELECT title, username FROM channels WHERE id = $1',
-        [deal.channel_id]
-      );
-      const channelData = channelInfo.rows[0];
-      const channelName = channelData?.title || channelData?.username || `Channel #${deal.channel_id}`;
+    const channelInfo = await DealFlowService.getChannelInfoForDeal(deal.id);
+    const briefPreview = briefText.substring(0, 200);
+    const briefTextDisplay = briefText.length > 200 ? `${briefPreview}...` : briefPreview;
 
-      // Get brief preview
-      const briefPreview = briefText.substring(0, 200);
-      const briefTextDisplay = briefText.length > 200 ? `${briefPreview}...` : briefPreview;
-
-      const notificationMessage = 
-        `📨 New Ad Request for Deal #${deal.id}!\n\n` +
-        `📺 Channel: ${channelName}\n` +
-        `💰 Price: ${deal.price_ton} TON\n` +
-        `📝 Format: ${deal.ad_format}\n\n` +
-        `📄 Brief:\n${briefTextDisplay}\n\n` +
-        `Please review and accept or decline the request.`;
-
-      const notificationButtons = {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: '✅ Accept', callback_data: `accept_request_${deal.id}` },
-              { text: '❌ Decline', callback_data: `decline_request_${deal.id}` }
-            ],
-            [
-              { text: '📝 Send to Draft', callback_data: `send_to_draft_${deal.id}` }
-            ],
-            [
-              { text: '📋 View Deal', callback_data: `deal_details_${deal.id}` }
-            ]
-          ]
-        }
-      };
-
-      await TelegramService.bot.sendMessage(
-        channelOwner.telegram_id,
-        notificationMessage,
-        notificationButtons
-      );
-    }
+    await NotificationService.notifyNewAdRequest(deal.id, deal.channel_owner_id, {
+      dealId: deal.id,
+      channelId: channelInfo.channelId,
+      channelName: channelInfo.channelName,
+      priceTon: deal.price_ton,
+      adFormat: deal.ad_format,
+      briefPreview: briefTextDisplay,
+    });
 
     await ctx.reply(
       `✅ Request submitted!\n\n` +
@@ -976,7 +868,7 @@ export class BotHandlers {
     }
 
     const isAdmin = await TelegramService.isBotAdmin(channelId);
-    
+
     if (!isAdmin) {
       await ctx.reply(
         `❌ Bot is not admin of channel ${channelId}\n\n` +
@@ -987,7 +879,7 @@ export class BotHandlers {
 
     // Get channel info
     const channelInfo = await TelegramService.getChannelInfo(channelId);
-    
+
     // Check if channel already exists
     const existing = await ChannelModel.findByTelegramId(channelId);
     if (existing) {
@@ -1054,17 +946,17 @@ export class BotHandlers {
       return;
     }
 
-    const channel = await db.query('SELECT * FROM channels WHERE id = $1', [channelId]);
-    if (channel.rows.length === 0) {
+    const channel = await ChannelRepository.findById(channelId);
+    if (!channel) {
       return ctx.reply('Channel not found');
     }
 
-    if (channel.rows[0].owner_id !== user.id) {
+    if (channel.owner_id !== user.id) {
       return ctx.reply('You are not the owner of this channel');
     }
 
-    const isAdmin = await TelegramService.isBotAdmin(channel.rows[0].telegram_channel_id);
-    
+    const isAdmin = await TelegramService.isBotAdmin(channel.telegram_channel_id!);
+
     await ctx.reply(
       `👥 Admin Status for Channel #${channelId}\n\n` +
       `Bot Admin: ${isAdmin ? '✅ Yes' : '❌ No'}\n` +
@@ -1082,12 +974,12 @@ export class BotHandlers {
       return ctx.reply('Please use /start first');
     }
 
-    const channel = await db.query('SELECT owner_id FROM channels WHERE id = $1', [channelId]);
-    if (channel.rows.length === 0) {
+    const ownerId = await ChannelRepository.getOwnerId(channelId);
+    if (!ownerId) {
       return ctx.reply('Channel not found');
     }
 
-    if (channel.rows[0].owner_id !== user.id) {
+    if (ownerId !== user.id) {
       return ctx.reply('You are not the owner of this channel');
     }
 
@@ -1123,18 +1015,17 @@ export class BotHandlers {
    */
   static async handleViewPricing(ctx: Context, channelId: number) {
     const pricing = await ChannelModel.getPricing(channelId);
-    
+
     if (pricing.length === 0) {
       await ctx.reply('No pricing set for this channel yet.');
       return;
     }
 
-    let message = `💰 Pricing for Channel #${channelId}:\n\n`;
-    pricing.forEach((p) => {
-      message += `• ${p.ad_format}: ${p.price_ton} TON\n`;
-    });
+    const result = pricing.reduce((message,p) => {
+      return message + `• ${p.ad_format}: ${p.price_ton} TON\n`;
+    },  `💰 Pricing for Channel #${channelId}:\n\n`);
 
-    await ctx.reply(message);
+    await ctx.reply(result);
   }
 
   /**
@@ -1146,12 +1037,12 @@ export class BotHandlers {
       return ctx.reply('Please use /start first');
     }
 
-    const channel = await db.query('SELECT owner_id FROM channels WHERE id = $1', [channelId]);
-    if (channel.rows.length === 0) {
+    const ownerId = await ChannelRepository.getOwnerId(channelId);
+    if (!ownerId) {
       return ctx.reply('Channel not found');
     }
 
-    if (channel.rows[0].owner_id !== user.id) {
+    if (ownerId !== user.id) {
       return ctx.reply('You are not the owner of this channel');
     }
 
@@ -1209,44 +1100,22 @@ export class BotHandlers {
 
     try {
       await DealFlowService.acceptDeal(dealId, user.id, ctx.from!.id);
-      
+
       const deal = await DealModel.findById(dealId);
       if (!deal || !deal.escrow_address) {
         return ctx.reply('Error: Deal or escrow address not found');
       }
 
-      // Get advertiser
-      const advertiser = await UserModel.findById(deal.advertiser_id);
-      if (!advertiser) {
-        return ctx.reply('Error: Advertiser not found');
-      }
+      const channelInfo = await DealFlowService.getChannelInfoForDeal(dealId);
 
-      // Send payment invoice to advertiser
-      const invoiceMessage = 
-        `💰 Payment Invoice for Deal #${dealId}\n\n` +
-        `Channel: #${deal.channel_id}\n` +
-        `Format: ${deal.ad_format}\n` +
-        `Amount: ${deal.price_ton} TON\n\n` +
-        `Please send ${deal.price_ton} TON to the escrow address:\n\n` +
-        `${deal.escrow_address}\n\n` +
-        `After sending payment, click "✅ Confirm Payment" below.\n\n` +
-        `This is a system-managed escrow wallet. Funds will be held until the post is published and verified.`;
-
-      const invoiceButtons = {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: '💳 Copy Escrow Address', callback_data: `copy_escrow_${dealId}` },
-              { text: '📋 View Deal Details', callback_data: `deal_details_${dealId}` }
-            ],
-            [
-              { text: '✅ Confirm Payment', callback_data: `confirm_payment_${dealId}` }
-            ]
-          ]
-        }
-      };
-
-      await TelegramService.bot.sendMessage(advertiser.telegram_id, invoiceMessage, invoiceButtons);
+      await NotificationService.notifyPaymentInvoice(dealId, deal.advertiser_id, {
+        dealId,
+        channelId: channelInfo.channelId,
+        channelName: channelInfo.channelName,
+        priceTon: deal.price_ton,
+        adFormat: deal.ad_format,
+        escrowAddress: deal.escrow_address,
+      });
 
       await ctx.reply('✅ Deal accepted! Payment invoice sent to advertiser.');
     } catch (error: any) {
@@ -1272,52 +1141,17 @@ export class BotHandlers {
       return ctx.reply('You are not authorized to decline this deal');
     }
 
-    await DealModel.updateStatus(dealId, 'cancelled');
+    await DealFlowService.declineDeal(dealId, user.id);
 
-    // Save cancellation message
-    await db.query(
-      `INSERT INTO deal_messages (deal_id, sender_id, message_text)
-       VALUES ($1, $2, $3)`,
-      [dealId, user.id, 'Deal declined by channel owner']
-    );
+    const channelInfo = await DealFlowService.getChannelInfoForDeal(dealId);
 
-    // Notify advertiser
-    const advertiser = await UserModel.findById(deal.advertiser_id);
-    if (advertiser) {
-      // Get channel info for notification
-      const channelInfo = await db.query(
-        'SELECT title, username FROM channels WHERE id = $1',
-        [deal.channel_id]
-      );
-      const channelData = channelInfo.rows[0];
-      const channelName = channelData?.title || channelData?.username || `Channel #${deal.channel_id}`;
-
-      const notificationMessage = 
-        `❌ Deal #${dealId} Declined\n\n` +
-        `The channel owner has declined your ad request.\n\n` +
-        `📺 Channel: ${channelName}\n` +
-        `💰 Price: ${deal.price_ton} TON\n` +
-        `📝 Format: ${deal.ad_format}\n\n` +
-        `You can browse other channels or create a new request.\n\n` +
-        `Use /deal ${dealId} to view details.`;
-
-      const notificationButtons = {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: '📋 View Deal', callback_data: `deal_details_${dealId}` },
-              { text: '📺 Browse Channels', callback_data: 'browse_channels' }
-            ]
-          ]
-        }
-      };
-
-      await TelegramService.bot.sendMessage(
-        advertiser.telegram_id,
-        notificationMessage,
-        notificationButtons
-      );
-    }
+    await NotificationService.notifyDealDeclined(dealId, deal.advertiser_id, {
+      dealId,
+      channelId: channelInfo.channelId,
+      channelName: channelInfo.channelName,
+      priceTon: deal.price_ton,
+      adFormat: deal.ad_format,
+    });
 
     await ctx.reply('❌ Deal declined. Advertiser has been notified.');
   }
@@ -1407,28 +1241,7 @@ export class BotHandlers {
           await DealModel.updateStatus(dealId, 'paid');
         }
 
-        // Notify channel owner
-        const channelOwner = await UserModel.findById(deal.channel_owner_id);
-        if (channelOwner) {
-          const ownerNotificationButtons = {
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  { text: '📋 View Deal', callback_data: `deal_details_${dealId}` }
-                ]
-              ]
-            }
-          };
-
-          await TelegramService.bot.sendMessage(
-            channelOwner.telegram_id,
-            `✅ Payment received for Deal #${dealId}!\n\n` +
-            `Amount: ${deal.price_ton} TON\n` +
-            `You can now publish the post.\n\n` +
-            `Use the button below to view deal details.`,
-            ownerNotificationButtons
-          );
-        }
+        await NotificationService.notifyPaymentReceived(dealId, deal.channel_owner_id, deal.price_ton);
 
         await ctx.reply(
           `✅ Payment Confirmed!\n\n` +
@@ -1524,16 +1337,7 @@ export class BotHandlers {
     await CreativeService.submit(dealId);
     await DealModel.updateStatus(dealId, 'creative_submitted');
 
-    // Notify advertiser
-    const advertiser = await UserModel.findById(deal.advertiser_id);
-    if (advertiser) {
-      await TelegramService.bot.sendMessage(
-        advertiser.telegram_id,
-        `📝 Creative submitted for Deal #${dealId}!\n\n` +
-        `Please review and approve or request revisions.\n\n` +
-        `Use /deal ${dealId} to view details.`
-      );
-    }
+    await NotificationService.notifyCreativeSubmitted(dealId, deal.advertiser_id);
 
     await ctx.reply('✅ Creative submitted! Waiting for advertiser approval.');
   }
@@ -1550,18 +1354,9 @@ export class BotHandlers {
     try {
       await DealFlowService.approveCreative(dealId, user.id);
 
-      // Notify channel owner
       const deal = await DealModel.findById(dealId);
       if (deal) {
-        const channelOwner = await UserModel.findById(deal.channel_owner_id);
-        if (channelOwner) {
-          await TelegramService.bot.sendMessage(
-            channelOwner.telegram_id,
-            `✅ Creative approved for Deal #${dealId}!\n\n` +
-            `You can now publish the post.\n\n` +
-            `Use /deal ${dealId} to view details.`
-          );
-        }
+        await NotificationService.notifyCreativeApproved(dealId, deal.channel_owner_id);
       }
 
       await ctx.reply('✅ Creative approved! Channel owner can now publish.');
@@ -1606,17 +1401,17 @@ export class BotHandlers {
       return ctx.reply('Please use /start first');
     }
 
-    const channel = await db.query('SELECT * FROM channels WHERE id = $1', [channelId]);
-    if (channel.rows.length === 0) {
+    const channel = await ChannelRepository.findById(channelId);
+    if (!channel) {
       return ctx.reply('Channel not found');
     }
 
-    if (channel.rows[0].owner_id !== user.id) {
+    if (channel.owner_id !== user.id) {
       return ctx.reply('You are not the owner of this channel');
     }
 
     try {
-      const stats = await TelegramService.fetchChannelStats(channel.rows[0].telegram_channel_id);
+      const stats = await TelegramService.fetchChannelStats(channel.telegram_channel_id!);
       await ChannelModel.saveStats(channelId, stats);
 
       let message = `📊 Statistics Updated for Channel #${channelId}\n\n`;
@@ -1753,44 +1548,11 @@ export class BotHandlers {
       return ctx.reply('Deal not found');
     }
 
-    // Update deal status to negotiating
-    await DealModel.updateStatus(pending.dealId, 'negotiating');
-
-    // Save comment as message
-    await db.query(
-      `INSERT INTO deal_messages (deal_id, sender_id, message_text)
-       VALUES ($1, $2, $3)`,
-      [pending.dealId, pending.userId, `📝 Draft feedback: ${commentText}`]
-    );
+    await DealFlowService.sendToDraft(pending.dealId, pending.userId, commentText);
 
     this.pendingDraftComments.delete(ctx.from!.id);
 
-    // Notify advertiser
-    const advertiser = await UserModel.findById(deal.advertiser_id);
-    if (advertiser) {
-      const notificationMessage = 
-        `📝 Deal #${pending.dealId} Sent to Draft\n\n` +
-        `The channel owner has sent your request back for revision.\n\n` +
-        `💬 Feedback:\n${commentText}\n\n` +
-        `Please review the feedback and update your brief if needed.\n\n` +
-        `Use /deal ${pending.dealId} to view details and edit your brief.`;
-
-      const notificationButtons = {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: '📋 View Deal', callback_data: `deal_details_${pending.dealId}` }
-            ]
-          ]
-        }
-      };
-
-      await TelegramService.bot.sendMessage(
-        advertiser.telegram_id,
-        notificationMessage,
-        notificationButtons
-      );
-    }
+    await NotificationService.notifyDealSentToDraft(pending.dealId, deal.advertiser_id, commentText);
 
     await ctx.reply(
       `✅ Request sent to draft!\n\n` +
@@ -1818,132 +1580,31 @@ export class BotHandlers {
       return ctx.reply('You are not authorized to publish post for this deal');
     }
 
-    if (deal.status !== 'paid') {
-      return ctx.reply(`Cannot publish post. Deal status: ${deal.status}`);
-    }
-
-    // Get text from deal_messages (brief from advertiser)
-    const messages = await db.query(
-      `SELECT message_text FROM deal_messages 
-       WHERE deal_id = $1 
-       ORDER BY created_at ASC 
-       LIMIT 1`,
-      [deal.id]
-    );
-
-    if (messages.rows.length === 0) {
-      return ctx.reply('No brief found in deal messages. Cannot publish post.');
-    }
-
-    const postText = messages.rows[0].message_text;
-
-    // Get channel info
-    const channel = await db.query(
-      'SELECT telegram_channel_id FROM channels WHERE id = $1',
-      [deal.channel_id]
-    );
-
-    if (channel.rows.length === 0) {
-      return ctx.reply('Channel not found');
-    }
-
-    const channelId = channel.rows[0].telegram_channel_id;
-
     try {
-      // Publish post to channel
-      const sentMessage = await TelegramService.bot.sendMessage(
-        channelId,
-        postText
-      );
-      const messageId = sentMessage.message_id;
+      const { postLink } = await DealFlowService.publishPost(dealId, user.id);
 
-      if (messageId) {
-        // Record post
-        // Create date in UTC - use MIN_POST_DURATION_HOURS from env
-        const minPostDurationHours = parseInt(process.env.MIN_POST_DURATION_HOURS || '24', 10);
-        const verificationUntil = new Date();
-        verificationUntil.setUTCHours(verificationUntil.getUTCHours() + minPostDurationHours);
+      await NotificationService.notifyPostPublished(dealId, deal.advertiser_id, postLink);
 
-        await DealModel.recordPost(deal.id, messageId, verificationUntil);
-        await DealModel.updateStatus(deal.id, 'posted');
-
-        console.log(`✅ Post published for Deal #${deal.id} to channel ${channelId}`);
-
-        // Get channel info for link
-        const channelInfo = await db.query(
-          'SELECT username, telegram_channel_id FROM channels WHERE id = $1',
-          [deal.channel_id]
-        );
-        const channelData = channelInfo.rows[0];
-        
-        // Build post link
-        let postLink = '';
-        if (channelData?.username) {
-          postLink = `https://t.me/${channelData.username.replace('@', '')}/${messageId}`;
-        } else if (channelData?.telegram_channel_id) {
-          // Convert channel ID format: -1001234567890 -> 1234567890
-          const channelIdStr = channelData.telegram_channel_id.toString().replace('-100', '');
-          postLink = `https://t.me/c/${channelIdStr}/${messageId}`;
-        }
-
-        // Notify advertiser to confirm publication
-        const advertiser = await UserModel.findById(deal.advertiser_id);
-        if (advertiser) {
-          const confirmMessage = 
-            `📤 Post Published for Deal #${deal.id}!\n\n` +
-            `The channel owner has published the post.\n\n` +
-            (postLink ? `🔗 View Post: <a href="${postLink}">Click here</a>\n\n` : '') +
-            `Please verify that the post is visible in the channel and click "✅ Confirm Publication" below.\n\n` +
-            `After your confirmation, funds will be released to the channel owner.\n\n` +
-            `Use /deal ${deal.id} to view details.`;
-
-          const confirmButtons = {
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  { text: '✅ Confirm Publication', callback_data: `confirm_publication_${deal.id}` }
-                ],
-                [
-                  { text: '📋 View Deal', callback_data: `deal_details_${deal.id}` }
-                ]
-              ]
-            },
-            parse_mode: 'HTML' as const
-          };
-
-          await TelegramService.bot.sendMessage(advertiser.telegram_id, confirmMessage, confirmButtons);
-        }
-
-        // Build post link for channel owner
-        let ownerPostLink = '';
-        if (channelData?.username) {
-          ownerPostLink = `https://t.me/${channelData.username.replace('@', '')}/${messageId}`;
-        } else if (channelData?.telegram_channel_id) {
-          const channelIdStr = channelData.telegram_channel_id.toString().replace('-100', '');
-          ownerPostLink = `https://t.me/c/${channelIdStr}/${messageId}`;
-        }
-
-        const ownerButtons: any[] = [];
-        if (ownerPostLink) {
-          ownerButtons.push([
-            Markup.button.url('🔗 View Post', ownerPostLink)
-          ]);
-        }
+      const ownerButtons: any[] = [];
+      if (postLink) {
         ownerButtons.push([
-          Markup.button.callback('📋 View Deal', `deal_details_${deal.id}`)
+          Markup.button.url('🔗 View Post', postLink)
         ]);
-
-        await ctx.reply(
-          `✅ Post published successfully!\n\n` +
-          `Deal #${deal.id} post has been published to the channel.\n\n` +
-          `Waiting for advertiser confirmation...\n\n` +
-          `After advertiser confirms, funds will be released to your wallet.\n\n` +
-          `Use /deal ${deal.id} to view details.`,
-          Markup.inlineKeyboard(ownerButtons)
-        );
       }
+      ownerButtons.push([
+        Markup.button.callback('📋 View Deal', `deal_details_${dealId}`)
+      ]);
+
+      await ctx.reply(
+        `✅ Post published successfully!\n\n` +
+        `Deal #${dealId} post has been published to the channel.\n\n` +
+        `Waiting for advertiser confirmation...\n\n` +
+        `After advertiser confirms, funds will be released to your wallet.\n\n` +
+        `Use /deal ${dealId} to view details.`,
+        Markup.inlineKeyboard(ownerButtons)
+      );
     } catch (error: any) {
-      logger.error(`Error publishing post for Deal #${deal.id}`, { dealId: deal.id, error: error.message, stack: error.stack });
+      logger.error(`Error publishing post for Deal #${dealId}`, { dealId, error: error.message, stack: error.stack });
       await ctx.reply(`❌ Error publishing post: ${error.message}`);
     }
   }
@@ -1990,108 +1651,33 @@ export class BotHandlers {
     // Deal is already verified (status = 'verified'), so we can proceed with fund release
     // Verification period has passed and post was verified by cron job
     // Just do a final check that post still exists
-    if (!deal.post_message_id || !deal.channel_id) {
-      return ctx.reply('Post information is missing. Cannot confirm publication.');
-    }
-
     try {
-      // Get channel info
-      const channel = await db.query(
-        'SELECT telegram_channel_id FROM channels WHERE id = $1',
-        [deal.channel_id]
-      );
+      const { txHash } = await DealFlowService.confirmPublication(dealId, user.id);
 
-      if (channel.rows.length === 0) {
-        return ctx.reply('Channel not found. Cannot confirm publication.');
-      }
-
-      const channelId = channel.rows[0].telegram_channel_id;
-
-      // Final check: verify bot still has access to channel
-      try {
-        const botInfo = await TelegramService.bot.getMe();
-        await TelegramService.bot.getChatMember(channelId, botInfo.id);
-      } catch (error: any) {
-        logger.warn(`Cannot verify channel access for Deal #${deal.id}`, {
-          dealId: deal.id,
-          error: error.message,
-        });
-        return ctx.reply(
-          `❌ Cannot verify channel access!\n\n` +
-          `The bot cannot access the channel. Please contact support.\n\n` +
-          `Use /deal ${deal.id} to view details.`
-        );
-      }
-
-      // Use transaction to prevent double release
-      await withTx(async (client) => {
-        // Lock deal row and check status atomically
-        const dealCheck = await client.query(
-          `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
-          [deal.id]
-        );
-
-        if (dealCheck.rows.length === 0) {
-          throw new Error('Deal not found');
-        }
-
-        const currentDeal = dealCheck.rows[0];
-        if (currentDeal.status !== 'verified') {
-          throw new Error(`Deal is not in verified status. Current status: ${currentDeal.status}`);
-        }
-
-        // Update status first (before blockchain operation)
-        // If blockchain operation fails, we can retry
-        await client.query(
-          `UPDATE deals 
-           SET status = 'completed', updated_at = CURRENT_TIMESTAMP
-           WHERE id = $1 AND status = 'verified'
-           RETURNING *`,
-          [deal.id]
-        );
-      });
-
-      // Release funds AFTER status update (idempotent operation)
-      // If this fails, status is already 'completed', so we can retry release
-      const txHash = await TONService.releaseFunds(
-        deal.escrow_address,
-        deal.channel_owner_wallet_address,
-        deal.price_ton.toString()
-      );
-
-      logger.info(`Funds released for Deal #${deal.id}`, {
-        dealId: deal.id,
+      logger.info(`Funds released for Deal #${dealId}`, {
+        dealId,
         txHash,
         advertiserId: user.id,
       });
 
-      // Notify channel owner
-      const channelOwner = await UserModel.findById(deal.channel_owner_id);
-      if (channelOwner) {
-        await TelegramService.bot.sendMessage(
-          channelOwner.telegram_id,
-          `✅ Deal #${deal.id} Completed!\n\n` +
-          `The advertiser has confirmed publication.\n` +
-          `Post verification period completed and post verified.\n` +
-          `Funds (${deal.price_ton} TON) have been released to your wallet:\n` +
-          `\`${deal.channel_owner_wallet_address}\`\n\n` +
-          `Transaction: ${txHash}\n\n` +
-          `Use /deal ${deal.id} to view details.`,
-          { parse_mode: 'Markdown' }
-        );
-      }
+      await NotificationService.notifyDealCompleted(dealId, deal.channel_owner_id, {
+        dealId,
+        priceTon: deal.price_ton,
+        channelOwnerWalletAddress: deal.channel_owner_wallet_address,
+        txHash,
+      });
 
       await ctx.reply(
         `✅ Publication Confirmed!\n\n` +
-        `Deal #${deal.id} has been completed.\n` +
+        `Deal #${dealId} has been completed.\n` +
         `Post verification period completed and post verified.\n` +
         `Funds (${deal.price_ton} TON) have been released to the channel owner.\n\n` +
         `Transaction: ${txHash}\n\n` +
-        `Use /deal ${deal.id} to view details.`
+        `Use /deal ${dealId} to view details.`
       );
     } catch (error: any) {
-      logger.error(`Error releasing funds for Deal #${deal.id}`, {
-        dealId: deal.id,
+      logger.error(`Error releasing funds for Deal #${dealId}`, {
+        dealId,
         error: error.message,
         stack: error.stack,
       });

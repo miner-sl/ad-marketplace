@@ -390,24 +390,24 @@ export class CronJobs {
                 // In production, you might want to implement a more robust check
                 // (e.g., try to forward message to a test chat, or use Telegram Client API)
                 
-                // Additional check: verify the post was published at least MIN_POST_DURATION_HOURS ago
-                const minPostDurationHours = parseInt(process.env.MIN_POST_DURATION_HOURS || '24', 10);
+                // Additional check: verify the post was published at least MIN_PUBLICATION_DURATION_DAYS ago
+                const minPublicationDurationDays = deal.min_publication_duration_days || 7;
                 if (deal.actual_post_time) {
                   const postTime = new Date(deal.actual_post_time);
-                  const hoursSincePost = (now.getTime() - postTime.getTime()) / (1000 * 60 * 60);
+                  const daysSincePost = (now.getTime() - postTime.getTime()) / (1000 * 60 * 60 * 24);
                   
-                  if (hoursSincePost >= minPostDurationHours) {
+                  if (daysSincePost >= minPublicationDurationDays) {
                     postExists = true;
-                    logger.info(`Deal #${deal.id}: Post verified (${minPostDurationHours}h+ since publication)`, {
+                    logger.info(`Deal #${deal.id}: Post verified (${minPublicationDurationDays} days+ since publication)`, {
                       dealId: deal.id,
-                      hoursSincePost: Math.floor(hoursSincePost),
-                      minPostDurationHours,
+                      daysSincePost: Math.floor(daysSincePost),
+                      minPublicationDurationDays,
                     });
                   } else {
                     logger.debug(`Deal #${deal.id}: Post not old enough yet`, {
                       dealId: deal.id,
-                      hoursSincePost: Math.floor(hoursSincePost),
-                      minPostDurationHours,
+                      daysSincePost: Math.floor(daysSincePost),
+                      minPublicationDurationDays,
                     });
                     continue; // Wait for full minimum duration
                   }
@@ -417,7 +417,7 @@ export class CronJobs {
                   postExists = true;
                   logger.info(`Deal #${deal.id}: Post verified (verification period passed, bot has access)`, {
                     dealId: deal.id,
-                    minPostDurationHours,
+                    minPublicationDurationDays,
                   });
                 }
               }
@@ -430,20 +430,63 @@ export class CronJobs {
             }
 
             if (postExists) {
-              // Post verified - mark as verified but DON'T release funds yet
+              // Check if minimum publication duration has been reached
+              let publicationDurationMet = false;
+              let daysSinceFirstPublication = 0;
+              let minPublicationDurationDays = deal.min_publication_duration_days || 7;
+              
+              if (deal.first_publication_time) {
+                const firstPublicationTime = new Date(deal.first_publication_time);
+                const now = new Date();
+                daysSinceFirstPublication = (now.getTime() - firstPublicationTime.getTime()) / (1000 * 60 * 60 * 24);
+                publicationDurationMet = daysSinceFirstPublication >= minPublicationDurationDays;
+              }
+
+              if (!publicationDurationMet) {
+                // Duration not met yet - notify channel owner
+                logger.info(`Deal #${deal.id}: Post verified but duration requirement not met`, {
+                  dealId: deal.id,
+                  daysSinceFirstPublication: Math.floor(daysSinceFirstPublication),
+                  minPublicationDurationDays,
+                });
+
+                const channelOwner = await UserModel.findById(deal.channel_owner_id);
+                if (channelOwner) {
+                  const remainingDays = Math.ceil(minPublicationDurationDays - daysSinceFirstPublication);
+                  const message = 
+                    `📢 Deal #${deal.id} Status Update\n\n` +
+                    `The post has been verified (remained on channel for required duration).\n\n` +
+                    `⚠️ Minimum publication duration not reached.\n` +
+                    `Required: ${minPublicationDurationDays} days\n` +
+                    `Elapsed: ${Math.floor(daysSinceFirstPublication)} days\n` +
+                    `Remaining: ${remainingDays} day(s)\n\n` +
+                    `Please wait until the minimum publication period is completed.\n\n` +
+                    `Use /deal ${deal.id} to view details.`;
+
+                  await TelegramService.bot.sendMessage(channelOwner.telegram_id, message);
+                }
+                continue; // Skip marking as verified until duration requirement met
+              }
+
+              // Post verified and duration requirement met - mark as verified but DON'T release funds yet
               // Funds will be released only when advertiser confirms publication
               await DealModel.markVerified(deal.id);
               // Don't mark as completed yet - wait for advertiser confirmation
 
-              logger.info(`Deal #${deal.id} marked as verified - waiting for advertiser confirmation`, { dealId: deal.id });
+              logger.info(`Deal #${deal.id} marked as verified - waiting for advertiser confirmation`, {
+                dealId: deal.id,
+                daysSinceFirstPublication: Math.floor(daysSinceFirstPublication),
+                minPublicationDurationDays,
+              });
 
               // Notify advertiser with confirmation button
               const advertiser = await UserModel.findById(deal.advertiser_id);
               if (advertiser) {
-                const minPostDurationHours = parseInt(process.env.MIN_POST_DURATION_HOURS || '24', 10);
                 const confirmMessage = 
                   `✅ Deal #${deal.id} Verified!\n\n` +
-                  `The post has been published and remained on the channel for at least ${minPostDurationHours} hours.\n\n` +
+                  `The post has remained on the channel for at least ${minPublicationDurationDays} days.\n` +
+                  `Minimum requirement met:\n` +
+                  `- Publication duration: ${Math.floor(daysSinceFirstPublication)}/${minPublicationDurationDays} days ✓\n\n` +
                   `Please confirm that the post is still visible and meets your requirements.\n\n` +
                   `After your confirmation, funds will be released to the channel owner.\n\n` +
                   `Use /deal ${deal.id} to view details.`;
@@ -470,7 +513,8 @@ export class CronJobs {
                 await TelegramService.bot.sendMessage(
                   channelOwner.telegram_id,
                   `✅ Deal #${deal.id} Verified!\n\n` +
-                  `The post has been verified (remained on channel for required duration).\n` +
+                  `The post has been verified (remained on channel for ${Math.floor(daysSinceFirstPublication)} days).\n` +
+                  `Minimum requirement met.\n` +
                   `Waiting for advertiser confirmation to release funds.\n\n` +
                   `Use /deal ${deal.id} to view details.`
                 );

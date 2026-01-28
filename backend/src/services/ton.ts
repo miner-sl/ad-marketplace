@@ -1,4 +1,4 @@
-import { Address, fromNano, toNano } from '@ton/ton';
+import { Address, fromNano, toNano } from '@ton/core';
 import * as dotenv from 'dotenv';
 import {mockTx} from "./mockTx";
 import logger from '../utils/logger';
@@ -15,13 +15,13 @@ async function retry<T>(
   backoff: number = 2
 ): Promise<T> {
   let lastError: Error | null = null;
-  
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await fn();
     } catch (error: any) {
       lastError = error;
-      
+
       if (attempt < maxRetries - 1) {
         const waitTime = delayMs * Math.pow(backoff, attempt);
         logger.warn(`Retry attempt ${attempt + 1}/${maxRetries} after ${waitTime}ms`, {
@@ -32,7 +32,7 @@ async function retry<T>(
       }
     }
   }
-  
+
   throw lastError || new Error('Retry failed');
 }
 
@@ -42,10 +42,10 @@ export interface EscrowWallet {
 }
 
 export class TONService {
-  private static providerUrl = process.env.TON_NETWORK === 'mainnet' 
+  private static providerUrl = process.env.TON_NETWORK === 'mainnet'
     ? 'https://toncenter.com/api/v2'
     : 'https://testnet.toncenter.com/api/v2';
-  
+
   private static apiKey = process.env.TON_API_KEY;
 
   /**
@@ -57,7 +57,7 @@ export class TONService {
     const mnemonic: string[] = [];
     // Simplified - in production use proper mnemonic generation
     // For MVP, we'll use a deterministic approach based on deal ID
-    
+
     // This is a placeholder - proper implementation would use @ton/crypto mnemonic generation
     return {
       address: '', // Would be generated from mnemonic
@@ -69,17 +69,17 @@ export class TONService {
    * Generate escrow address for a deal
    * This address represents a wallet managed by our system where advertiser funds
    * will be held (escrowed) until the ad is published and verified.
-   * 
+   *
    * For MVP: Uses deterministic approach based on deal ID
    * In production: Should generate a new unique wallet per deal or use a smart contract
-   * 
+   *
    * The wallet is controlled by our system and funds are released to channel owner
    * only after successful ad publication and verification.
    */
   static async generateEscrowAddress(dealId: number): Promise<string> {
     // For MVP, we'll use a simplified approach
     // In production, generate a new wallet per deal or use a smart contract
-    
+
     // Placeholder - would generate actual TON address
     // Using deal ID to create deterministic address for testing
     // TODO: Replace with actual wallet generation using @ton/crypto
@@ -107,19 +107,19 @@ export class TONService {
       }
 
       const url = `${this.providerUrl}/getAddressInformation?address=${encodeURIComponent(formattedAddress)}${this.apiKey ? `&api_key=${this.apiKey}` : ''}`;
-      
+
       const data = await retry(async () => {
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        return await response.json() as { 
+        return await response.json() as {
           ok?: boolean;
           result?: { balance?: string };
           error?: string;
         };
       }, 3, 1000, 2);
-      
+
       // Check for API errors
       if (data.ok === false || data.error) {
         logger.warn('Balance check API error', {
@@ -128,7 +128,7 @@ export class TONService {
         });
         return '0';
       }
-      
+
       return data?.result?.balance || '0';
     } catch (error: any) {
       logger.error('Failed to get balance', { error: error.message, address, stack: error.stack });
@@ -189,12 +189,12 @@ export class TONService {
 
         // Check incoming messages (payments TO this address)
         // in_msg.value contains the amount sent TO the address (in nanoTON)
-        // 
+        //
         // Example values:
         // - "0" = no payment (system message)
         // - "1606764295" = 1.606764295 TON (1606764295 / 10^9)
         // - "25500000000" = 25.5 TON (25500000000 / 10^9)
-        // 
+        //
         // Conversion: 1 TON = 1,000,000,000 nanoTON (10^9)
         if (tx.in_msg) {
           const inMsg = tx.in_msg;
@@ -203,7 +203,7 @@ export class TONService {
           if (inMsg.value && inMsg.value !== '0') {
             const txValueNano = BigInt(inMsg.value);
             const txValueTON = fromNano(txValueNano); // Convert nanoTON to TON
-            
+
             console.log('💰 Found incoming payment transaction:', {
               valueNano: inMsg.value,
               valueTON: txValueTON,
@@ -236,7 +236,7 @@ export class TONService {
         // Also check out_msgs for incoming payments (when checking from sender's perspective)
         // But for escrow, we want in_msg (money coming IN)
         // out_msgs are payments FROM this address (not what we're looking for)
-        
+
         // Check transaction value directly (some APIs return it here as total)
         if (tx.value && tx.value !== '0') {
           const txValueNano = BigInt(tx.value);
@@ -301,7 +301,7 @@ export class TONService {
       console.log('Checking balance:', { address, balance, expectedAmount });
       const balanceNano = BigInt(balance);
       const expectedNano = toNano(expectedAmount);
-      
+
       return {
         received: balanceNano >= expectedNano,
         amount: fromNano(balanceNano),
@@ -322,7 +322,7 @@ export class TONService {
     // This would require signing and broadcasting a transaction
     // For MVP, we'll return a placeholder transaction hash
     // In production, use wallet to sign and send transaction
-    
+
     // Placeholder implementation
     return `tx_${Date.now()}`;
   }
@@ -366,7 +366,7 @@ export class TONService {
       // return mockTx;
       const url = `${this.providerUrl}/getTransactions?address=${encodeURIComponent(formattedAddress)}&limit=${limit}${this.apiKey ? `&api_key=${this.apiKey}` : ''}`;
       console.log('transactions url', url);
-      
+
       // const response = await fetch(url);
       // const data = await response.json() as {
       //   ok?: boolean;
@@ -386,9 +386,9 @@ export class TONService {
         // Common errors:
         // - "cannot locate transaction" - address is new or has no transactions (not critical)
         // - Other errors - log but don't fail
-        const isNonCriticalError = data.error?.includes('cannot locate transaction') || 
+        const isNonCriticalError = data.error?.includes('cannot locate transaction') ||
                                    data.error?.includes('LITE_SERVER_UNKNOWN');
-        
+
         if (isNonCriticalError) {
           console.log('Address has no transactions yet (new address):', {
             address: formattedAddress,
@@ -404,7 +404,7 @@ export class TONService {
         // Return empty array instead of throwing - allows fallback to balance check
         return [];
       }
-      
+
       return data.result || [];
     } catch (error: any) {
       console.error('Failed to get transactions:', error);

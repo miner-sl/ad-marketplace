@@ -93,7 +93,7 @@ app.get('/live', (req, res) => {
 
 // Swagger documentation
 const swaggerDocument = YAML.load(path.join(__dirname, '../swagger.yaml'));
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+app.use('/api-docs', swaggerUi.serve as any, swaggerUi.setup(swaggerDocument) as any);
 
 // API routes
 app.use('/api/channels', channelsRouter);

@@ -22,7 +22,7 @@ services:
 
   app:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     container_name: ad-marketplace-app
     environment:
@@ -35,15 +35,16 @@ services:
       TON_API_KEY: ${TON_API_KEY}
       TON_WALLET_MNEMONIC: ${TON_WALLET_MNEMONIC:-}
       DEAL_TIMEOUT_HOURS: ${DEAL_TIMEOUT_HOURS:-72}
-      MIN_POST_DURATION_HOURS: ${MIN_POST_DURATION_HOURS:-24}
+      MIN_PUBLICATION_DURATION_DAYS: ${MIN_PUBLICATION_DURATION_DAYS:-7}
+      VERIFIED_TIMEOUT_HOURS: ${VERIFIED_TIMEOUT_HOURS:-168}
     ports:
       - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      - ./src:/app/src
-      - ./dist:/app/dist
+      - ./backend/src:/app/src
+      - ./backend/dist:/app/dist
       - /app/node_modules
     networks:
       - ad-marketplace-network

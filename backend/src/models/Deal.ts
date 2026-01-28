@@ -37,6 +37,8 @@ export interface Deal {
   actual_post_time?: Date;
   post_message_id?: number;
   post_verification_until?: Date;
+  first_publication_time?: Date;
+  min_publication_duration_days?: number;
   timeout_at?: Date;
   created_at: Date;
   updated_at: Date;

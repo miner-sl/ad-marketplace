@@ -28,7 +28,7 @@ services:
 
   app:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile.prod
     container_name: ad-marketplace-app-prod
     restart: unless-stopped
@@ -42,7 +42,8 @@ services:
       TON_API_KEY: ${TON_API_KEY}
       TON_WALLET_MNEMONIC: ${TON_WALLET_MNEMONIC}
       DEAL_TIMEOUT_HOURS: ${DEAL_TIMEOUT_HOURS:-72}
-      MIN_POST_DURATION_HOURS: ${MIN_POST_DURATION_HOURS:-24}
+      MIN_PUBLICATION_DURATION_DAYS: ${MIN_PUBLICATION_DURATION_DAYS:-7}
+      VERIFIED_TIMEOUT_HOURS: ${VERIFIED_TIMEOUT_HOURS:-168}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       LOG_DIR: /app/logs
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}

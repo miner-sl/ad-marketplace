@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { ChannelModel } from '../models/Channel';
+import { ChannelRepository } from '../repositories/ChannelRepository';
 import { UserModel } from '../models/User';
 import { TelegramService } from '../services/telegram';
 import { validate } from '../middleware/validation';
 import { createChannelSchema } from '../utils/validation';
-import db from '../db/connection';
 
 const router = Router();
 
@@ -21,47 +21,18 @@ router.get('/', async (req, res) => {
       offset = 0,
     } = req.query;
 
-    let query = `
-      SELECT c.*, cs.subscribers_count, cs.average_views, cp.price_ton, cp.ad_format
-      FROM channels c
-      LEFT JOIN LATERAL (
-        SELECT * FROM channel_stats 
-        WHERE channel_id = c.id 
-        ORDER BY stats_date DESC 
-        LIMIT 1
-      ) cs ON true
-      LEFT JOIN channel_pricing cp ON cp.channel_id = c.id AND cp.is_active = TRUE
-      WHERE c.is_active = TRUE
-    `;
-    const params: any[] = [];
-    let paramCount = 1;
+    const filters = {
+      min_subscribers: min_subscribers ? parseInt(min_subscribers as string) : undefined,
+      max_subscribers: max_subscribers ? parseInt(max_subscribers as string) : undefined,
+      min_price: min_price ? parseFloat(min_price as string) : undefined,
+      max_price: max_price ? parseFloat(max_price as string) : undefined,
+      ad_format: ad_format as string | undefined,
+      limit: parseInt(limit as string),
+      offset: parseInt(offset as string),
+    };
 
-    if (min_subscribers) {
-      query += ` AND cs.subscribers_count >= $${paramCount++}`;
-      params.push(parseInt(min_subscribers as string));
-    }
-    if (max_subscribers) {
-      query += ` AND cs.subscribers_count <= $${paramCount++}`;
-      params.push(parseInt(max_subscribers as string));
-    }
-    if (ad_format) {
-      query += ` AND cp.ad_format = $${paramCount++}`;
-      params.push(ad_format);
-    }
-    if (min_price) {
-      query += ` AND cp.price_ton >= $${paramCount++}`;
-      params.push(parseFloat(min_price as string));
-    }
-    if (max_price) {
-      query += ` AND cp.price_ton <= $${paramCount++}`;
-      params.push(parseFloat(max_price as string));
-    }
-
-    query += ` ORDER BY c.created_at DESC LIMIT $${paramCount++} OFFSET $${paramCount++}`;
-    params.push(parseInt(limit as string), parseInt(offset as string));
-
-    const result = await db.query(query, params);
-    res.json(result.rows);
+    const channels = await ChannelRepository.listChannelsWithFilters(filters);
+    res.json(channels);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -70,25 +41,13 @@ router.get('/', async (req, res) => {
 // Get channel details
 router.get('/:id', async (req, res) => {
   try {
-    const channel = await db.query(
-      `SELECT c.*, cs.*, 
-       (SELECT json_agg(cp.*) FROM channel_pricing cp WHERE cp.channel_id = c.id AND cp.is_active = TRUE) as pricing
-       FROM channels c
-       LEFT JOIN LATERAL (
-         SELECT * FROM channel_stats 
-         WHERE channel_id = c.id 
-         ORDER BY stats_date DESC 
-         LIMIT 1
-       ) cs ON true
-       WHERE c.id = $1`,
-      [req.params.id]
-    );
+    const channel = await ChannelRepository.findByIdWithDetails(parseInt(req.params.id));
 
-    if (channel.rows.length === 0) {
+    if (!channel) {
       return res.status(404).json({ error: 'Channel not found' });
     }
 
-    res.json(channel.rows[0]);
+    res.json(channel);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -161,14 +120,12 @@ router.post('/:id/pricing', async (req, res) => {
 // Refresh channel stats
 router.post('/:id/refresh-stats', async (req, res) => {
   try {
-    const channel = await db.query('SELECT * FROM channels WHERE id = $1', [req.params.id]);
-    if (channel.rows.length === 0) {
+    const channel = await ChannelRepository.findById(parseInt(req.params.id));
+    if (!channel || !channel.telegram_channel_id) {
       return res.status(404).json({ error: 'Channel not found' });
     }
 
-    const stats = await TelegramService.fetchChannelStats(
-      channel.rows[0].telegram_channel_id
-    );
+    const stats = await TelegramService.fetchChannelStats(channel.telegram_channel_id);
     const savedStats = await ChannelModel.saveStats(parseInt(req.params.id), stats);
     res.json(savedStats);
   } catch (error: any) {

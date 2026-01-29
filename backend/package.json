@@ -10,7 +10,6 @@
     "migrate": "tsx src/db/migrate.ts",
     "migrate:run": "tsx src/db/run_migrations.ts",
     "test": "jest",
-    "wallet:generate": "tsx src/scripts/generate-wallet.ts",
     "wallet:escrow": "tsx src/scripts/generate-escrow-wallet.ts",
     "wallet:transfer": "tsx src/scripts/transfer-funds.ts",
     "db:test": "tsx src/scripts/test-db-connection.ts",

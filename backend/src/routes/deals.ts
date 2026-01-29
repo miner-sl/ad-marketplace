@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { DealModel } from '../models/Deal';
+import { DealRepository } from '../repositories/DealRepository';
+import { CreativeRepository } from '../repositories/CreativeRepository';
 import { DealFlowService } from '../services/dealFlow';
 import { validate } from '../middleware/validation';
 import { createDealSchema, confirmPaymentSchema, submitCreativeSchema } from '../utils/validation';
-import db from '../db/connection';
 
 const router = Router();
 
@@ -16,15 +17,11 @@ router.get('/', async (req, res) => {
     if (user_id) {
       deals = await DealModel.findByUser(parseInt(user_id as string));
     } else {
-      const result = await db.query(
-        `SELECT * FROM deals 
-         WHERE ($1::text IS NULL OR status = $1)
-         AND ($2::text IS NULL OR deal_type = $2)
-         ORDER BY created_at DESC
-         LIMIT 100`,
-        [status || null, deal_type || null]
-      );
-      deals = result.rows;
+      deals = await DealRepository.listDealsWithFilters({
+        status: status as string | undefined,
+        deal_type: deal_type as string | undefined,
+        limit: 100,
+      });
     }
 
     res.json(deals);
@@ -41,22 +38,14 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Deal not found' });
     }
 
-    // Get messages
-    const messages = await db.query(
-      'SELECT * FROM deal_messages WHERE deal_id = $1 ORDER BY created_at ASC',
-      [deal.id]
-    );
-
-    // Get creative if exists
-    const creative = await db.query(
-      'SELECT * FROM creatives WHERE deal_id = $1 ORDER BY created_at DESC LIMIT 1',
-      [deal.id]
-    );
+    // Get messages and creative using repositories
+    const messages = await DealRepository.getMessages(deal.id);
+    const creative = await CreativeRepository.findByDeal(deal.id);
 
     res.json({
       ...deal,
-      messages: messages.rows,
-      creative: creative.rows[0] || null,
+      messages,
+      creative,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

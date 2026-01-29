@@ -8,7 +8,30 @@ export interface DealMessage {
   created_at: Date;
 }
 
+export interface DealListFilters {
+  status?: string;
+  deal_type?: string;
+  limit?: number;
+}
+
 export class DealRepository {
+  /**
+   * List deals with filters (status, deal_type)
+   */
+  static async listDealsWithFilters(filters: DealListFilters): Promise<any[]> {
+    const { status, deal_type, limit = 100 } = filters;
+
+    const result = await db.query(
+      `SELECT * FROM deals 
+       WHERE ($1::text IS NULL OR status = $1)
+       AND ($2::text IS NULL OR deal_type = $2)
+       ORDER BY created_at DESC
+       LIMIT $3`,
+      [status || null, deal_type || null, limit]
+    );
+    return result?.rows || [];
+  }
+
   /**
    * Get pending deals for channel owner
    */
@@ -21,7 +44,7 @@ export class DealRepository {
        LIMIT $2`,
       [ownerId, limit]
     );
-    return result.rows;
+    return result?.rows || [];
   }
 
   /**
@@ -32,7 +55,7 @@ export class DealRepository {
       'SELECT * FROM deal_messages WHERE deal_id = $1 ORDER BY created_at ASC',
       [dealId]
     );
-    return result.rows;
+    return result?.rows || [];
   }
 
   /**
@@ -43,6 +66,9 @@ export class DealRepository {
       `SELECT message_text FROM deal_messages WHERE deal_id = $1 ORDER BY created_at ASC LIMIT 1`,
       [dealId]
     );
+    if (!result?.rows || result.rows.length === 0) {
+      return null;
+    }
     return result.rows[0]?.message_text || null;
   }
 
@@ -62,6 +88,9 @@ export class DealRepository {
        WHERE d.id = $1`,
       [dealId]
     );
+    if (!result?.rows || result.rows.length === 0) {
+      return null;
+    }
     return result.rows[0] || null;
   }
 }

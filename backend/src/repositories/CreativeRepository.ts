@@ -24,6 +24,9 @@ export class CreativeRepository {
        LIMIT 1`,
       [dealId]
     );
+    if (!result?.rows || result.rows.length === 0) {
+      return null;
+    }
     return result.rows[0] || null;
   }
 }

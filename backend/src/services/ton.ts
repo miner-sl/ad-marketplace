@@ -40,6 +40,60 @@ async function retry<T>(
   throw lastError || new Error('Retry failed');
 }
 
+/**
+ * Retry function with exponential backoff for rate limiting (429 errors)
+ */
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 5,
+  initialDelayMs: number = 2000,
+  backoffMultiplier: number = 2
+): Promise<T> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+
+      // Check if it's a rate limit error (429) or network error
+      const isRateLimit = error.response?.status === 429 ||
+                         error.status === 429 ||
+                         error.message?.includes('429') ||
+                         error.message?.includes('rate limit') ||
+                         error.message?.includes('Too Many Requests');
+
+      // For rate limit errors, use longer delays
+      if (isRateLimit && attempt < maxRetries - 1) {
+        const waitTime = initialDelayMs * Math.pow(backoffMultiplier, attempt);
+        logger.warn(`Rate limit hit, retrying after ${waitTime}ms`, {
+          attempt: attempt + 1,
+          maxRetries,
+          waitTime,
+          error: error.message,
+        });
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+
+      // For other errors, use shorter delays
+      if (attempt < maxRetries - 1) {
+        const waitTime = initialDelayMs * Math.pow(backoffMultiplier, attempt);
+        logger.warn(`Request failed, retrying after ${waitTime}ms`, {
+          attempt: attempt + 1,
+          maxRetries,
+          waitTime,
+          error: error.message,
+        });
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+  }
+
+  throw lastError || new Error('Retry failed after all attempts');
+}
+
 export interface EscrowWallet {
   address: string;
   mnemonic: string;
@@ -536,6 +590,209 @@ export class TONService {
   }
 
   /**
+   * Transfer TON from one address to another using mnemonic key
+   * Public method with retry logic for rate limiting
+   * @param fromAddress Source wallet address
+   * @param toAddress Destination wallet address
+   * @param amount Amount in TON (e.g., "10.5")
+   * @param comment Optional transaction comment
+   * @param fromMnemonicKey Mnemonic phrase (24 words) for the source wallet
+   * @returns Transaction hash
+   */
+  static async transferTon(
+    fromAddress: string,
+    toAddress: string,
+    amount: string,
+    comment: string | undefined,
+    fromMnemonicKey: string
+  ): Promise<string> {
+    try {
+      // Validate addresses
+      if (!this.isValidAddress(fromAddress)) {
+        throw new Error(`Invalid from address: ${fromAddress}`);
+      }
+
+      if (!this.isValidAddress(toAddress)) {
+        throw new Error(`Invalid to address: ${toAddress}`);
+      }
+
+      // Parse addresses
+      const toAddr = Address.parse(toAddress);
+
+      // Convert amount to nanoTON
+      const amountNano = toNano(amount);
+
+      // Parse mnemonic phrase
+      const mnemonicArray = fromMnemonicKey.trim().split(/\s+/);
+      if (mnemonicArray.length !== 24) {
+        throw new Error('Mnemonic must be 24 words');
+      }
+
+      // Convert mnemonic to wallet key
+      const walletKey = await mnemonicToWalletKey(mnemonicArray);
+
+      // Get TON client
+      const isMainnet = process.env.TON_NETWORK === 'mainnet';
+      const endpoint = isMainnet
+        ? process.env.TON_RPC_URL || 'https://toncenter.com/api/v2/jsonRPC'
+        : process.env.TON_RPC_URL || 'https://testnet.toncenter.com/api/v2/jsonRPC';
+
+      logger.info(`Initializing TonClient`, {
+        endpoint,
+        hasApiKey: !!this.apiKey,
+        network: isMainnet ? 'mainnet' : 'testnet',
+      });
+
+      const client = new TonClient({
+        endpoint,
+        apiKey: this.apiKey,
+      });
+
+      // Create wallet contract instance
+      const wallet = WalletContractV4.create({
+        publicKey: walletKey.publicKey,
+        workchain: 0,
+      });
+
+      // Verify the wallet address matches the provided fromAddress
+      const walletAddress = wallet.address.toString({ bounceable: false, urlSafe: true });
+      if (walletAddress !== fromAddress) {
+        throw new Error(
+          `Wallet address mismatch. Expected: ${fromAddress}, ` +
+          `Got: ${walletAddress}. Mnemonic may be incorrect.`
+        );
+      }
+
+      // Open wallet contract
+      const walletContract = client.open(wallet);
+
+      logger.info(`Connecting to wallet`, {
+        address: fromAddress,
+        network: isMainnet ? 'mainnet' : 'testnet',
+      });
+
+      // Add a small delay before first call to avoid immediate rate limits
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Get current balance with retry logic
+      const balance = await retryWithBackoff(
+        () => walletContract.getBalance(),
+        5, // max retries
+        2000, // initial delay 2 seconds
+        2 // backoff multiplier
+      );
+
+      // Add delay between API calls
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Get seqno with retry logic
+      const seqno = await retryWithBackoff(
+        () => walletContract.getSeqno(),
+        5, // max retries
+        2000, // initial delay 2 seconds
+        2 // backoff multiplier
+      );
+
+      logger.info(`Wallet state`, {
+        address: fromAddress,
+        balance: balance.toString(),
+        balanceTON: fromNano(balance),
+        seqno,
+      });
+
+      // Verify sufficient balance
+      if (balance < amountNano) {
+        throw new Error(
+          `Insufficient balance. Required: ${amount} TON (${amountNano.toString()} nanoTON), ` +
+          `Available: ${fromNano(balance)} TON (${balance.toString()} nanoTON)`
+        );
+      }
+
+      // Create transfer message
+      const transfer = walletContract.createTransfer({
+        secretKey: walletKey.secretKey,
+        messages: [
+          internal({
+            to: toAddr,
+            value: amountNano,
+            body: comment ? beginCell().storeUint(0, 32).storeStringTail(comment).endCell() : undefined,
+            bounce: false,
+          }),
+        ],
+        seqno: seqno,
+      });
+
+      // Send transaction to blockchain
+      logger.info(`Sending transaction`, {
+        from: fromAddress,
+        to: toAddress,
+        amount: amount,
+        amountNano: amountNano.toString(),
+        seqno,
+      });
+
+      // Send the transfer transaction with retry logic
+      await retryWithBackoff(
+        () => walletContract.send(transfer),
+        3, // max retries for send
+        3000, // initial delay 3 seconds
+        2 // backoff multiplier
+      );
+
+      logger.info(`Transaction sent successfully`, {
+        fromAddress,
+        toAddress,
+        amount,
+        amountNano: amountNano.toString(),
+        seqno,
+      });
+
+      // Wait a bit for transaction to be processed
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Try to get the transaction hash from recent transactions
+      let txHash: string;
+      try {
+        const transactions = await this.getTransactions(fromAddress, 1);
+        if (transactions && transactions.length > 0 && transactions[0].transaction_id?.hash) {
+          txHash = transactions[0].transaction_id.hash;
+          logger.info(`Found transaction hash`, { txHash });
+        } else {
+          // Fallback: generate a reference hash based on timestamp
+          txHash = `tx_${Date.now()}`;
+          logger.warn(`Could not retrieve transaction hash, using reference`, { txHash });
+        }
+      } catch (error: any) {
+        // Fallback if transaction lookup fails
+        txHash = `tx_${Date.now()}`;
+        logger.warn(`Transaction hash lookup failed, using reference`, {
+          txHash,
+          error: error.message,
+        });
+      }
+
+      logger.info(`Transfer completed`, {
+        fromAddress,
+        toAddress,
+        amount,
+        amountNano: amountNano.toString(),
+        txHash,
+      });
+
+      return txHash;
+    } catch (error: any) {
+      logger.error(`Failed to transfer TON`, {
+        fromAddress,
+        toAddress,
+        amount,
+        error: error.message,
+        stack: error.stack,
+      });
+      throw new Error(`Failed to transfer TON: ${error.message}`);
+    }
+  }
+
+  /**
    * Release funds from escrow wallet to recipient
    * @param dealId Deal ID to get escrow wallet
    * @param recipientAddress Recipient TON address
@@ -560,132 +817,27 @@ export class TONService {
         throw new Error(`Invalid recipient address: ${recipientAddress}`);
       }
 
-      // Parse addresses
-      // const escrowAddr = Address.parse(escrowWallet.address);
-      const recipientAddr = Address.parse(recipientAddress);
-
-      // Convert amount to nanoTON
-      const amountNano = toNano(amount);
-
-      // Get TON client (connects to testnet or mainnet based on TON_NETWORK)
-      const client = this.getTonClient();
-
-      // Create wallet contract instance with public key
-      // The wallet address is derived from the public key, so it matches escrowAddr
-      const wallet = WalletContractV4.create({
-        publicKey: Buffer.from(escrowWallet.publicKey, 'hex'),
-        workchain: 0
-      });
-
-      // Verify the wallet address matches the stored escrow address
-      const walletAddress = wallet.address.toString({ bounceable: false, urlSafe: true });
-      if (walletAddress !== escrowWallet.address) {
-        throw new Error(
-          `Wallet address mismatch. Expected: ${escrowWallet.address}, ` +
-          `Got: ${walletAddress}. Public key may be incorrect.`
-        );
-      }
-
-      // Open wallet contract - this connects to the wallet on the blockchain (testnet or mainnet)
-      // The wallet contract is already bound to the correct address via the public key
-      const walletContract = client.open(wallet);
-
-      // Verify wallet is accessible and get current state
-      logger.info(`Connecting to escrow wallet`, {
-        dealId,
-        address: escrowWallet.address,
-        network: process.env.TON_NETWORK || 'testnet',
-      });
-
-      // Get current balance and seqno
-      const balance = await walletContract.getBalance();
-      const seqno = await walletContract.getSeqno();
-
-      logger.info(`Escrow wallet state`, {
-        dealId,
-        address: escrowWallet.address,
-        balance: balance.toString(),
-        seqno,
-      });
-
-      // Verify sufficient balance
-      if (balance < amountNano) {
-        throw new Error(
-          `Insufficient balance. Required: ${amount} TON (${amountNano.toString()} nanoTON), ` +
-          `Available: ${fromNano(balance)} TON (${balance.toString()} nanoTON)`
-        );
-      }
-
-      // Create transfer message
-      const transfer = walletContract.createTransfer({
-        secretKey: escrowWallet.secretKey,
-        messages: [
-          internal({
-            to: recipientAddr,
-            value: amountNano,
-            body: comment ? beginCell().storeUint(0, 32).storeStringTail(comment).endCell() : undefined,
-            bounce: false,
-          }),
-        ],
-        seqno: seqno,
-      });
-
-      // Send transaction to blockchain
-      logger.info(`Sending transaction`, {
-        dealId,
-        from: escrowWallet.address,
-        to: recipientAddress,
-        amount: amount,
-        amountNano: amountNano.toString(),
-        seqno,
-      });
-
-      // Send the transfer transaction
-      // The send() method returns a promise that resolves when the transaction is sent
-      await walletContract.send(transfer);
-
-      logger.info(`Transaction sent successfully`, {
+      logger.info(`Releasing funds from escrow wallet`, {
         dealId,
         escrowAddress: escrowWallet.address,
         recipientAddress,
         amount,
-        amountNano: amountNano.toString(),
-        seqno,
       });
 
-      // Wait a bit for transaction to be processed
-      // In production, you might want to poll for transaction confirmation
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Try to get the transaction hash from recent transactions
-      // Note: This is a best-effort approach. For production, implement proper transaction tracking
-      let txHash: string;
-      try {
-        const transactions = await this.getTransactions(escrowWallet.address, 1);
-        if (transactions && transactions.length > 0 && transactions[0].transaction_id?.hash) {
-          txHash = transactions[0].transaction_id.hash;
-          logger.info(`Found transaction hash`, { dealId, txHash });
-        } else {
-          // Fallback: generate a reference hash based on deal and timestamp
-          txHash = `tx_${dealId}_${Date.now()}`;
-          logger.warn(`Could not retrieve transaction hash, using reference`, { dealId, txHash });
-        }
-      } catch (error: any) {
-        // Fallback if transaction lookup fails
-        txHash = `tx_${dealId}_${Date.now()}`;
-        logger.warn(`Transaction hash lookup failed, using reference`, {
-          dealId,
-          txHash,
-          error: error.message,
-        });
-      }
+      // Use transferTon function with the escrow wallet's mnemonic
+      const txHash = await this.transferTon(
+        escrowWallet.address,
+        recipientAddress,
+        amount,
+        comment || `Transfer from escrow wallet for Deal #${dealId}`,
+        escrowWallet.mnemonic
+      );
 
       logger.info(`Funds released from escrow`, {
         dealId,
         escrowAddress: escrowWallet.address,
         recipientAddress,
         amount,
-        amountNano: amountNano.toString(),
         txHash,
       });
 

@@ -455,11 +455,12 @@ export class DealFlowService {
       );
     });
 
-    // Release funds
+    // Release funds from escrow wallet to channel owner
     const txHash = await TONService.releaseFunds(
-      deal.escrow_address,
-      deal.channel_owner_wallet_address,
-      deal.price_ton.toString()
+      dealId,
+      deal.channel_owner_wallet_address!,
+      deal.price_ton.toString(),
+      `Payment for Deal #${dealId}`
     );
 
     return { txHash };
@@ -606,9 +607,10 @@ export class DealFlowService {
     if (verified) {
       // Release funds to channel owner
       await TONService.releaseFunds(
-        deal.escrow_address,
-        deal.channel_owner_wallet_address,
-        deal.price_ton.toString()
+        dealId,
+        deal.channel_owner_wallet_address!,
+        deal.price_ton.toString(),
+        `Payment for Deal #${dealId}`
       );
 
       await DealModel.updateStatus(dealId, 'verified');

@@ -4,10 +4,19 @@ import db from './connection';
 
 async function runMigrations() {
   try {
-    const migrationsDir = path.join(__dirname, 'migrations');
+    // Try source directory first (for tsx), then dist directory (for compiled)
+    let migrationsDir = path.join(__dirname, 'migrations');
+    
+    // If running from dist, try to find source migrations
+    if (!fs.existsSync(migrationsDir) && __dirname.includes('dist')) {
+      const sourceDir = path.join(__dirname, '../../src/db/migrations');
+      if (fs.existsSync(sourceDir)) {
+        migrationsDir = sourceDir;
+      }
+    }
     
     if (!fs.existsSync(migrationsDir)) {
-      console.log('No migrations directory found');
+      console.log(`No migrations directory found. Checked: ${migrationsDir}`);
       return;
     }
 

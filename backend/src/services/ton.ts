@@ -1,7 +1,11 @@
-import { Address, fromNano, toNano } from '@ton/core';
+import { Address, fromNano, toNano, internal, beginCell, Cell } from '@ton/core';
+import { mnemonicToWalletKey, mnemonicNew } from '@ton/crypto';
+import { WalletContractV4, TonClient, internal as tonInternal, SendMode } from '@ton/ton';
 import * as dotenv from 'dotenv';
-import {mockTx} from "./mockTx";
+import { mockTx } from "./mockTx";
 import logger from '../utils/logger';
+import db from '../db/connection';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -39,6 +43,8 @@ async function retry<T>(
 export interface EscrowWallet {
   address: string;
   mnemonic: string;
+  publicKey: string;
+  secretKey: Buffer;
 }
 
 export class TONService {
@@ -49,62 +55,277 @@ export class TONService {
   private static apiKey = process.env.TON_API_KEY;
 
   /**
-   * Generate a new wallet for escrow
+   * Get TON client for network operations
+   */
+  private static getTonClient(): TonClient {
+    const isMainnet = process.env.TON_NETWORK === 'mainnet';
+
+    // Use proper RPC endpoints
+    const endpoint = isMainnet
+      ? process.env.TON_RPC_URL || 'https://toncenter.com/api/v2/jsonRPC'
+      : process.env.TON_RPC_URL || 'https://testnet.toncenter.com/api/v2/jsonRPC';
+
+    logger.info(`Connecting to TON ${isMainnet ? 'mainnet' : 'testnet'}`, { endpoint });
+
+    return new TonClient({
+      endpoint,
+      apiKey: this.apiKey,
+    });
+  }
+
+  /**
+   * Encryption key for storing secret keys in database
+   * In production, this should be stored in environment variables or a secure key management system
+   */
+  private static getEncryptionKey(): Buffer {
+    const key = process.env.ESCROW_ENCRYPTION_KEY || process.env.SECRET_KEY || 'default-key-change-in-production';
+    if (key === 'default-key-change-in-production') {
+      logger.warn('Using default encryption key! Change ESCROW_ENCRYPTION_KEY in production!');
+    }
+    // Use first 32 bytes for AES-256
+    const hash = crypto.createHash('sha256').update(key).digest();
+    return Buffer.from(hash.slice(0, 32));
+  }
+
+  /**
+   * Encrypt secret key for storage
+   */
+  private static encryptSecretKey(secretKey: Buffer): string {
+    const algorithm = 'aes-256-cbc';
+    const key = this.getEncryptionKey();
+    const iv = crypto.randomBytes(16);
+
+    const cipher = crypto.createCipheriv(algorithm, key, iv);
+    let encrypted = cipher.update(secretKey);
+    encrypted = Buffer.concat([encrypted, cipher.final()]);
+
+    // Return iv:encrypted as hex string
+    return iv.toString('hex') + ':' + encrypted.toString('hex');
+  }
+
+  /**
+   * Decrypt secret key from storage
+   */
+  private static decryptSecretKey(encrypted: string): Buffer {
+    const algorithm = 'aes-256-cbc';
+    const key = this.getEncryptionKey();
+
+    const parts = encrypted.split(':');
+    const iv = Buffer.from(parts[0], 'hex');
+    const encryptedData = Buffer.from(parts[1], 'hex');
+
+    const decipher = crypto.createDecipheriv(algorithm, key, iv);
+    let decrypted = decipher.update(encryptedData);
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
+
+    return decrypted;
+  }
+
+  /**
+   * Generate a new wallet for escrow using TON crypto
    */
   static async generateEscrowWallet(): Promise<EscrowWallet> {
-    // Generate random mnemonic
-    const { randomBytes } = await import('crypto');
-    const mnemonic: string[] = [];
-    // Simplified - in production use proper mnemonic generation
-    // For MVP, we'll use a deterministic approach based on deal ID
+    try {
+      // Generate mnemonic (24 words for TON)
+      const mnemonicArray = await mnemonicNew(24);
 
-    // This is a placeholder - proper implementation would use @ton/crypto mnemonic generation
-    return {
-      address: '', // Would be generated from mnemonic
-      mnemonic: mnemonic.join(' '),
-    };
+      // Convert mnemonic to wallet key
+      const walletKey = await mnemonicToWalletKey(mnemonicArray);
+
+      // Create wallet contract (V4 is the latest standard)
+      const wallet = WalletContractV4.create({ publicKey: walletKey.publicKey, workchain: 0 });
+      const address = wallet.address.toString({ bounceable: false, urlSafe: true });
+
+      return {
+        address,
+        mnemonic: mnemonicArray.join(' '),
+        publicKey: walletKey.publicKey.toString('hex'),
+        secretKey: walletKey.secretKey,
+      };
+    } catch (error: any) {
+      logger.error('Failed to generate escrow wallet', { error: error.message, stack: error.stack });
+      throw new Error(`Failed to generate escrow wallet: ${error.message}`);
+    }
   }
 
   /**
-   * Generate escrow address for a deal
+   * Generate escrow address for a deal and store secret key
    * This address represents a wallet managed by our system where advertiser funds
    * will be held (escrowed) until the ad is published and verified.
-   *
-   * For MVP: Uses deterministic approach based on deal ID
-   * In production: Should generate a new unique wallet per deal or use a smart contract
-   *
-   * The wallet is controlled by our system and funds are released to channel owner
-   * only after successful ad publication and verification.
    */
   static async generateEscrowAddress(dealId: number): Promise<string> {
-    // For MVP, we'll use a simplified approach
-    // In production, generate a new wallet per deal or use a smart contract
+    try {
+      const existing = await db.query(
+        'SELECT address FROM escrow_wallets WHERE deal_id = $1',
+        [dealId]
+      );
 
-    // Placeholder - would generate actual TON address
-    // Using deal ID to create deterministic address for testing
-    // TODO: Replace with actual wallet generation using @ton/crypto
-    return `EQ${dealId.toString().padStart(44, '0')}`;
+      if (existing.rows.length > 0) {
+        logger.info(`Escrow wallet already exists for Deal #${dealId}`, { dealId, address: existing.rows[0].address });
+        return existing.rows[0].address;
+      }
+
+      const wallet = await this.generateEscrowWallet();
+
+      const encryptedMnemonic = this.encryptSecretKey(Buffer.from(wallet.mnemonic, 'utf8'));
+      const encryptedSecretKey = this.encryptSecretKey(wallet.secretKey);
+
+      await db.query(
+        `INSERT INTO escrow_wallets (deal_id, address, mnemonic_encrypted, secret_key_encrypted, public_key)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (deal_id) DO UPDATE
+         SET address = EXCLUDED.address,
+             mnemonic_encrypted = EXCLUDED.mnemonic_encrypted,
+             secret_key_encrypted = EXCLUDED.secret_key_encrypted,
+             public_key = EXCLUDED.public_key,
+             updated_at = CURRENT_TIMESTAMP`,
+        [dealId, wallet.address, encryptedMnemonic, encryptedSecretKey, wallet.publicKey]
+      );
+
+      logger.info(`Generated escrow wallet for Deal #${dealId}`, {
+        dealId,
+        address: wallet.address,
+      });
+
+      return wallet.address;
+    } catch (error: any) {
+      logger.error(`Failed to generate escrow address for Deal #${dealId}`, {
+        dealId,
+        error: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
   }
 
   /**
-   * Check balance of escrow address
+   * Get escrow wallet for a deal
+   */
+  static async getEscrowWallet(dealId: number): Promise<EscrowWallet | null> {
+    try {
+      const result = await db.query(
+        'SELECT address, mnemonic_encrypted, secret_key_encrypted, public_key FROM escrow_wallets WHERE deal_id = $1',
+        [dealId]
+      );
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      const row = result.rows[0];
+      const mnemonicBuffer = this.decryptSecretKey(row.mnemonic_encrypted);
+      const mnemonic = mnemonicBuffer.toString('utf8');
+      const secretKey = this.decryptSecretKey(row.secret_key_encrypted);
+
+      return {
+        address: row.address,
+        mnemonic,
+        publicKey: row.public_key,
+        secretKey,
+      };
+    } catch (error: any) {
+      logger.error(`Failed to get escrow wallet for Deal #${dealId}`, {
+        dealId,
+        error: error.message,
+        stack: error.stack,
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Get balance of address using @ton/ton TonClient
+   * Uses the TON SDK library - for wallet contracts, uses contract.getBalance()
+   * For raw addresses, uses the TON API endpoint (via TonClient's endpoint)
    */
   static async getBalance(address: string): Promise<string> {
     try {
       // Validate address format first
       if (!this.isValidAddress(address)) {
-        console.warn('Invalid address format for balance check:', address);
+        logger.warn('Invalid address format for balance check:', address);
         return '0';
       }
 
-      // Try to convert address to raw format if needed
-      let formattedAddress = address;
+      // Parse address
+      const parsedAddress = Address.parse(address);
+
+      // Get TON client (connects to testnet or mainnet)
+      const client = this.getTonClient();
+
+      // For wallet contracts, we can use contract.getBalance()
+      // For raw addresses, we need to use the API
+      // Try to get balance using TonClient's provider.getState() method
       try {
-        const parsedAddress = Address.parse(address);
-        formattedAddress = parsedAddress.toString();
-      } catch (e) {
-        console.warn('Address parsing failed for balance check, using original:', address);
+        // Open a provider for the address
+        const provider = client.provider(parsedAddress);
+
+        // Get contract state which includes balance
+        const state = await provider.getState();
+
+        // Balance is in nanoTON (BigInt)
+        const balanceNano = state.balance;
+
+        logger.debug('Balance retrieved using TonClient provider', {
+          address,
+          balance: balanceNano.toString(),
+          balanceTON: (Number(balanceNano) / 1e9).toFixed(9),
+        });
+
+        // Return balance as string (in nanoTON)
+        return balanceNano.toString();
+      } catch (providerError: any) {
+        // If provider method fails, fall back to API
+        logger.debug('Provider method failed, using API fallback', {
+          address,
+          error: providerError.message,
+        });
+        return await this.getBalanceViaAPI(address);
       }
+    } catch (error: any) {
+      logger.warn('Failed to get balance, falling back to API', {
+        error: error.message,
+        address,
+      });
+
+      // Fallback to API method if TonClient fails
+      try {
+        return await this.getBalanceViaAPI(address);
+      } catch (fallbackError: any) {
+        logger.error('Balance check fallback also failed', {
+          address,
+          error: fallbackError.message,
+        });
+        return '0';
+      }
+    }
+  }
+
+  /**
+   * Get balance for a wallet contract using @ton/ton
+   * This is more efficient when you have a wallet contract instance
+   * Uses contract.getBalance() method directly
+   */
+  static async getWalletBalance(walletContract: any): Promise<string> {
+    try {
+      const balance = await walletContract.getBalance();
+      return balance.toString();
+    } catch (error: any) {
+      logger.error('Failed to get wallet balance', {
+        error: error.message,
+        stack: error.stack,
+      });
+      return '0';
+    }
+  }
+
+  /**
+   * Get balance via REST API (fallback method)
+   * @private
+   */
+  private static async getBalanceViaAPI(address: string): Promise<string> {
+    try {
+      const parsedAddress = Address.parse(address);
+      const formattedAddress = parsedAddress.toString();
 
       const url = `${this.providerUrl}/getAddressInformation?address=${encodeURIComponent(formattedAddress)}${this.apiKey ? `&api_key=${this.apiKey}` : ''}`;
 
@@ -131,7 +352,10 @@ export class TONService {
 
       return data?.result?.balance || '0';
     } catch (error: any) {
-      logger.error('Failed to get balance', { error: error.message, address, stack: error.stack });
+      logger.error('Failed to get balance via API', {
+        error: error.message,
+        address,
+      });
       return '0';
     }
   }
@@ -312,19 +536,192 @@ export class TONService {
   }
 
   /**
-   * Release funds from escrow to channel owner
+   * Release funds from escrow wallet to recipient
+   * @param dealId Deal ID to get escrow wallet
+   * @param recipientAddress Recipient TON address
+   * @param amount Amount in TON (e.g., "25.5")
+   * @param comment Optional comment for transaction
    */
   static async releaseFunds(
+    dealId: number,
+    recipientAddress: string,
+    amount: string,
+    comment?: string
+  ): Promise<string> {
+    try {
+      // Get escrow wallet for the deal
+      const escrowWallet = await this.getEscrowWallet(dealId);
+      if (!escrowWallet) {
+        throw new Error(`Escrow wallet not found for Deal #${dealId}`);
+      }
+
+      // Validate recipient address
+      if (!this.isValidAddress(recipientAddress)) {
+        throw new Error(`Invalid recipient address: ${recipientAddress}`);
+      }
+
+      // Parse addresses
+      // const escrowAddr = Address.parse(escrowWallet.address);
+      const recipientAddr = Address.parse(recipientAddress);
+
+      // Convert amount to nanoTON
+      const amountNano = toNano(amount);
+
+      // Get TON client (connects to testnet or mainnet based on TON_NETWORK)
+      const client = this.getTonClient();
+
+      // Create wallet contract instance with public key
+      // The wallet address is derived from the public key, so it matches escrowAddr
+      const wallet = WalletContractV4.create({
+        publicKey: Buffer.from(escrowWallet.publicKey, 'hex'),
+        workchain: 0
+      });
+
+      // Verify the wallet address matches the stored escrow address
+      const walletAddress = wallet.address.toString({ bounceable: false, urlSafe: true });
+      if (walletAddress !== escrowWallet.address) {
+        throw new Error(
+          `Wallet address mismatch. Expected: ${escrowWallet.address}, ` +
+          `Got: ${walletAddress}. Public key may be incorrect.`
+        );
+      }
+
+      // Open wallet contract - this connects to the wallet on the blockchain (testnet or mainnet)
+      // The wallet contract is already bound to the correct address via the public key
+      const walletContract = client.open(wallet);
+
+      // Verify wallet is accessible and get current state
+      logger.info(`Connecting to escrow wallet`, {
+        dealId,
+        address: escrowWallet.address,
+        network: process.env.TON_NETWORK || 'testnet',
+      });
+
+      // Get current balance and seqno
+      const balance = await walletContract.getBalance();
+      const seqno = await walletContract.getSeqno();
+
+      logger.info(`Escrow wallet state`, {
+        dealId,
+        address: escrowWallet.address,
+        balance: balance.toString(),
+        seqno,
+      });
+
+      // Verify sufficient balance
+      if (balance < amountNano) {
+        throw new Error(
+          `Insufficient balance. Required: ${amount} TON (${amountNano.toString()} nanoTON), ` +
+          `Available: ${fromNano(balance)} TON (${balance.toString()} nanoTON)`
+        );
+      }
+
+      // Create transfer message
+      const transfer = walletContract.createTransfer({
+        secretKey: escrowWallet.secretKey,
+        messages: [
+          internal({
+            to: recipientAddr,
+            value: amountNano,
+            body: comment ? beginCell().storeUint(0, 32).storeStringTail(comment).endCell() : undefined,
+            bounce: false,
+          }),
+        ],
+        seqno: seqno,
+      });
+
+      // Send transaction to blockchain
+      logger.info(`Sending transaction`, {
+        dealId,
+        from: escrowWallet.address,
+        to: recipientAddress,
+        amount: amount,
+        amountNano: amountNano.toString(),
+        seqno,
+      });
+
+      // Send the transfer transaction
+      // The send() method returns a promise that resolves when the transaction is sent
+      await walletContract.send(transfer);
+
+      logger.info(`Transaction sent successfully`, {
+        dealId,
+        escrowAddress: escrowWallet.address,
+        recipientAddress,
+        amount,
+        amountNano: amountNano.toString(),
+        seqno,
+      });
+
+      // Wait a bit for transaction to be processed
+      // In production, you might want to poll for transaction confirmation
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Try to get the transaction hash from recent transactions
+      // Note: This is a best-effort approach. For production, implement proper transaction tracking
+      let txHash: string;
+      try {
+        const transactions = await this.getTransactions(escrowWallet.address, 1);
+        if (transactions && transactions.length > 0 && transactions[0].transaction_id?.hash) {
+          txHash = transactions[0].transaction_id.hash;
+          logger.info(`Found transaction hash`, { dealId, txHash });
+        } else {
+          // Fallback: generate a reference hash based on deal and timestamp
+          txHash = `tx_${dealId}_${Date.now()}`;
+          logger.warn(`Could not retrieve transaction hash, using reference`, { dealId, txHash });
+        }
+      } catch (error: any) {
+        // Fallback if transaction lookup fails
+        txHash = `tx_${dealId}_${Date.now()}`;
+        logger.warn(`Transaction hash lookup failed, using reference`, {
+          dealId,
+          txHash,
+          error: error.message,
+        });
+      }
+
+      logger.info(`Funds released from escrow`, {
+        dealId,
+        escrowAddress: escrowWallet.address,
+        recipientAddress,
+        amount,
+        amountNano: amountNano.toString(),
+        txHash,
+      });
+
+      return txHash;
+    } catch (error: any) {
+      logger.error(`Failed to release funds for Deal #${dealId}`, {
+        dealId,
+        recipientAddress,
+        amount,
+        error: error.message,
+        stack: error.stack,
+      });
+      throw new Error(`Failed to release funds: ${error.message}`);
+    }
+  }
+
+  /**
+   * Release funds from escrow address (backward compatibility)
+   * @deprecated Use releaseFunds(dealId, recipientAddress, amount) instead
+   */
+  static async releaseFundsByAddress(
     escrowAddress: string,
     recipientAddress: string,
     amount: string
   ): Promise<string> {
-    // This would require signing and broadcasting a transaction
-    // For MVP, we'll return a placeholder transaction hash
-    // In production, use wallet to sign and send transaction
+    // Try to find deal by escrow address
+    const result = await db.query(
+      'SELECT deal_id FROM escrow_wallets WHERE address = $1',
+      [escrowAddress]
+    );
 
-    // Placeholder implementation
-    return `tx_${Date.now()}`;
+    if (result.rows.length === 0) {
+      throw new Error(`Escrow wallet not found for address: ${escrowAddress}`);
+    }
+
+    return await this.releaseFunds(result.rows[0].deal_id, recipientAddress, amount);
   }
 
   /**

@@ -17,7 +17,6 @@ router.get('/', async (req, res) => {
       min_price,
       max_price,
       ad_format,
-      language,
       limit = 50,
       offset = 0,
     } = req.query;

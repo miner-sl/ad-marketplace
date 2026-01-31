@@ -640,11 +640,12 @@ export class CronJobs {
                 );
               });
 
-              // Release funds
+              // Release funds using dealId (releaseFunds expects dealId, not escrow_address)
               const txHash = await TONService.releaseFunds(
-                deal.escrow_address,
+                deal.id,
                 deal.channel_owner_wallet_address,
-                deal.price_ton.toString()
+                deal.price_ton.toString(),
+                `Auto-release: Buyer did not confirm within timeout period (Deal #${deal.id})`
               );
 
               logger.info(`Auto-released funds for Deal #${deal.id}`, {

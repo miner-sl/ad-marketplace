@@ -6,10 +6,10 @@ import { TelegramService } from '../services/telegram';
 import { validate } from '../middleware/validation';
 import { createChannelSchema } from '../utils/validation';
 
-const router = Router();
+const channelsRouter = Router();
 
 // List channels with filters
-router.get('/', async (req, res) => {
+channelsRouter.get('/', async (req, res) => {
   try {
     const {
       min_subscribers,
@@ -39,7 +39,7 @@ router.get('/', async (req, res) => {
 });
 
 // Get channel details
-router.get('/:id', async (req, res) => {
+channelsRouter.get('/:id', async (req, res) => {
   try {
     const channel = await ChannelRepository.findByIdWithDetails(parseInt(req.params.id));
 
@@ -54,7 +54,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Register channel
-router.post('/', validate(createChannelSchema), async (req, res) => {
+channelsRouter.post('/', validate(createChannelSchema), async (req, res) => {
   try {
     const { telegram_id, telegram_channel_id, bot_token } = req.body;
 
@@ -103,7 +103,7 @@ router.post('/', validate(createChannelSchema), async (req, res) => {
 });
 
 // Set pricing
-router.post('/:id/pricing', async (req, res) => {
+channelsRouter.post('/:id/pricing', async (req, res) => {
   try {
     const { ad_format, price_ton } = req.body;
     const pricing = await ChannelModel.setPricing(
@@ -118,7 +118,7 @@ router.post('/:id/pricing', async (req, res) => {
 });
 
 // Refresh channel stats
-router.post('/:id/refresh-stats', async (req, res) => {
+channelsRouter.post('/:id/refresh-stats', async (req, res) => {
   try {
     const channel = await ChannelRepository.findById(parseInt(req.params.id));
     if (!channel || !channel.telegram_channel_id) {
@@ -133,4 +133,4 @@ router.post('/:id/refresh-stats', async (req, res) => {
   }
 });
 
-export default router;
+export default channelsRouter;

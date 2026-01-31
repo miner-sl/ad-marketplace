@@ -161,16 +161,16 @@ bot.on('callback_query', async (ctx) => {
       await ctx.reply('Channel not found');
       return;
     }
-    
+
     const stats = await ChannelModel.getLatestStats(channelId);
     const pricing = await ChannelModel.getPricing(channelId);
     const channelData = channel.rows[0];
-    
+
     let message = `📺 Channel Details\n\n`;
     message += `Name: ${channelData.title || channelData.username || 'Unnamed'}\n`;
     message += `ID: ${channelData.id}\n`;
     message += `Telegram: @${channelData.username || `channel_${channelData.telegram_channel_id}`}\n\n`;
-    
+
     if (stats) {
       message += `📊 Statistics:\n`;
       if (stats.subscribers_count) {
@@ -184,14 +184,14 @@ bot.on('callback_query', async (ctx) => {
       }
       message += '\n';
     }
-    
+
     if (pricing.length > 0) {
       message += `💰 Pricing:\n`;
       pricing.forEach((p) => {
         message += `• ${p.ad_format}: ${p.price_ton} TON\n`;
       });
     }
-    
+
     const buttons: any[] = [];
     pricing.forEach((p) => {
       buttons.push([
@@ -201,7 +201,7 @@ bot.on('callback_query', async (ctx) => {
         )
       ]);
     });
-    
+
     await ctx.reply(message, buttons.length > 0 ? Markup.inlineKeyboard(buttons) : undefined);
     try {
       await ctx.answerCbQuery('Channel details');
@@ -429,7 +429,7 @@ bot.on('callback_query', async (ctx) => {
 // Handle text messages for deal negotiations, pricing, and briefs
 bot.on('text', async (ctx) => {
   const text = ctx.message.text;
-  
+
   // Check if it's a deal message command
   if (text.startsWith('/msg_deal ')) {
     const parts = text.substring(10).split(' ');
@@ -476,12 +476,6 @@ bot.on('text', async (ctx) => {
     return;
   }
 
-  // Handle pricing input (if user is in pricing setup mode)
-  // Check if message is a number (price)
-  if (/^\d+\.?\d*$/.test(text.trim()) && !text.startsWith('/')) {
-    // Could be pricing input - would need session storage to track state
-    // For MVP, user should use command format: /set_price_<id> <format> <amount>
-  }
 });
 
 // Error handling

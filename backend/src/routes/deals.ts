@@ -6,10 +6,10 @@ import { DealFlowService } from '../services/dealFlow';
 import { validate } from '../middleware/validation';
 import { createDealSchema, confirmPaymentSchema, submitCreativeSchema } from '../utils/validation';
 
-const router = Router();
+const dealsRouter = Router();
 
 // List deals
-router.get('/', async (req, res) => {
+dealsRouter.get('/', async (req, res) => {
   try {
     const { user_id, status, deal_type } = req.query;
     let deals;
@@ -31,7 +31,7 @@ router.get('/', async (req, res) => {
 });
 
 // Get deal details
-router.get('/:id', async (req, res) => {
+dealsRouter.get('/:id', async (req, res) => {
   try {
     const deal = await DealModel.findById(parseInt(req.params.id));
     if (!deal) {
@@ -53,7 +53,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create deal
-router.post('/', validate(createDealSchema), async (req, res) => {
+dealsRouter.post('/', validate(createDealSchema), async (req, res) => {
   try {
     const {
       deal_type,
@@ -84,7 +84,7 @@ router.post('/', validate(createDealSchema), async (req, res) => {
 });
 
 // Accept deal
-router.post('/:id/accept', async (req, res) => {
+dealsRouter.post('/:id/accept', async (req, res) => {
   try {
     const { channel_owner_id } = req.body;
     const deal = await DealFlowService.acceptDeal(parseInt(req.params.id), channel_owner_id);
@@ -95,7 +95,7 @@ router.post('/:id/accept', async (req, res) => {
 });
 
 // Confirm payment
-router.post('/:id/payment', validate(confirmPaymentSchema), async (req, res) => {
+dealsRouter.post('/:id/payment', validate(confirmPaymentSchema), async (req, res) => {
   try {
     const { tx_hash } = req.body;
     const deal = await DealFlowService.confirmPayment(parseInt(req.params.id), tx_hash);
@@ -106,7 +106,7 @@ router.post('/:id/payment', validate(confirmPaymentSchema), async (req, res) => 
 });
 
 // Submit creative
-router.post('/:id/creative', validate(submitCreativeSchema), async (req, res) => {
+dealsRouter.post('/:id/creative', validate(submitCreativeSchema), async (req, res) => {
   try {
     const { channel_owner_id, content_type, content_data } = req.body;
     const creative = await DealFlowService.submitCreative(
@@ -121,7 +121,7 @@ router.post('/:id/creative', validate(submitCreativeSchema), async (req, res) =>
 });
 
 // Approve creative
-router.post('/:id/creative/approve', async (req, res) => {
+dealsRouter.post('/:id/creative/approve', async (req, res) => {
   try {
     const { advertiser_id } = req.body;
     const deal = await DealFlowService.approveCreative(parseInt(req.params.id), advertiser_id);
@@ -132,7 +132,7 @@ router.post('/:id/creative/approve', async (req, res) => {
 });
 
 // Request revision
-router.post('/:id/creative/revision', async (req, res) => {
+dealsRouter.post('/:id/creative/revision', async (req, res) => {
   try {
     const { advertiser_id, notes } = req.body;
     const deal = await DealFlowService.requestRevision(
@@ -147,7 +147,7 @@ router.post('/:id/creative/revision', async (req, res) => {
 });
 
 // Schedule post
-router.post('/:id/schedule', async (req, res) => {
+dealsRouter.post('/:id/schedule', async (req, res) => {
   try {
     const { post_time } = req.body;
     const deal = await DealFlowService.schedulePost(
@@ -161,7 +161,7 @@ router.post('/:id/schedule', async (req, res) => {
 });
 
 // Cancel deal
-router.post('/:id/cancel', async (req, res) => {
+dealsRouter.post('/:id/cancel', async (req, res) => {
   try {
     const deal = await DealModel.cancel(parseInt(req.params.id));
     res.json(deal);
@@ -170,4 +170,4 @@ router.post('/:id/cancel', async (req, res) => {
   }
 });
 
-export default router;
+export default dealsRouter;

@@ -17,14 +17,15 @@ import db from './db/connection';
 
 const app = express();
 const PORT = env.PORT;
+const isProd = env.NODE_ENV === 'production';
 
 // Middleware
 app.use(requestIdMiddleware);
 app.use(helmet({
-  contentSecurityPolicy: env.NODE_ENV === 'production' ? undefined : false,
+  contentSecurityPolicy: isProd ? undefined : false,
 }));
 app.use(cors({
-  origin: env.NODE_ENV === 'production' 
+  origin: isProd
     ? process.env.ALLOWED_ORIGINS?.split(',') || false
     : true,
 }));
@@ -45,7 +46,7 @@ app.use((req, res, next) => {
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: env.NODE_ENV === 'production' ? 100 : 1000, // More lenient in dev
+  max: isProd ? 100 : 1000, // More lenient in dev
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -54,8 +55,8 @@ app.use('/api/', limiter);
 
 // Health check endpoints
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     requestId: req.requestId,
@@ -66,16 +67,16 @@ app.get('/health', (req, res) => {
 app.get('/ready', async (req, res) => {
   try {
     await db.query('SELECT 1');
-    res.json({ 
-      status: 'ready', 
+    res.json({
+      status: 'ready',
       timestamp: new Date().toISOString(),
       database: 'connected',
       requestId: req.requestId,
     });
   } catch (error: any) {
     logger.error('Readiness check failed', { error: error.message, requestId: req.requestId });
-    res.status(503).json({ 
-      status: 'not ready', 
+    res.status(503).json({
+      status: 'not ready',
       database: 'disconnected',
       requestId: req.requestId,
     });
@@ -84,8 +85,8 @@ app.get('/ready', async (req, res) => {
 
 // Liveness check
 app.get('/live', (req, res) => {
-  res.json({ 
-    status: 'alive', 
+  res.json({
+    status: 'alive',
     timestamp: new Date().toISOString(),
     requestId: req.requestId,
   });
@@ -106,12 +107,12 @@ app.post('/webhook', async (req, res) => {
     await bot.handleUpdate(req.body);
     res.sendStatus(200);
   } catch (error: any) {
-    logger.error('Webhook error', { 
-      error: error.message, 
+    logger.error('Webhook error', {
+      error: error.message,
       stack: error.stack,
       requestId: req.requestId,
     });
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Webhook processing failed',
       requestId: req.requestId,
     });
@@ -122,7 +123,7 @@ app.post('/webhook', async (req, res) => {
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || 'Internal server error';
-  
+
   logger.error('Request error', {
     error: message,
     stack: err.stack,
@@ -131,10 +132,10 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
     path: req.path,
     requestId: req.requestId,
   });
-  
+
   res.status(status).json({
-    error: env.NODE_ENV === 'production' && status === 500 
-      ? 'Internal server error' 
+    error: isProd && status === 500
+      ? 'Internal server error'
       : message,
     requestId: req.requestId,
     ...(env.NODE_ENV !== 'production' && { stack: err.stack }),
@@ -148,7 +149,7 @@ const server = app.listen(PORT, () => {
     environment: env.NODE_ENV,
     nodeVersion: process.version,
   });
-  
+
   // Start cron jobs
   try {
     CronJobs.startAll();
@@ -158,7 +159,7 @@ const server = app.listen(PORT, () => {
   }
 
   // Launch bot
-  if (env.NODE_ENV === 'production' && env.TELEGRAM_WEBHOOK_URL) {
+  if (isProd && env.TELEGRAM_WEBHOOK_URL) {
     bot.telegram.setWebhook(env.TELEGRAM_WEBHOOK_URL)
       .then(() => {
         logger.info('Telegram webhook set successfully', { url: env.TELEGRAM_WEBHOOK_URL });
@@ -186,7 +187,7 @@ async function gracefulShutdown(signal: string) {
     logger.warn('Shutdown already in progress, forcing exit');
     process.exit(1);
   }
-  
+
   shutdownInProgress = true;
   logger.info(`Received ${signal}, starting graceful shutdown...`);
 
@@ -234,7 +235,7 @@ process.on('uncaughtException', (error: Error) => {
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
-  logger.error('Unhandled promise rejection', { 
+  logger.error('Unhandled promise rejection', {
     reason: reason?.message || reason,
     stack: reason?.stack,
   });

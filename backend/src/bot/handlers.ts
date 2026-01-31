@@ -15,19 +15,6 @@ import logger from '../utils/logger';
 
 export class BotHandlers {
   /**
-   * Helper to safely answer callback query (only if it's a callback query)
-   */
-  private static async safeAnswerCbQuery(ctx: Context, text: string) {
-    if (ctx.callbackQuery) {
-      try {
-        await ctx.answerCbQuery(text);
-      } catch (error) {
-        // Ignore errors if not a callback query context
-      }
-    }
-  }
-
-  /**
    * Escape Markdown special characters
    */
   private static escapeMarkdown(text: string): string {
@@ -56,13 +43,6 @@ export class BotHandlers {
    * Handle /start command
    */
   static async handleStart(ctx: Context) {
-    const user = await UserModel.findOrCreate({
-      telegram_id: ctx.from!.id,
-      username: ctx.from!.username,
-      first_name: ctx.from!.first_name,
-      last_name: ctx.from!.last_name,
-    });
-
     await ctx.reply(
       `Welcome to Ad Marketplace! 🎯\n\n` +
       `You can:\n` +
@@ -172,7 +152,7 @@ export class BotHandlers {
       ];
 
       await ctx.reply(message, Markup.inlineKeyboard(buttons));
-      message = ''; // Clear for next channel
+      message = '';
     }
   }
 
@@ -220,7 +200,7 @@ export class BotHandlers {
       }
 
       await ctx.reply(message, Markup.inlineKeyboard(buttons));
-      message = ''; // Clear for next campaign
+      message = '';
     }
   }
 
@@ -267,7 +247,7 @@ export class BotHandlers {
       ];
 
       await ctx.reply(message, Markup.inlineKeyboard(buttons));
-      message = ''; // Clear for next channel
+      message = '';
     }
   }
 
@@ -317,7 +297,7 @@ export class BotHandlers {
       ];
 
       await ctx.reply(message, Markup.inlineKeyboard(buttons));
-      message = ''; // Clear for next deal
+      message = '';
     }
   }
 
@@ -421,28 +401,6 @@ export class BotHandlers {
       'refunded': '💰 Refunded'
     };
     return statusMap[status] || status;
-  }
-
-  /**
-   * Get emoji for deal status
-   */
-  static getDealStatusEmoji(status: string): string {
-    const emojiMap: Record<string, string> = {
-      'pending': '⏳',
-      'negotiating': '💬',
-      'approved': '✅',
-      'payment_pending': '💰',
-      'paid': '✅',
-      'creative_submitted': '📝',
-      'creative_approved': '✅',
-      'scheduled': '📅',
-      'posted': '📤',
-      'verified': '✅',
-      'completed': '✅',
-      'cancelled': '❌',
-      'refunded': '💰'
-    };
-    return emojiMap[status] || '📋';
   }
 
   /**
@@ -555,17 +513,6 @@ export class BotHandlers {
           : creativeText;
         dealInfo += `\n📄 Creative Text:\n${this.escapeMarkdown(creativePreview)}\n`;
       }
-    }
-    // Show recent messages
-    if (messages.length > 0) {
-      // dealInfo += `\n📨 Recent messages: ${messages.length}\n`;
-    //   messages.slice(-3).forEach((msg: any) => {
-    //     const sender = msg.sender_id === deal.channel_owner_id ? 'Channel Owner' : 'Advertiser';
-    //     // Escape user content to prevent Markdown parsing errors
-    //     const messagePreview = msg.message_text.substring(0, 50);
-    //     const escapedMessage = this.escapeMarkdown(messagePreview);
-    //     dealInfo += `\n${sender}: ${escapedMessage}${msg.message_text.length > 50 ? '...' : ''}`;
-    //   });
     }
 
     // Add action buttons based on deal status and user role

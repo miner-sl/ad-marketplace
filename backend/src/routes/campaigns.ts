@@ -4,10 +4,10 @@ import { UserModel } from '../models/User';
 import { validate } from '../middleware/validation';
 import { createCampaignSchema } from '../utils/validation';
 
-const router = Router();
+const campaignsRouter = Router();
 
 // List campaigns with filters
-router.get('/', async (req, res) => {
+campaignsRouter.get('/', async (req, res) => {
   try {
     const {
       advertiser_id,
@@ -35,7 +35,7 @@ router.get('/', async (req, res) => {
 });
 
 // Get campaign details
-router.get('/:id', async (req, res) => {
+campaignsRouter.get('/:id', async (req, res) => {
   try {
     const campaign = await CampaignRepository.findById(parseInt(req.params.id));
     if (!campaign) {
@@ -48,7 +48,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create campaign
-router.post('/', validate(createCampaignSchema), async (req, res) => {
+campaignsRouter.post('/', validate(createCampaignSchema), async (req, res) => {
   try {
     const {
       telegram_id,
@@ -90,7 +90,7 @@ router.post('/', validate(createCampaignSchema), async (req, res) => {
 });
 
 // Update campaign
-router.put('/:id', async (req, res) => {
+campaignsRouter.put('/:id', async (req, res) => {
   try {
     const {
       title,
@@ -116,4 +116,4 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-export default router;
+export default campaignsRouter;

@@ -1,5 +1,6 @@
 import * as cron from 'node-cron';
 import { DealModel } from '../models/Deal';
+import { DealRepository } from '../repositories/DealRepository';
 import { TONService } from '../services/ton';
 import { TelegramService } from '../services/telegram';
 import { DealFlowService } from '../services/dealFlow';
@@ -53,37 +54,37 @@ export class CronJobs {
   /**
    * Check for pending payments and update deal status
    * Runs every 2 minutes
+   * Optimized: Batch fetches users to avoid N+1 queries
    */
   private static startPaymentCheckJob() {
     const job = cron.schedule('*/2 * * * *', async () => {
       try {
         logger.debug('Checking for pending payments...');
 
-        const deals = await db.query(
+        const dealsResult = await db.query(
           `SELECT * FROM deals 
            WHERE status = 'payment_pending' 
            AND escrow_address IS NOT NULL
            ORDER BY created_at ASC`
         );
 
-        for (const deal of deals.rows) {
+        const deals = dealsResult?.rows || [];
+        if (deals.length === 0) {
+          return;
+        }
+
+        // Batch fetch all users at once (solves N+1 problem)
+        const userIds = new Set<number>();
+        deals.forEach((deal: any) => {
+          userIds.add(deal.advertiser_id);
+          userIds.add(deal.channel_owner_id);
+        });
+        const usersMap = await UserModel.findByIds(Array.from(userIds));
+
+        // Process deals
+        for (const deal of deals) {
           try {
-            // Use atomic UPDATE to prevent double processing
-            // Check if deal is still in payment_pending status
-            const dealCheck = await db.query(
-              `SELECT status FROM deals WHERE id = $1`,
-              [deal.id]
-            );
-
-            if (dealCheck.rows.length === 0 || dealCheck.rows[0].status !== 'payment_pending') {
-              // Already processed by another process
-              logger.debug(`Deal #${deal.id} already processed, skipping`, { 
-                dealId: deal.id, 
-                currentStatus: dealCheck.rows[0]?.status 
-              });
-              continue;
-            }
-
+            // Payment check is done outside transaction to avoid long-running locks
             const paymentCheck = await TONService.checkPayment(
               deal.escrow_address,
               deal.price_ton.toString()
@@ -106,8 +107,11 @@ export class CronJobs {
                 throw error;
               }
 
+              // Get users from batch-fetched map
+              const advertiser = usersMap.get(deal.advertiser_id);
+              const channelOwner = usersMap.get(deal.channel_owner_id);
+
               // Notify advertiser
-              const advertiser = await UserModel.findById(deal.advertiser_id);
               if (advertiser) {
                 await TelegramService.bot.sendMessage(
                   advertiser.telegram_id,
@@ -115,11 +119,12 @@ export class CronJobs {
                   `Amount: ${deal.price_ton} TON\n` +
                   `The channel owner will now prepare the creative.\n\n` +
                   `Use /deal ${deal.id} to view details.`
-                );
+                ).catch((err: any) => {
+                  logger.warn(`Failed to notify advertiser for Deal #${deal.id}`, { dealId: deal.id, error: err.message });
+                });
               }
 
               // Notify channel owner
-              const channelOwner = await UserModel.findById(deal.channel_owner_id);
               if (channelOwner) {
                 await TelegramService.bot.sendMessage(
                   channelOwner.telegram_id,
@@ -127,7 +132,9 @@ export class CronJobs {
                   `Amount: ${deal.price_ton} TON\n` +
                   `You can now submit the creative.\n\n` +
                   `Use /deal ${deal.id} to view details.`
-                );
+                ).catch((err: any) => {
+                  logger.warn(`Failed to notify channel owner for Deal #${deal.id}`, { dealId: deal.id, error: err.message });
+                });
               }
             }
           } catch (error: any) {
@@ -146,88 +153,73 @@ export class CronJobs {
   /**
    * Auto-post scheduled creatives
    * Runs every 5 minutes
+   * Optimized: Batch fetches channels, creatives, and users to avoid N+1 queries
    */
   private static startAutoPostJob() {
     const job = cron.schedule('*/5 * * * *', async () => {
       try {
         logger.debug('Checking for scheduled posts...');
 
-        const deals = await db.query(
-          `SELECT * FROM deals 
-           WHERE status IN ('scheduled', 'paid', 'creative_approved')
-           AND scheduled_post_time IS NOT NULL
-           AND scheduled_post_time <= NOW()
-           ORDER BY scheduled_post_time ASC
-           LIMIT  20
-       `);
+        // Use optimized query with JOIN to get channel info
+        const deals = await DealRepository.findDealsReadyForAutoPost(20);
 
-        for (const deal of deals.rows) {
+        if (deals.length === 0) {
+          return;
+        }
+
+        // Batch fetch all required data
+        const channelIds = Array.from(new Set(deals.map((d: any) => d.channel_id)));
+        const channelOwnerIds = Array.from(new Set(deals.map((d: any) => d.channel_owner_id)));
+
+        // Batch fetch channels and users
+        const channelsMap = await DealRepository.findChannelsByIds(channelIds);
+        const usersMap = await UserModel.findByIds(channelOwnerIds);
+
+        const now = new Date();
+
+        for (const deal of deals) {
           logger.debug(`Processing deal for auto-post`, { dealId: deal.id, status: deal.status });
           try {
-            // Double-check that scheduled_post_time has passed (additional validation)
+            // Double-check that scheduled_post_time has passed
             if (!deal.scheduled_post_time) {
               logger.debug(`Skipping Deal #${deal.id}: No scheduled_post_time`, { dealId: deal.id });
               continue;
             }
 
-            // Parse scheduled_post_time (format: 2026-01-25 07:10:27.000000)
             const scheduledTime = new Date(deal.scheduled_post_time);
-            const now = new Date();
-            
-            // Validate that scheduled time is a valid date
+
             if (isNaN(scheduledTime.getTime())) {
               logger.error(`Deal #${deal.id}: Invalid scheduled_post_time format`, { dealId: deal.id, scheduledPostTime: deal.scheduled_post_time });
               continue;
             }
-            
+
             if (scheduledTime > now) {
               const diffMs = scheduledTime.getTime() - now.getTime();
               const minutesUntilPublish = Math.ceil(diffMs / (1000 * 60));
-              const secondsUntilPublish = Math.ceil(diffMs / 1000);
-              logger.debug(`Skipping Deal #${deal.id}: Scheduled time hasn't arrived yet`, { 
-                dealId: deal.id, 
-                scheduled: scheduledTime.toISOString(), 
+              logger.debug(`Skipping Deal #${deal.id}: Scheduled time hasn't arrived yet`, {
+                dealId: deal.id,
+                scheduled: scheduledTime.toISOString(),
                 now: now.toISOString(),
-                remainingMinutes: minutesUntilPublish,
-                remainingSeconds: secondsUntilPublish
+                remainingMinutes: minutesUntilPublish
               });
               continue;
             }
 
-            logger.info(`Deal #${deal.id}: Scheduled time has passed. Publishing...`, { 
-              dealId: deal.id, 
-              scheduled: scheduledTime.toISOString(), 
-              now: now.toISOString() 
+            logger.info(`Deal #${deal.id}: Scheduled time has passed. Publishing...`, {
+              dealId: deal.id,
+              scheduled: scheduledTime.toISOString(),
+              now: now.toISOString()
             });
 
-            // Check if creative is approved
-            const creative = await db.query(
-              `SELECT * FROM creatives 
-               WHERE deal_id = $1 
-               AND status = 'approved'
-               ORDER BY created_at DESC LIMIT 1`,
-              [deal.id]
-            );
-
-            // if (creative.rows.length === 0) {
-            //   console.log(`⏭️ Skipping Deal #${deal.id}: No approved creative`);
-            //   continue;
-            // }
-
-            // Get channel info
-            const channel = await db.query(
-              'SELECT telegram_channel_id FROM channels WHERE id = $1',
-              [deal.channel_id]
-            );
-
-            if (channel.rows.length === 0) {
+            // Get channel from batch-fetched map
+            const channel = channelsMap.get(deal.channel_id);
+            if (!channel || !channel.telegram_channel_id) {
               logger.warn(`Deal #${deal.id}: Channel not found`, { dealId: deal.id, channelId: deal.channel_id });
               continue;
             }
 
-            // Call handlePublishPost for this deal
-            // Get channel owner to create proper mock context
-            const channelOwner = await UserModel.findById(deal.channel_owner_id);
+            // Get channel owner from batch-fetched map
+            const channelOwner = usersMap.get(deal.channel_owner_id);
             if (!channelOwner) {
               logger.warn(`Deal #${deal.id}: Channel owner not found`, { dealId: deal.id, channelOwnerId: deal.channel_owner_id });
               continue;
@@ -247,7 +239,6 @@ export class CronJobs {
               logger.info(`Auto-published Deal #${deal.id} via handlePublishPost`, { dealId: deal.id });
             } catch (error: any) {
               logger.error(`Error calling handlePublishPost for Deal #${deal.id}`, { dealId: deal.id, error: error.message, stack: error.stack });
-              // Re-throw to be caught by outer catch block
               throw error;
             }
           } catch (error: any) {
@@ -274,23 +265,38 @@ export class CronJobs {
 
         const expiredDeals = await DealModel.findExpiredDeals();
 
+        if (expiredDeals.length === 0) {
+          return;
+        }
+
+        // Batch fetch all users at once (solves N+1 problem)
+        const userIds = new Set<number>();
+        expiredDeals.forEach((deal: any) => {
+          userIds.add(deal.advertiser_id);
+          userIds.add(deal.channel_owner_id);
+        });
+        const usersMap = await UserModel.findByIds(Array.from(userIds));
+
         for (const deal of expiredDeals) {
           try {
             await DealModel.cancel(deal.id, 'Deal expired (timeout)');
 
             logger.info(`Cancelled expired Deal #${deal.id}`, { dealId: deal.id });
 
-            // Notify both parties
-            const advertiser = await UserModel.findById(deal.advertiser_id);
-            const channelOwner = await UserModel.findById(deal.channel_owner_id);
+            // Get users from batch-fetched map
+            const advertiser = usersMap.get(deal.advertiser_id);
+            const channelOwner = usersMap.get(deal.channel_owner_id);
 
+            // Notify both parties
             if (advertiser) {
               await TelegramService.bot.sendMessage(
                 advertiser.telegram_id,
                 `⏰ Deal #${deal.id} has expired and been cancelled.\n\n` +
                 `Reason: Timeout (no activity for 72 hours)\n\n` +
                 `Use /deal ${deal.id} to view details.`
-              );
+              ).catch((err: any) => {
+                logger.warn(`Failed to notify advertiser for Deal #${deal.id}`, { dealId: deal.id, error: err.message });
+              });
             }
 
             if (channelOwner) {
@@ -299,7 +305,9 @@ export class CronJobs {
                 `⏰ Deal #${deal.id} has expired and been cancelled.\n\n` +
                 `Reason: Timeout (no activity for 72 hours)\n\n` +
                 `Use /deal ${deal.id} to view details.`
-              );
+              ).catch((err: any) => {
+                logger.warn(`Failed to notify channel owner for Deal #${deal.id}`, { dealId: deal.id, error: err.message });
+              });
             }
           } catch (error: any) {
             logger.error(`Error cancelling expired Deal #${deal.id}`, { dealId: deal.id, error: error.message, stack: error.stack });
@@ -323,7 +331,19 @@ export class CronJobs {
       try {
         logger.debug('Checking for posts ready for verification...');
 
-        const deals = await DealModel.findDealsReadyForVerification();
+        const deals = await DealRepository.findDealsReadyForVerificationWithChannels();
+
+        if (deals.length === 0) {
+          return;
+        }
+
+        // Batch fetch all users at once (solves N+1 problem)
+        const userIds = new Set<number>();
+        deals.forEach((deal: any) => {
+          userIds.add(deal.advertiser_id);
+          userIds.add(deal.channel_owner_id);
+        });
+        const usersMap = await UserModel.findByIds(Array.from(userIds));
 
         for (const deal of deals) {
           try {
@@ -332,18 +352,12 @@ export class CronJobs {
               continue;
             }
 
-            // Get channel info
-            const channel = await db.query(
-              'SELECT telegram_channel_id FROM channels WHERE id = $1',
-              [deal.channel_id]
-            );
-
-            if (channel.rows.length === 0) {
-              logger.warn(`Deal #${deal.id}: Channel not found`, { dealId: deal.id, channelId: deal.channel_id });
+            if (!deal.telegram_channel_id) {
+              logger.warn(`Deal #${deal.id}: Channel telegram_channel_id not found`, { dealId: deal.id, channelId: deal.channel_id });
               continue;
             }
 
-            const channelId = channel.rows[0].telegram_channel_id;
+            const channelId = deal.telegram_channel_id;
 
             // Verify that verification period has passed
             if (!deal.post_verification_until) {
@@ -369,12 +383,12 @@ export class CronJobs {
 
             // Verification period has passed - now verify post exists
             let postExists = false;
-            
+
             try {
               // Check if bot still has access to channel
               const botInfo = await TelegramService.bot.getMe();
               const member = await TelegramService.bot.getChatMember(channelId, botInfo.id);
-              
+
               if (member.status !== 'administrator' && member.status !== 'creator') {
                 logger.warn(`Deal #${deal.id}: Bot is not admin of channel`, {
                   dealId: deal.id,
@@ -389,13 +403,13 @@ export class CronJobs {
                 // For now, if bot has access and verification period passed, we assume post exists
                 // In production, you might want to implement a more robust check
                 // (e.g., try to forward message to a test chat, or use Telegram Client API)
-                
+
                 // Additional check: verify the post was published at least MIN_PUBLICATION_DURATION_DAYS ago
                 const minPublicationDurationDays = deal.min_publication_duration_days || 7;
                 if (deal.actual_post_time) {
                   const postTime = new Date(deal.actual_post_time);
                   const daysSincePost = (now.getTime() - postTime.getTime()) / (1000 * 60 * 60 * 24);
-                  
+
                   if (daysSincePost >= minPublicationDurationDays) {
                     postExists = true;
                     logger.info(`Deal #${deal.id}: Post verified (${minPublicationDurationDays} days+ since publication)`, {
@@ -434,7 +448,7 @@ export class CronJobs {
               let publicationDurationMet = false;
               let daysSinceFirstPublication = 0;
               let minPublicationDurationDays = deal.min_publication_duration_days || 7;
-              
+
               if (deal.first_publication_time) {
                 const firstPublicationTime = new Date(deal.first_publication_time);
                 const now = new Date();
@@ -450,10 +464,10 @@ export class CronJobs {
                   minPublicationDurationDays,
                 });
 
-                const channelOwner = await UserModel.findById(deal.channel_owner_id);
+                const channelOwner = usersMap.get(deal.channel_owner_id);
                 if (channelOwner) {
                   const remainingDays = Math.ceil(minPublicationDurationDays - daysSinceFirstPublication);
-                  const message = 
+                  const message =
                     `📢 Deal #${deal.id} Status Update\n\n` +
                     `The post has been verified (remained on channel for required duration).\n\n` +
                     `⚠️ Minimum publication duration not reached.\n` +
@@ -463,7 +477,9 @@ export class CronJobs {
                     `Please wait until the minimum publication period is completed.\n\n` +
                     `Use /deal ${deal.id} to view details.`;
 
-                  await TelegramService.bot.sendMessage(channelOwner.telegram_id, message);
+                  await TelegramService.bot.sendMessage(channelOwner.telegram_id, message).catch((err: any) => {
+                    logger.warn(`Failed to notify channel owner for Deal #${deal.id}`, { dealId: deal.id, error: err.message });
+                  });
                 }
                 continue; // Skip marking as verified until duration requirement met
               }
@@ -479,10 +495,12 @@ export class CronJobs {
                 minPublicationDurationDays,
               });
 
+              const advertiser = usersMap.get(deal.advertiser_id);
+              const channelOwner = usersMap.get(deal.channel_owner_id);
+
               // Notify advertiser with confirmation button
-              const advertiser = await UserModel.findById(deal.advertiser_id);
               if (advertiser) {
-                const confirmMessage = 
+                const confirmMessage =
                   `✅ Deal #${deal.id} Verified!\n\n` +
                   `The post has remained on the channel for at least ${minPublicationDurationDays} days.\n` +
                   `Minimum requirement met:\n` +
@@ -504,11 +522,12 @@ export class CronJobs {
                   }
                 };
 
-                await TelegramService.bot.sendMessage(advertiser.telegram_id, confirmMessage, confirmButtons);
+                await TelegramService.bot.sendMessage(advertiser.telegram_id, confirmMessage, confirmButtons).catch((err: any) => {
+                  logger.warn(`Failed to notify advertiser for Deal #${deal.id}`, { dealId: deal.id, error: err.message });
+                });
               }
 
               // Notify channel owner
-              const channelOwner = await UserModel.findById(deal.channel_owner_id);
               if (channelOwner) {
                 await TelegramService.bot.sendMessage(
                   channelOwner.telegram_id,
@@ -517,7 +536,9 @@ export class CronJobs {
                   `Minimum requirement met.\n` +
                   `Waiting for advertiser confirmation to release funds.\n\n` +
                   `Use /deal ${deal.id} to view details.`
-                );
+                ).catch((err: any) => {
+                  logger.warn(`Failed to notify channel owner for Deal #${deal.id}`, { dealId: deal.id, error: err.message });
+                });
               }
             } else {
               // Post not found - refund
@@ -526,10 +547,11 @@ export class CronJobs {
               // Refund to advertiser (would need advertiser wallet address in production)
               logger.warn(`Deal #${deal.id}: Post not found, marked for refund`, { dealId: deal.id });
 
-              // Notify both parties
-              const advertiser = await UserModel.findById(deal.advertiser_id);
-              const channelOwner = await UserModel.findById(deal.channel_owner_id);
+              // Get users from batch-fetched map
+              const advertiser = usersMap.get(deal.advertiser_id);
+              const channelOwner = usersMap.get(deal.channel_owner_id);
 
+              // Notify both parties
               if (advertiser) {
                 await TelegramService.bot.sendMessage(
                   advertiser.telegram_id,
@@ -537,7 +559,9 @@ export class CronJobs {
                   `The post was not found or was removed.\n` +
                   `Funds will be refunded to you.\n\n` +
                   `Use /deal ${deal.id} to view details.`
-                );
+                ).catch((err: any) => {
+                  logger.warn(`Failed to notify advertiser for Deal #${deal.id}`, { dealId: deal.id, error: err.message });
+                });
               }
 
               if (channelOwner) {
@@ -547,7 +571,9 @@ export class CronJobs {
                   `The post was not found or was removed.\n` +
                   `Funds will be refunded to the advertiser.\n\n` +
                   `Use /deal ${deal.id} to view details.`
-                );
+                ).catch((err: any) => {
+                  logger.warn(`Failed to notify channel owner for Deal #${deal.id}`, { dealId: deal.id, error: err.message });
+                });
               }
             }
           } catch (error: any) {
@@ -654,6 +680,7 @@ export class CronJobs {
                 reason: 'Buyer did not confirm within timeout period',
               });
 
+              // Note: Users are fetched in processAutoRelease method
               // Notify both parties
               const advertiser = await UserModel.findById(deal.advertiser_id);
               const channelOwner = await UserModel.findById(deal.channel_owner_id);

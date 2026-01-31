@@ -132,4 +132,25 @@ export class UserModel {
       return result.rows[0];
     });
   }
+
+  /**
+   * Batch fetch users by IDs (solves N+1 query problem)
+   */
+  static async findByIds(userIds: number[]): Promise<Map<number, User>> {
+    if (userIds.length === 0) {
+      return new Map();
+    }
+
+    const result = await db.query(
+      `SELECT * FROM users WHERE id = ANY($1::int[])`,
+      [userIds]
+    );
+
+    const userMap = new Map<number, User>();
+    for (const user of result.rows || []) {
+      userMap.set(user.id, user);
+    }
+
+    return userMap;
+  }
 }

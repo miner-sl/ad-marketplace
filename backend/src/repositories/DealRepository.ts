@@ -93,4 +93,57 @@ export class DealRepository {
     }
     return result.rows[0] || null;
   }
+
+  /**
+   * Batch fetch channels by IDs (solves N+1 query problem)
+   */
+  static async findChannelsByIds(channelIds: number[]): Promise<Map<number, { id: number; telegram_channel_id?: number }>> {
+    if (channelIds.length === 0) {
+      return new Map();
+    }
+
+    const result = await db.query(
+      `SELECT id, telegram_channel_id FROM channels WHERE id = ANY($1::int[])`,
+      [channelIds]
+    );
+
+    const channelMap = new Map<number, { id: number; telegram_channel_id?: number }>();
+    for (const channel of result.rows || []) {
+      channelMap.set(channel.id, channel);
+    }
+
+    return channelMap;
+  }
+
+  /**
+   * Get deals ready for auto-post with channel info (optimized query)
+   */
+  static async findDealsReadyForAutoPost(limit: number = 20): Promise<any[]> {
+    const result = await db.query(
+      `SELECT d.*, c.telegram_channel_id, c.owner_id as channel_owner_id
+       FROM deals d
+       INNER JOIN channels c ON d.channel_id = c.id
+       WHERE d.status IN ('scheduled', 'paid', 'creative_approved')
+       AND d.scheduled_post_time IS NOT NULL
+       AND d.scheduled_post_time <= NOW()
+       ORDER BY d.scheduled_post_time ASC
+       LIMIT $1`,
+      [limit]
+    );
+    return result?.rows || [];
+  }
+
+  /**
+   * Get deals ready for verification with channel info (optimized query)
+   */
+  static async findDealsReadyForVerificationWithChannels(): Promise<any[]> {
+    const result = await db.query(
+      `SELECT d.*, c.telegram_channel_id
+       FROM deals d
+       INNER JOIN channels c ON d.channel_id = c.id
+       WHERE d.status = 'posted' 
+       AND d.post_verification_until < CURRENT_TIMESTAMP`
+    );
+    return result?.rows || [];
+  }
 }

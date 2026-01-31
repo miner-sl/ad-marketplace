@@ -634,6 +634,17 @@ export class CronJobs {
 
         const deals = await DealModel.findVerifiedDealsForAutoRelease();
 
+        if (deals.length === 0) {
+          return;
+        }
+
+        const userIds = new Set<number>();
+        deals.forEach((deal: any) => {
+          userIds.add(deal.advertiser_id);
+          userIds.add(deal.channel_owner_id);
+        });
+        const usersMap = await UserModel.findByIds(Array.from(userIds));
+
         for (const deal of deals) {
           try {
             if (!deal.escrow_address || !deal.channel_owner_wallet_address) {
@@ -641,10 +652,8 @@ export class CronJobs {
               continue;
             }
 
-            // Use atomic UPDATE to prevent double processing
             try {
               await withTx(async (client) => {
-                // Lock and check status
                 const dealCheck = await client.query(
                   `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
                   [deal.id]
@@ -652,11 +661,9 @@ export class CronJobs {
 
                 if (dealCheck.rows.length === 0 || dealCheck.rows[0].status !== 'verified') {
                   logger.debug(`Deal #${deal.id} already processed`, { dealId: deal.id });
-                  // Return early - transaction will be rolled back
                   return;
                 }
 
-                // Update status first
                 await client.query(
                   `UPDATE deals 
                    SET status = 'completed', updated_at = CURRENT_TIMESTAMP
@@ -666,7 +673,6 @@ export class CronJobs {
                 );
               });
 
-              // Release funds using dealId (releaseFunds expects dealId, not escrow_address)
               const txHash = await TONService.releaseFunds(
                 deal.id,
                 deal.channel_owner_wallet_address,
@@ -680,10 +686,8 @@ export class CronJobs {
                 reason: 'Buyer did not confirm within timeout period',
               });
 
-              // Note: Users are fetched in processAutoRelease method
-              // Notify both parties
-              const advertiser = await UserModel.findById(deal.advertiser_id);
-              const channelOwner = await UserModel.findById(deal.channel_owner_id);
+              const advertiser = usersMap.get(deal.advertiser_id);
+              const channelOwner = usersMap.get(deal.channel_owner_id);
 
               if (advertiser) {
                 await TelegramService.bot.sendMessage(
@@ -692,7 +696,9 @@ export class CronJobs {
                   `You did not confirm publication within the timeout period.\n` +
                   `Funds have been automatically released to the channel owner.\n\n` +
                   `Use /deal ${deal.id} to view details.`
-                );
+                ).catch((err: any) => {
+                  logger.warn(`Failed to notify advertiser for Deal #${deal.id}`, { dealId: deal.id, error: err.message });
+                });
               }
 
               if (channelOwner) {
@@ -703,10 +709,11 @@ export class CronJobs {
                   `Funds (${deal.price_ton} TON) have been automatically released to your wallet.\n\n` +
                   `Transaction: ${txHash}\n\n` +
                   `Use /deal ${deal.id} to view details.`
-                );
+                ).catch((err: any) => {
+                  logger.warn(`Failed to notify channel owner for Deal #${deal.id}`, { dealId: deal.id, error: err.message });
+                });
               }
             } catch (dbError: any) {
-              // Transaction already handled by withTx
               throw dbError;
             }
           } catch (error: any) {

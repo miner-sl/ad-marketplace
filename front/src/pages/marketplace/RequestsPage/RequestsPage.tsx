@@ -7,30 +7,21 @@ import {
   Text,
 } from '@components'
 import { DealCard, CampaignCard } from '@components'
-import { useDealsQuery, useCampaignsQuery } from '@store-new'
-import { useUser } from '@store'
+import { useDealRequestsQuery, useCampaignsQuery } from '@store-new'
+import { useTelegramUser } from '@hooks'
 import { ROUTES_NAME } from '@routes'
 import styles from './RequestsPage.module.scss'
 
 export const RequestsPage = () => {
   const navigate = useNavigate()
-  const { user } = useUser()
-  const { data: deals, isLoading: dealsLoading } = useDealsQuery({
-    user_id: user?.id,
-    status: 'pending',
-  })
+  const telegramUser = useTelegramUser()
+  const { data: incomingRequests = [], isLoading: dealsLoading } = useDealRequestsQuery(
+    telegramUser?.id,
+    20
+  )
   const { data: campaigns } = useCampaignsQuery({
     status: 'active',
   })
-
-  // Get deals where user is channel owner and deal is pending (incoming requests)
-  const incomingRequests =
-    deals?.filter(
-      (deal) =>
-        deal.channel_owner_id === user?.id &&
-        deal.status === 'pending' &&
-        deal.deal_type === 'campaign'
-    ) || []
 
   // Get active campaigns that match user's channels
   const matchingCampaigns = campaigns?.filter((campaign) => {

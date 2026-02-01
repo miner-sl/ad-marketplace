@@ -214,13 +214,23 @@ export const useDealsQuery = (filters?: DealFilters) => {
   })
 }
 
-export const useDealQuery = (id: number) => {
+export const useDealQuery = (id: number, userId?: number) => {
   return useQuery<Deal>({
-    queryKey: [...TANSTACK_KEYS.DEAL(id)],
-    queryFn: () => dealsAPI.getDeal(id),
+    queryKey: [...TANSTACK_KEYS.DEAL(id), userId],
+    queryFn: () => dealsAPI.getDeal(id, userId),
     enabled: !!id,
     gcTime: TANSTACK_GC_TIME,
     staleTime: TANSTACK_TTL.DEAL || 30000,
+  })
+}
+
+export const useDealRequestsQuery = (telegramId: number | undefined, limit?: number) => {
+  return useQuery<Deal[]>({
+    queryKey: [...TANSTACK_KEYS.DEAL_REQUESTS(telegramId || 0)],
+    queryFn: () => dealsAPI.getDealRequests(telegramId!, limit),
+    enabled: !!telegramId,
+    gcTime: TANSTACK_GC_TIME,
+    staleTime: TANSTACK_TTL.DEAL_REQUESTS || 30000,
   })
 }
 

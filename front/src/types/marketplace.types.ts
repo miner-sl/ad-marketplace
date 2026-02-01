@@ -100,6 +100,8 @@ export interface Deal {
   channel_owner_id: number
   advertiser_id: number
   ad_format: AdFormat
+  owner: boolean
+  advertiser: boolean
   price_ton: number
   status: DealStatus
   escrow_address?: string

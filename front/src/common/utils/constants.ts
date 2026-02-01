@@ -21,6 +21,7 @@ export const TANSTACK_KEYS = {
   DEALS: ['marketplace', 'deals'],
   DEAL: (id: number) => ['marketplace', 'deals', id],
   DEAL_CREATIVE: (dealId: number) => ['marketplace', 'deals', dealId, 'creative'],
+  DEAL_REQUESTS: (telegramId: number) => ['marketplace', 'deals', 'requests', telegramId],
 }
 
 export const TANSTACK_TTL = {
@@ -40,6 +41,7 @@ export const TANSTACK_TTL = {
   DEALS: 30 * 1000, // 30 seconds
   DEAL: 30 * 1000, // 30 seconds
   DEAL_CREATIVE: 30 * 1000, // 30 seconds
+  DEAL_REQUESTS: 30 * 1000, // 30 seconds
 }
 
 export const TANSTACK_GC_TIME = 30 * 60 * 1000 // 30 minute

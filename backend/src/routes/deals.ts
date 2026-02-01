@@ -5,7 +5,7 @@ import { CreativeRepository } from '../repositories/CreativeRepository';
 import { DealFlowService } from '../services/dealFlow';
 import { UserModel } from '../models/User';
 import { validate, validateQuery } from '../middleware/validation';
-import { createDealSchema, confirmPaymentSchema, submitCreativeSchema, listDealsQuerySchema } from '../utils/validation';
+import { createDealSchema, confirmPaymentSchema, submitCreativeSchema, listDealsQuerySchema, dealRequestsQuerySchema } from '../utils/validation';
 
 const dealsRouter = Router();
 
@@ -38,6 +38,22 @@ dealsRouter.get('/', validateQuery(listDealsQuerySchema), async (req, res) => {
   }
 });
 
+// Get deal requests for channel owner by Telegram ID
+dealsRouter.get('/requests', validateQuery(dealRequestsQuerySchema), async (req, res) => {
+  try {
+    const { telegram_id, limit } = req?.query;
+    const dealsLimit = limit || 20;
+
+    const deals = await DealFlowService.findDealRequestByTelegramId(telegram_id, dealsLimit);
+    res.json(deals);
+  } catch (error: any) {
+    if (error.message === 'User not found') {
+      return res.status(404).json({ error: error.message });
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get deal details
 dealsRouter.get('/:id', async (req, res) => {
   try {
@@ -46,12 +62,36 @@ dealsRouter.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Deal not found' });
     }
 
+    let user = null;
+    const { user_id } = req.query;
+    if (user_id) {
+      const telegramIdStr = typeof user_id === 'string' ? user_id : String(user_id);
+      const telegramId = Number(telegramIdStr);
+      if (!isNaN(telegramId)) {
+        user = await UserModel.findByTelegramId(telegramId);
+        if (user) {
+          const isAuthorized =
+            deal.channel_owner_id === user.id ||
+            deal.advertiser_id === user.id;
+
+          if (!isAuthorized) {
+            return res.status(403).json({ error: 'Unauthorized: You are not authorized to view this deal' });
+          }
+        }
+      }
+    }
+
     // Get messages and creative using repositories
     const messages = await DealRepository.getMessages(deal.id);
     const creative = await CreativeRepository.findByDeal(deal.id);
 
+    // Remove sensitive field before sending response
+    const { channel_owner_wallet_address, ...dealWithoutWallet } = deal;
+
     res.json({
-      ...deal,
+      ...dealWithoutWallet,
+      owner: user !== null ? user?.id === deal.channel_owner_id : false,
+      advertiser: user !== null ? user?.id === deal.advertiser_id : false,
       messages,
       creative,
     });

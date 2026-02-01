@@ -114,7 +114,7 @@ export const MarketplaceHomePage = () => {
               type="basic"
               onClick={() => navigate('/requests')}
             >
-              Incoming Requests
+              Ad Requests
             </Button>
           </BlockNew>
           <BlockNew gap={8} row>

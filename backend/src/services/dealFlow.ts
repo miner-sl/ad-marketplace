@@ -6,6 +6,8 @@ import { CreativeService } from './creative';
 import { PostService } from './post';
 import { withTx } from '../utils/transaction';
 import db from '../db/connection';
+import { DealRepository } from '../repositories/DealRepository';
+import { ChannelRepository } from '../repositories/ChannelRepository';
 
 export class DealFlowService {
   /**
@@ -120,14 +122,18 @@ export class DealFlowService {
    */
   static async acceptDeal(dealId: number, channelOwnerId: number, telegramUserId?: number): Promise<any> {
     return await withTx(async (client) => {
-      // Lock deal row to prevent race conditions
+      const user = await UserModel.findByTelegramId(channelOwnerId);
+      if (!user) {
+        throw new Error('User not found');
+      }
       const dealResult = await client.query(
         `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
         [dealId]
       );
 
       const deal = dealResult.rows[0];
-      if (!deal || deal.channel_owner_id !== channelOwnerId) {
+      console.log({ deal });
+      if (!deal || deal.channel_owner_id !== user.id) {
         throw new Error('Deal not found or unauthorized');
       }
 
@@ -135,7 +141,7 @@ export class DealFlowService {
       if (telegramUserId) {
         const isAdmin = await ChannelModel.verifyAdminStatus(
           deal.channel_id,
-          channelOwnerId,
+          user.id,
           telegramUserId
         );
         if (!isAdmin) {
@@ -143,23 +149,17 @@ export class DealFlowService {
         }
       }
 
-      // Check status atomically within transaction
       if (deal.status !== 'pending' && deal.status !== 'negotiating') {
         throw new Error(`Cannot accept deal in status: ${deal.status}`);
       }
 
-      // Get channel owner wallet address
-      const channelOwner = await client.query('SELECT wallet_address FROM users WHERE id = $1', [channelOwnerId]);
-      const ownerWalletAddress = channelOwner.rows[0]?.wallet_address;
-
+      const ownerWalletAddress = user.wallet_address;
       if (!ownerWalletAddress) {
         throw new Error('Channel owner wallet address not set. Please set your wallet address first.');
       }
 
-      // Generate escrow address for this deal
       const escrowAddress = await TONService.generateEscrowAddress(dealId);
 
-      // Update deal with escrow address and owner wallet address (atomic)
       const updateResult = await client.query(
         `UPDATE deals 
          SET escrow_address = $1, channel_owner_wallet_address = $2, status = 'payment_pending', updated_at = CURRENT_TIMESTAMP
@@ -173,13 +173,6 @@ export class DealFlowService {
       }
 
       const updated = updateResult.rows[0];
-
-      // Insert message in same transaction
-      await client.query(
-        `INSERT INTO deal_messages (deal_id, sender_id, message_text)
-         VALUES ($1, $2, $3)`,
-        [dealId, channelOwnerId, 'Deal accepted. Waiting for payment.']
-      );
 
       return updated;
     });
@@ -660,6 +653,45 @@ export class DealFlowService {
       channelUsername: channel.username,
       telegramChannelId: channel.telegram_channel_id,
     };
+  }
+
+  /**
+   * Find deal requests for a channel owner by Telegram ID
+   * Returns deals extended with channel info as nested channel field
+   */
+  static async findDealRequestByTelegramId(telegramId: number, limit: number = 20): Promise<any[]> {
+    // Find user by Telegram ID
+    const user = await UserModel.findByTelegramId(telegramId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Get pending deals for user's channels
+    const deals = await DealRepository.findPendingForChannelOwner(user.id, limit);
+
+    if (deals.length === 0) {
+      return [];
+    }
+
+    // Batch fetch channels and briefs to avoid N+1 queries
+    const channelIds = deals.map(deal => deal.channel_id);
+    const dealIds = deals.map(deal => deal.id);
+
+    const channelsMap = await ChannelRepository.findBasicInfoByIds(channelIds);
+    const briefsMap = await DealRepository.findBriefsByDealIds(dealIds);
+
+    return deals.map(deal => {
+      const channel = channelsMap.get(deal.channel_id);
+      const briefText = briefsMap.get(deal.id) || null;
+
+      const isOwner = deal.channel_owner_id === user.id;
+
+      return {
+        ...deal,
+        channel: channel ? { ...channel, owner: isOwner } : null,
+        brief: briefText,
+      };
+    });
   }
 
   /**

@@ -73,6 +73,30 @@ export class DealRepository {
   }
 
   /**
+   * Batch fetch briefs for multiple deals (solves N+1 query problem)
+   */
+  static async findBriefsByDealIds(dealIds: number[]): Promise<Map<number, string>> {
+    if (dealIds.length === 0) {
+      return new Map();
+    }
+
+    const result = await db.query(
+      `SELECT DISTINCT ON (dm.deal_id) dm.deal_id, dm.message_text 
+       FROM deal_messages dm
+       WHERE dm.deal_id = ANY($1::int[]) 
+       ORDER BY dm.deal_id, dm.created_at ASC`,
+      [dealIds]
+    );
+
+    const briefMap = new Map<number, string>();
+    for (const row of result.rows || []) {
+      briefMap.set(row.deal_id, row.message_text);
+    }
+
+    return briefMap;
+  }
+
+  /**
    * Get channel info for deal
    */
   static async getChannelInfoForDeal(dealId: number): Promise<{

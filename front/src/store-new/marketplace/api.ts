@@ -161,10 +161,18 @@ export const dealsAPI = {
     return data
   },
 
-  getDeal: async (id: number): Promise<Deal> => {
-    const { data, ok, error } = await MarketplaceService.getDeal(id)
+  getDeal: async (id: number, userId?: number): Promise<Deal> => {
+    const { data, ok, error } = await MarketplaceService.getDeal(id, userId)
     if (!ok || !data) {
       throw new Error(error || 'Failed to fetch deal')
+    }
+    return data
+  },
+
+  getDealRequests: async (telegramId: number, limit?: number): Promise<Deal[]> => {
+    const { data, ok, error } = await MarketplaceService.getDealRequests(telegramId, limit)
+    if (!ok || !data) {
+      throw new Error(error || 'Failed to fetch deal requests')
     }
     return data
   },

@@ -64,3 +64,8 @@ export const listDealsQuerySchema = z.object({
   deal_type: z.enum(['listing', 'campaign']).optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).optional(),
 });
+
+export const dealRequestsQuerySchema = z.object({
+  telegram_id: z.string().regex(/^\d+$/).transform(Number),
+  limit: z.string().regex(/^\d+$/).transform(Number).optional(),
+});

@@ -55,6 +55,27 @@ export class ChannelRepository {
   }
 
   /**
+   * Batch fetch channel basic info by IDs (solves N+1 query problem)
+   */
+  static async findBasicInfoByIds(channelIds: number[]): Promise<Map<number, ChannelInfo>> {
+    if (channelIds.length === 0) {
+      return new Map();
+    }
+
+    const result = await db.query(
+      `SELECT id, title, username, telegram_channel_id FROM channels WHERE id = ANY($1::int[])`,
+      [channelIds]
+    );
+
+    const channelMap = new Map<number, ChannelInfo>();
+    for (const channel of result.rows || []) {
+      channelMap.set(channel.id, channel);
+    }
+
+    return channelMap;
+  }
+
+  /**
    * Get channel by ID
    */
   static async findById(channelId: number): Promise<ChannelBasicInfo | null> {

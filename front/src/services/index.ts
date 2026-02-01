@@ -67,21 +67,21 @@ export const MarketplaceService = {
     const queryParams = filters
       ? '?' + new URLSearchParams(filters as Record<string, string>).toString()
       : ''
-    return apiRequest<Channel[]>(`/channels${queryParams}`)
+    return await apiRequest<Channel[]>(`/channels${queryParams}`)
   },
 
   getChannel: async (id: number): Promise<ApiResponse<Channel>> => {
-    return apiRequest<Channel>(`/channels/${id}`)
+    return await apiRequest<Channel>(`/channels/${id}`)
   },
 
   getChannelStats: async (id: number): Promise<ApiResponse<Channel['stats']>> => {
-    return apiRequest<Channel['stats']>(`/channels/${id}/stats`)
+    return await apiRequest<Channel['stats']>(`/channels/${id}/stats`)
   },
 
   setChannelPricing: async (
     request: SetChannelPricingRequest
   ): Promise<ApiResponse<ChannelPricing>> => {
-    return apiRequest<ChannelPricing>(`/channels/${request.channel_id}/pricing`, {
+    return await apiRequest<ChannelPricing>(`/channels/${request.channel_id}/pricing`, {
       method: 'POST',
       body: JSON.stringify(request),
     })
@@ -95,17 +95,17 @@ export const MarketplaceService = {
     const queryParams = filters
       ? '?' + new URLSearchParams(filters as Record<string, string>).toString()
       : ''
-    return apiRequest<ChannelListing[]>(`/channel-listings${queryParams}`)
+    return await apiRequest<ChannelListing[]>(`/channel-listings${queryParams}`)
   },
 
   getChannelListing: async (id: number): Promise<ApiResponse<ChannelListing>> => {
-    return apiRequest<ChannelListing>(`/channel-listings/${id}`)
+    return await apiRequest<ChannelListing>(`/channel-listings/${id}`)
   },
 
   createChannelListing: async (
     request: CreateChannelListingRequest
   ): Promise<ApiResponse<ChannelListing>> => {
-    return apiRequest<ChannelListing>('/channel-listings', {
+    return await apiRequest<ChannelListing>('/channel-listings', {
       method: 'POST',
       body: JSON.stringify(request),
     })
@@ -115,14 +115,14 @@ export const MarketplaceService = {
     id: number,
     data: Partial<CreateChannelListingRequest> & { is_active?: boolean }
   ): Promise<ApiResponse<ChannelListing>> => {
-    return apiRequest<ChannelListing>(`/channel-listings/${id}`, {
+    return await apiRequest<ChannelListing>(`/channel-listings/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     })
   },
 
   deleteChannelListing: async (id: number): Promise<ApiResponse<void>> => {
-    return apiRequest<void>(`/channel-listings/${id}`, {
+    return await apiRequest<void>(`/channel-listings/${id}`, {
       method: 'DELETE',
     })
   },
@@ -132,15 +132,15 @@ export const MarketplaceService = {
     const queryParams = filters
       ? '?' + new URLSearchParams(filters as Record<string, string>).toString()
       : ''
-    return apiRequest<Campaign[]>(`/campaigns${queryParams}`)
+    return await apiRequest<Campaign[]>(`/campaigns${queryParams}`)
   },
 
   getCampaign: async (id: number): Promise<ApiResponse<Campaign>> => {
-    return apiRequest<Campaign>(`/campaigns/${id}`)
+    return await apiRequest<Campaign>(`/campaigns/${id}`)
   },
 
   createCampaign: async (request: CreateCampaignRequest): Promise<ApiResponse<Campaign>> => {
-    return apiRequest<Campaign>('/campaigns', {
+    return await apiRequest<Campaign>('/campaigns', {
       method: 'POST',
       body: JSON.stringify(request),
     })
@@ -150,14 +150,14 @@ export const MarketplaceService = {
     id: number,
     data: Partial<CreateCampaignRequest> & { status?: Campaign['status'] }
   ): Promise<ApiResponse<Campaign>> => {
-    return apiRequest<Campaign>(`/campaigns/${id}`, {
+    return await apiRequest<Campaign>(`/campaigns/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     })
   },
 
   deleteCampaign: async (id: number): Promise<ApiResponse<void>> => {
-    return apiRequest<void>(`/campaigns/${id}`, {
+    return await apiRequest<void>(`/campaigns/${id}`, {
       method: 'DELETE',
     })
   },
@@ -170,12 +170,23 @@ export const MarketplaceService = {
     return await apiRequest<Deal[]>(`/deals${queryParams}`)
   },
 
-  getDeal: async (id: number): Promise<ApiResponse<Deal>> => {
-    return apiRequest<Deal>(`/deals/${id}`)
+  getDeal: async (id: number, userId?: number): Promise<ApiResponse<Deal>> => {
+    const queryParams = userId ? `?user_id=${userId}` : '';
+    return await apiRequest<Deal>(`/deals/${id}${queryParams}`)
+  },
+
+  getDealRequests: async (telegramId: number, limit?: number): Promise<ApiResponse<Deal[]>> => {
+    const queryParams = new URLSearchParams({
+      telegram_id: telegramId.toString(),
+    })
+    if (limit) {
+      queryParams.append('limit', limit.toString())
+    }
+    return await apiRequest<Deal[]>(`/deals/requests?${queryParams.toString()}`)
   },
 
   createDeal: async (request: CreateDealRequest): Promise<ApiResponse<Deal>> => {
-    return apiRequest<Deal>('/deals', {
+    return await apiRequest<Deal>('/deals', {
       method: 'POST',
       body: JSON.stringify(request),
     })
@@ -185,34 +196,34 @@ export const MarketplaceService = {
     id: number,
     channel_owner_id: number
   ): Promise<ApiResponse<Deal>> => {
-    return apiRequest<Deal>(`/deals/${id}/accept`, {
+    return await apiRequest<Deal>(`/deals/${id}/accept`, {
       method: 'POST',
       body: JSON.stringify({ channel_owner_id }),
     })
   },
 
   rejectDeal: async (id: number): Promise<ApiResponse<Deal>> => {
-    return apiRequest<Deal>(`/deals/${id}/reject`, {
+    return await apiRequest<Deal>(`/deals/${id}/reject`, {
       method: 'POST',
     })
   },
 
   confirmPayment: async (id: number, tx_hash: string): Promise<ApiResponse<Deal>> => {
-    return apiRequest<Deal>(`/deals/${id}/confirm-payment`, {
+    return await apiRequest<Deal>(`/deals/${id}/confirm-payment`, {
       method: 'POST',
       body: JSON.stringify({ tx_hash }),
     })
   },
 
   submitCreative: async (request: SubmitCreativeRequest): Promise<ApiResponse<Creative>> => {
-    return apiRequest<Creative>(`/deals/${request.deal_id}/creative`, {
+    return await apiRequest<Creative>(`/deals/${request.deal_id}/creative`, {
       method: 'POST',
       body: JSON.stringify(request),
     })
   },
 
   approveCreative: async (dealId: number): Promise<ApiResponse<Creative>> => {
-    return apiRequest<Creative>(`/deals/${dealId}/creative/approve`, {
+    return await apiRequest<Creative>(`/deals/${dealId}/creative/approve`, {
       method: 'POST',
     })
   },
@@ -221,7 +232,7 @@ export const MarketplaceService = {
     dealId: number,
     revision_notes: string
   ): Promise<ApiResponse<Creative>> => {
-    return apiRequest<Creative>(`/deals/${dealId}/creative/revision`, {
+    return await apiRequest<Creative>(`/deals/${dealId}/creative/revision`, {
       method: 'POST',
       body: JSON.stringify({ revision_notes }),
     })
@@ -231,20 +242,20 @@ export const MarketplaceService = {
     dealId: number,
     scheduled_post_time: string
   ): Promise<ApiResponse<Deal>> => {
-    return apiRequest<Deal>(`/deals/${dealId}/schedule`, {
+    return await apiRequest<Deal>(`/deals/${dealId}/schedule`, {
       method: 'POST',
       body: JSON.stringify({ scheduled_post_time }),
     })
   },
 
   cancelDeal: async (id: number, reason?: string): Promise<ApiResponse<Deal>> => {
-    return apiRequest<Deal>(`/deals/${id}/cancel`, {
+    return await apiRequest<Deal>(`/deals/${id}/cancel`, {
       method: 'POST',
       body: JSON.stringify({ reason }),
     })
   },
 
   getDealCreative: async (dealId: number): Promise<ApiResponse<Creative>> => {
-    return apiRequest<Creative>(`/deals/${dealId}/creative`)
+    return await apiRequest<Creative>(`/deals/${dealId}/creative`)
   },
 }

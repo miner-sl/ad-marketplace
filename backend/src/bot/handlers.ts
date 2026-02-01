@@ -255,49 +255,47 @@ export class BotHandlers {
    * Handle /requests command (channel owner views incoming requests)
    */
   static async handleIncomingRequests(ctx: Context) {
-    const user = await UserModel.findByTelegramId(ctx.from!.id);
-    if (!user) {
-      return ctx.reply('Please use /start first');
-    }
+    try {
+      const deals = await DealFlowService.findDealRequestByTelegramId(ctx.from!.id, 20);
 
-    // Get pending deals for user's channels
-    const deals = await DealRepository.findPendingForChannelOwner(user.id, 20);
-
-    if (deals.length === 0) {
-      return ctx.reply('No pending requests at the moment.');
-    }
-
-    let message = `📨 Incoming Requests (${deals.length}):\n\n`;
-
-    for (const deal of deals) {
-      const channel = await ChannelRepository.getBasicInfo(deal.channel_id);
-      const channelName = channel?.title || channel?.username || `Channel #${deal.channel_id}`;
-
-      // Get brief message
-      const briefText = await DealRepository.getBrief(deal.id);
-
-      message += `📋 Deal #${deal.id}\n`;
-      message += `📺 Channel: ${channelName}\n`;
-      message += `💰 Price: ${deal.price_ton} TON\n`;
-      message += `📝 Format: ${deal.ad_format}\n`;
-      if (briefText) {
-        const briefPreview = briefText.substring(0, 100);
-        message += `📄 Brief: ${briefPreview}${briefText.length > 100 ? '...' : ''}\n`;
+      if (deals.length === 0) {
+        return ctx.reply('No pending requests at the moment.');
       }
-      message += `\n`;
 
-      const buttons = [
-        [
-          Markup.button.callback('✅ Accept', `accept_request_${deal.id}`),
-          Markup.button.callback('❌ Decline', `decline_request_${deal.id}`)
-        ],
-        [
-          Markup.button.callback('📋 View Details', `deal_details_${deal.id}`)
-        ]
-      ];
+      let message = `📨 Incoming Requests (${deals.length}):\n\n`;
 
-      await ctx.reply(message, Markup.inlineKeyboard(buttons));
-      message = '';
+      for (const deal of deals) {
+        const channelName = deal.channel?.title || deal.channel?.username || `Channel #${deal.channel_id}`;
+        const briefText = deal.brief || null;
+
+        message += `📋 Deal #${deal.id}\n`;
+        message += `📺 Channel: ${channelName}\n`;
+        message += `💰 Price: ${deal.price_ton} TON\n`;
+        message += `📝 Format: ${deal.ad_format}\n`;
+        if (briefText) {
+          const briefPreview = briefText.substring(0, 100);
+          message += `📄 Brief: ${briefPreview}${briefText.length > 100 ? '...' : ''}\n`;
+        }
+        message += `\n`;
+
+        const buttons = [
+          [
+            Markup.button.callback('✅ Accept', `accept_request_${deal.id}`),
+            Markup.button.callback('❌ Decline', `decline_request_${deal.id}`)
+          ],
+          [
+            Markup.button.callback('📋 View Details', `deal_details_${deal.id}`)
+          ]
+        ];
+
+        await ctx.reply(message, Markup.inlineKeyboard(buttons));
+        message = '';
+      }
+    } catch (error: any) {
+      if (error.message === 'User not found') {
+        return ctx.reply('Please use /start first');
+      }
+      throw error;
     }
   }
 

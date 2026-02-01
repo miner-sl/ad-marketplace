@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Confetti from 'react-confetti'
-import {useWindowSize} from "../../hooks/useWindowSize.ts";
+
+import {useWindowSize} from "../../hooks/useWindowSize";
 
 interface ConfettiAnimationProps {
   active: boolean

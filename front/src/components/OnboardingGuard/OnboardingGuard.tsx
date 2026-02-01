@@ -2,7 +2,8 @@ import { useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTelegramUser } from '@hooks'
 import { ROUTES_NAME } from '@routes'
-import {useUserMeQuery} from "@store-new";
+import { useUserMeQuery } from "@store-new";
+import { Skeleton } from "@components";
 
 interface OnboardingGuardProps {
   children: React.ReactNode
@@ -31,11 +32,15 @@ export const OnboardingGuard = ({ children }: OnboardingGuardProps) => {
   }, [isLoading, isRegistered, navigate, location.pathname, telegramUser?.id])
 
   if (isLoading || !telegramUser?.id) {
-    return null
+    return( <Skeleton />);
   }
 
   if (!isRegistered && location.pathname !== ROUTES_NAME.ONBOARDING) {
-    return null
+    return (
+      <p>
+        You need to register in <a href={ROUTES_NAME.ONBOARDING}>onboarding</a>
+      </p>
+    )
   }
 
   return <>{children}</>

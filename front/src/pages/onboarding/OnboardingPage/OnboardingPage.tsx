@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
 import {
   BlockNew,
   PageLayout,
@@ -7,6 +8,7 @@ import {
   Text,
   Button,
   TelegramMainButton,
+  useToast,
 } from '@components';
 import { useTelegramUser } from '@hooks';
 import { useRegisterUserMutation } from '@store-new';
@@ -20,6 +22,7 @@ export const OnboardingPage = () => {
   const telegramUser = useTelegramUser()
   const registerUserMutation = useRegisterUserMutation()
   const [selectedRoles, setSelectedRoles] = useState<UserRole[]>([])
+  const {showToast} = useToast();
 
   const toggleRole = (role: UserRole) => {
     setSelectedRoles((prev) =>
@@ -31,7 +34,7 @@ export const OnboardingPage = () => {
 
   const handleContinue = async () => {
     if (!telegramUser?.id || selectedRoles.length === 0) {
-      return
+      return;
     }
 
     try {
@@ -46,6 +49,7 @@ export const OnboardingPage = () => {
       // Navigate to home after registration
       navigate(ROUTES_NAME.MARKETPLACE_HOME, { replace: true })
     } catch (error) {
+      showToast({message: error instanceof Error ? error?.message : 'Failed to register user', type: 'error' });
       console.error('Failed to register user:', error)
     }
   }

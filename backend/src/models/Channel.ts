@@ -149,6 +149,31 @@ export class ChannelModel {
     return result.rows;
   }
 
+  static async getPricingById(pricingId: number): Promise<(ChannelPricing & { owner_id: number }) | null> {
+    const result = await db.query(
+      `SELECT cp.*, c.owner_id 
+       FROM channel_pricing cp
+       INNER JOIN channels c ON cp.channel_id = c.id
+       WHERE cp.id = $1 AND cp.is_active = TRUE`,
+      [pricingId]
+    );
+    if (!result.rows || result.rows.length === 0) {
+      return null;
+    }
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      channel_id: row.channel_id,
+      ad_format: row.ad_format,
+      price_ton: row.price_ton,
+      currency: row.currency,
+      is_active: row.is_active,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      owner_id: row.owner_id,
+    };
+  }
+
   static async verifyAdminStatus(channelId: number, userId: number, telegramUserId: number): Promise<boolean> {
     // Check if user is channel owner
     const channel = await db.query(

@@ -555,7 +555,7 @@ export class TONService {
     txHash?: string;
   }> {
     try {
-      address = '0QATCMF58O_55amFk1SM0mJiBD6rIshKr68sUZbpOrXTRwpb';
+      // address = '0QATCMF58O_55amFk1SM0mJiBD6rIshKr68sUZbpOrXTRwpb';
       // First, check for recent transaction with specific amount (more reliable)
       const recentTx = await this.checkRecentTransaction(address, expectedAmount, checkRecentMinutes);
       console.log({recentTx})

@@ -4,6 +4,7 @@ import { DealRepository } from '../repositories/DealRepository';
 import { CreativeRepository } from '../repositories/CreativeRepository';
 import { DealFlowService } from '../services/dealFlow';
 import { UserModel } from '../models/User';
+import { ChannelModel } from '../models/Channel';
 import { validate, validateQuery } from '../middleware/validation';
 import { createDealSchema, confirmPaymentSchema, submitCreativeSchema, listDealsQuerySchema, dealRequestsQuerySchema } from '../utils/validation';
 
@@ -41,8 +42,9 @@ dealsRouter.get('/', validateQuery(listDealsQuerySchema), async (req, res) => {
 // Get deal requests for channel owner by Telegram ID
 dealsRouter.get('/requests', validateQuery(dealRequestsQuerySchema), async (req, res) => {
   try {
-    const { telegram_id, limit } = req?.query;
-    const dealsLimit = limit || 20;
+    const telegram_id = req.query.telegram_id as unknown as number;
+    const limitValue = req.query.limit as unknown as number | undefined;
+    const dealsLimit = limitValue ?? 20;
 
     const deals = await DealFlowService.findDealRequestByTelegramId(telegram_id, dealsLimit);
     res.json(deals);
@@ -85,13 +87,25 @@ dealsRouter.get('/:id', async (req, res) => {
     const messages = await DealRepository.getMessages(deal.id);
     const creative = await CreativeRepository.findByDeal(deal.id);
 
+    // Fetch advertiser information
+    const advertiser = await UserModel.findById(deal.advertiser_id);
+    const advertiserInfo = advertiser ? {
+      id: advertiser.id,
+      telegram_id: advertiser.telegram_id,
+      username: advertiser.username,
+      first_name: advertiser.first_name,
+      last_name: advertiser.last_name,
+      is_channel_owner: advertiser.is_channel_owner,
+      is_advertiser: advertiser.is_advertiser,
+    } : null;
+
     // Remove sensitive field before sending response
     const { channel_owner_wallet_address, ...dealWithoutWallet } = deal;
 
     res.json({
       ...dealWithoutWallet,
       owner: user !== null ? user?.id === deal.channel_owner_id : false,
-      advertiser: user !== null ? user?.id === deal.advertiser_id : false,
+      advertiser: advertiserInfo,
       messages,
       creative,
     });
@@ -104,27 +118,29 @@ dealsRouter.get('/:id', async (req, res) => {
 dealsRouter.post('/', validate(createDealSchema), async (req, res) => {
   try {
     const {
-      deal_type,
-      listing_id,
-      campaign_id,
-      channel_id,
-      channel_owner_id,
+      pricing_id,
       advertiser_id,
-      ad_format,
-      price_ton,
       publish_date,
       postText,
     } = req.body;
 
+    if (!pricing_id) {
+      return res.status(400).json({ error: 'pricing_id is required' });
+    }
+
+    // Fetch pricing details and derive other fields
+    const pricing = await ChannelModel.getPricingById(pricing_id);
+    if (!pricing) {
+      return res.status(404).json({ error: 'Pricing not found' });
+    }
+
     const result = await DealFlowService.initializeDeal({
-      deal_type,
-      listing_id,
-      campaign_id,
-      channel_id,
-      channel_owner_id,
+      deal_type: 'listing',
+      channel_id: pricing.channel_id,
+      channel_owner_id: pricing.owner_id,
       advertiser_id,
-      ad_format,
-      price_ton: parseFloat(price_ton),
+      ad_format: pricing.ad_format,
+      price_ton: pricing.price_ton,
       publish_date: publish_date ? new Date(publish_date) : undefined,
       postText,
     });

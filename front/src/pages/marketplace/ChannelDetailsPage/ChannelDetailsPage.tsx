@@ -6,6 +6,7 @@ import {
   TelegramBackButton,
   Text,
   TelegramMainButton,
+  ChannelLink,
 } from '@components'
 import {useChannelQuery, useChannelStatsQuery} from '@store-new'
 import {useTelegramUser} from '@hooks'
@@ -50,20 +51,20 @@ export const ChannelDetailsPage = () => {
     <Page back>
       <PageLayout>
         <TelegramBackButton/>
-        <BlockNew gap={16} className={styles.container}>
-          <BlockNew padding="0 16px">
-            <Text type="hero" weight="bold">
-              {channel.title || `@${channel.username || 'channel'}`}
-            </Text>
-            {channel.is_verified && (
-              <Text type="caption" color="accent">
-                ✓ Verified Channel
-              </Text>
-            )}
+        <BlockNew gap={4} className={styles.container}>
+          <BlockNew padding="0 8px">
+            <BlockNew gap={4}>
+              <ChannelLink channel={channel} showLabel={false} textType="title2" weight="bold" />
+              {channel.is_verified && (
+                <Text type="caption" color="accent">
+                  ✓ Verified Channel
+                </Text>
+              )}
+            </BlockNew>
           </BlockNew>
 
           {channel.description && (
-            <BlockNew padding="0 16px">
+            <BlockNew padding="0 8px">
               <Text type="text" color="secondary">
                 {channel.description}
               </Text>
@@ -71,8 +72,8 @@ export const ChannelDetailsPage = () => {
           )}
 
           {displayStats && (
-            <BlockNew gap={12} padding="0 16px">
-              <BlockNew gap={4}>
+            <BlockNew gap={2} padding="0 8px">
+              <BlockNew gap={2}>
                 <Text type="title2" weight="bold">
                   Statistics
                 </Text>
@@ -102,12 +103,12 @@ export const ChannelDetailsPage = () => {
           )}
 
           {channel.pricing && channel.pricing.length > 0 && (
-            <BlockNew gap={12} padding="0 16px">
+            <BlockNew gap={2} padding="0 8px">
               <Text type="title2" weight="bold">
                 Pricing
               </Text>
               {postPricing && (
-                <BlockNew gap={4}>
+                <BlockNew gap={2} row>
                   <Text type="text" weight="bold">
                     Post
                   </Text>
@@ -117,7 +118,7 @@ export const ChannelDetailsPage = () => {
                 </BlockNew>
               )}
               {forwardPricing && (
-                <BlockNew gap={4}>
+                <BlockNew gap={2} row>
                   <Text type="text" weight="bold">
                     Forward
                   </Text>
@@ -127,7 +128,7 @@ export const ChannelDetailsPage = () => {
                 </BlockNew>
               )}
               {storyPricing && (
-                <BlockNew gap={4}>
+                <BlockNew gap={2} row>
                   <Text type="text" weight="bold">
                     Story
                   </Text>

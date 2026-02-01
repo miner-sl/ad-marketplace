@@ -7,6 +7,8 @@ import {
   TelegramBackButton,
   Text,
   TelegramMainButton,
+  ChannelLink,
+  useToast,
 } from '@components'
 import {useChannelQuery, useCreateDealMutation} from '@store-new'
 import {useTelegramUser} from '@hooks'
@@ -18,10 +20,10 @@ export const RequestPostPage = () => {
   const channelId = id ? parseInt(id) : 0
 
   const {data: channel} = useChannelQuery(channelId);
-  console.log(channel);
   const createDealMutation = useCreateDealMutation()
   const telegramUser = useTelegramUser()
   const userId = telegramUser?.id
+  const { showToast } = useToast()
 
   const [publishDate, setPublishDate] = useState('')
   const [messageText, setMessageText] = useState('')
@@ -47,21 +49,24 @@ export const RequestPostPage = () => {
 
     try {
       const deal = await createDealMutation.mutateAsync({
-        deal_type: 'listing',
-        channel_id: channel.id,
-        channel_owner_id: channel.owner_id,
+        pricing_id: postPricing.id,
         advertiser_id: userId,
-        ad_format: 'post',
-        price_ton: postPricing.price_ton,
         publish_date: formatPublishDate(publishDate),
         postText: messageText,
+      })
+      showToast({
+        message: 'Deal created successfully',
+        type: 'success',
       })
 
       // Navigate to deal details page
       navigate(`/marketplace/deals/${deal.id}`)
     } catch (error) {
-      console.error('Failed to create deal:', error)
-      // Error handling can be improved with toast notifications
+      console.error(error);
+      showToast({
+        message: error instanceof Error ? error.message : 'Failed to create deal',
+        type: 'error',
+      })
     }
   }
 
@@ -87,15 +92,13 @@ export const RequestPostPage = () => {
             <Text type="hero" weight="bold">
               Request Post
             </Text>
-            <Text type="caption" color="secondary">
-              Channel: {channel.title || `@${channel.username || 'channel'}`}
-            </Text>
+            <ChannelLink channel={channel} showLabel={false} />
           </BlockNew>
 
           <BlockNew gap={12} padding="0 16px">
             <BlockNew gap={4}>
               <Text type="text" weight="medium">
-                Publish Date (Optional)
+                Publish Date
               </Text>
               <input
                 type="datetime-local"

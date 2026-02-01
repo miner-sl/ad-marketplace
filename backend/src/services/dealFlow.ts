@@ -159,7 +159,6 @@ export class DealFlowService {
       }
 
       const escrowAddress = await TONService.generateEscrowAddress(dealId);
-
       const updateResult = await client.query(
         `UPDATE deals 
          SET escrow_address = $1, channel_owner_wallet_address = $2, status = 'payment_pending', updated_at = CURRENT_TIMESTAMP

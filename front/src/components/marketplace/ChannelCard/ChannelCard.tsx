@@ -41,9 +41,16 @@ export const ChannelCard = ({
         <Block row justify="between" align="start" gap={12}>
           <div style={{ flex: 1 }}>
             <Block gap={8}>
-            <Text type="title2" weight="bold">
-              {channel.title || `@${channel.username || 'channel'}`}
-            </Text>
+            <Block row gap={8} align="center">
+              <Text type="title2" weight="bold">
+                {channel.title || `@${channel.username || 'channel'}`}
+              </Text>
+              {channel.price_ton && (
+                <span className={styles.priceBadge}>
+                  {channel.price_ton} TON
+                </span>
+              )}
+            </Block>
             {channel.description && (
               <Text type="caption" color="secondary">
                 {channel.description.slice(0, 100)}

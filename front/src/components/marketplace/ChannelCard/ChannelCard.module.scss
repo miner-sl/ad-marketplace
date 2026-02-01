@@ -13,3 +13,15 @@
     transform: translateY(0);
   }
 }
+
+.priceBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(33, 150, 243, 0.1);
+  color: var(--color-accentsBrandCommunity);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}

@@ -10,14 +10,8 @@ export const createChannelSchema = z.object({
 });
 
 export const createDealSchema = z.object({
-  deal_type: z.enum(['listing', 'campaign']),
-  listing_id: z.number().optional(),
-  campaign_id: z.number().optional(),
-  channel_id: z.number(),
-  channel_owner_id: z.number(),
+  pricing_id: z.number().positive(),
   advertiser_id: z.number(),
-  ad_format: z.string(),
-  price_ton: z.number().positive(),
   publish_date: z.string().datetime().optional(),
   postText: z.string().optional(),
 });

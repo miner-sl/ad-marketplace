@@ -1,6 +1,6 @@
 import {useParams} from 'react-router-dom'
 import {openTelegramLink} from '@tma.js/sdk-react'
-import {BlockNew, Button, DealStatusBadge, PageLayout, Page, TelegramBackButton, Text,} from '@components'
+import {BlockNew, Button, DealStatusBadge, PageLayout, Page, TelegramBackButton, Text, ChannelLink} from '@components'
 import {
   useAcceptDealMutation,
   useApproveCreativeMutation,
@@ -47,27 +47,18 @@ export const DealDetailsPage = () => {
   const isAdvertiser = deal.advertiser_id === user?.id
   const canInteract = isChannelOwner || isAdvertiser
 
-  const getChannelLink = (): string | null => {
-    if (!deal.channel) return null
-    if (deal.channel.username) {
-      return `https://t.me/${deal.channel.username.replace('@', '')}`
+  const handleAdvertiserClick = () => {
+    const advertiser = typeof deal.advertiser === 'object' && deal.advertiser !== null ? deal.advertiser : null
+    if (advertiser) {
+      if (advertiser.username) {
+        openTelegramLink(`https://t.me/${advertiser.username.replace('@', '')}`)
+      } else if (advertiser.telegram_id) {
+        // For users without username, use user ID
+        openTelegramLink(`https://t.me/user${advertiser.telegram_id}`)
+      }
     }
-    if (deal.channel.telegram_channel_id) {
-      // For private channels, use the channel ID format
-      const channelId = deal.channel.telegram_channel_id.toString().replace('-100', '')
-      return `https://t.me/c/${channelId}`
-    }
-    return null
   }
 
-  let channelLink = getChannelLink();
-  console.log({deal, channelLink});
-  const handleChannelClick = () => {
-    const link = channelLink
-    if (link) {
-      openTelegramLink(link)
-    }
-  }
 
   const getTONScanUrl = (address: string): string => {
     const baseUrl = config.isDev 
@@ -151,23 +142,25 @@ export const DealDetailsPage = () => {
 
           <BlockNew gap={12} padding="0 16px">
             <BlockNew gap={4}>
-              <BlockNew row>
-                {channelLink ? (
-                  <span style={{textDecoration: 'underline'}}>
-                  <Text
-                    type="text"
-                    color="accent"
-                    onClick={handleChannelClick}
-                  >
-                    {`@${deal.channel?.title}` || `@${deal.channel?.username || 'channel'}`}
+              <ChannelLink channel={deal.channel} />
+              {typeof deal.advertiser === 'object' && deal.advertiser !== null && (
+                <BlockNew row gap={8}>
+                  <Text type="text" color="secondary">
+                    Advertiser:
                   </Text>
-                </span>
-                ) : (
-                  <Text type="text">
-                    Channel: {deal.channel?.title || `@${deal.channel?.username || 'channel'}`}
-                  </Text>
-                )}
-              </BlockNew>
+                  <span style={{ textDecoration: 'underline' }}>
+                    <Text
+                      type="text"
+                      color="accent"
+                      onClick={handleAdvertiserClick}
+                    >
+                      {deal.advertiser.username 
+                        ? `@${deal.advertiser.username}` 
+                        : deal.advertiser.first_name || `User #${deal.advertiser.telegram_id}`}
+                    </Text>
+                  </span>
+                </BlockNew>
+              )}
               {deal.channel?.stats && (
                 <BlockNew row gap={12} marginValue={8}>
                   {deal.channel.stats.subscribers_count && (

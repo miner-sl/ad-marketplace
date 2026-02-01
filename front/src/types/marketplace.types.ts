@@ -46,6 +46,7 @@ export interface Channel {
   telegram_channel_id: number
   username?: string
   title?: string
+  price_ton?: string
   description?: string
   bot_admin_id?: number
   is_verified: boolean
@@ -91,6 +92,16 @@ export interface DealMessage {
   created_at: string
 }
 
+export interface AdvertiserInfo {
+  id: number
+  telegram_id: number
+  username?: string
+  first_name?: string
+  last_name?: string
+  is_channel_owner: boolean
+  is_advertiser: boolean
+}
+
 export interface Deal {
   id: number
   deal_type: DealType
@@ -101,7 +112,7 @@ export interface Deal {
   advertiser_id: number
   ad_format: AdFormat
   owner: boolean
-  advertiser: boolean
+  advertiser: boolean | AdvertiserInfo | null
   price_ton: number
   status: DealStatus
   escrow_address?: string
@@ -183,16 +194,19 @@ export interface CreateCampaignRequest {
 }
 
 export interface CreateDealRequest {
-  deal_type: DealType
-  listing_id?: number
-  campaign_id?: number
-  channel_id: number
-  channel_owner_id: number
+  // New simplified format
+  pricing_id?: number
   advertiser_id: number
-  ad_format: AdFormat
-  price_ton: number
   publish_date?: string
   postText?: string
+  // Legacy fields (for backward compatibility)
+  deal_type?: DealType
+  listing_id?: number
+  campaign_id?: number
+  channel_id?: number
+  channel_owner_id?: number
+  ad_format?: AdFormat
+  price_ton?: number
 }
 
 export interface SubmitCreativeRequest {

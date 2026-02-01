@@ -9,13 +9,15 @@ import {
   Text,
   TabsContainer,
 } from '@components'
-import { ChannelCard, CampaignCard } from '@components'
+import { ChannelCard, CampaignCard, Skeleton } from '@components'
 import {
   useChannelsQuery,
   useCampaignsQuery,
 } from '@store-new'
 import { useUser } from '@store'
-import {ROUTES_NAME} from "../../../routes/routes.ts";
+import {ROUTES_NAME} from "../../../routes/routes";
+
+import styles from './MarketplaceHomePage.module.scss';
 
 export const MarketplaceHomePage = () => {
   const navigate = useNavigate()
@@ -61,6 +63,31 @@ export const MarketplaceHomePage = () => {
     []
   )
 
+  const isLoading = channelsLoading || campaignsLoading;
+  const activeTabIndex = tabs.findIndex((tab) => tab.value === activeTab)
+
+  const contentSlides = [
+    <BlockNew gap={8}>
+      {(!channels || channels.length === 0) && (
+          <Text type="text" color="secondary" align="center">
+            No channels available
+          </Text>
+      )}
+      {channels?.map((channel) => (
+          <ChannelCard key={channel.id} channel={channel} />
+      ))}
+    </BlockNew>,
+    <BlockNew gap={8}>
+      {(!campaigns || campaigns.length === 0) && (
+          <Text type="text" color="secondary" align="center">
+            No campaigns available
+          </Text>
+      )}
+      {campaigns?.map((campaign) => (
+          <CampaignCard key={campaign.id} campaign={campaign} />
+      ))}
+    </BlockNew>
+  ];
   return (
     <Page back={false}>
       <PageLayout>
@@ -130,44 +157,22 @@ export const MarketplaceHomePage = () => {
           )}
         </BlockNew>
 
-        {activeTab === 'channels' && (
-          <>
-            {channelsLoading ? (
-              <Text type="text" color="secondary" align="center">
-                Loading channels...
-              </Text>
-            ) : channels && channels.length > 0 ? (
-              <BlockNew gap={8}>
-                {channels.map((channel) => (
-                  <ChannelCard key={channel.id} channel={channel} />
-                ))}
-              </BlockNew>
-            ) : (
-              <Text type="text" color="secondary" align="center">
-                No channels available
-              </Text>
-            )}
-          </>
-        )}
-
-        {activeTab === 'campaigns' && (
-          <>
-            {campaignsLoading ? (
-              <Text type="text" color="secondary" align="center">
-                Loading campaigns...
-              </Text>
-            ) : campaigns && campaigns.length > 0 ? (
-              <BlockNew gap={8}>
-                {campaigns.map((campaign) => (
-                  <CampaignCard key={campaign.id} campaign={campaign} />
-                ))}
-              </BlockNew>
-            ) : (
-              <Text type="text" color="secondary" align="center">
-                No active campaigns
-              </Text>
-            )}
-          </>
+        {isLoading ? (
+            <Skeleton />
+        ) : (
+            <div
+                className={styles.contentSlider}
+                style={{
+                  transform: `translateX(-${activeTabIndex * 50}%)`,
+                  width: `${contentSlides.length * 100}%`,
+                }}
+            >
+              {contentSlides.map((slide, index) => (
+                  <div className={styles.contentSlide} key={index}>
+                    {slide}
+                  </div>
+              ))}
+            </div>
         )}
       </BlockNew>
       </PageLayout>

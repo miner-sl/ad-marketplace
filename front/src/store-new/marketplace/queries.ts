@@ -208,9 +208,6 @@ export const useDealsQuery = (filters?: DealFilters) => {
   return useQuery<Deal[]>({
     queryKey: [...TANSTACK_KEYS.DEALS, filters],
     queryFn: async () => await dealsAPI.getDeals(filters),
-    enabled: filters?.user_id !== undefined,
-    gcTime: TANSTACK_GC_TIME,
-    staleTime: TANSTACK_TTL.DEALS || 30000, // 30 seconds default
   })
 }
 

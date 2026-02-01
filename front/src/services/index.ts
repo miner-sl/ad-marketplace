@@ -171,9 +171,17 @@ export const MarketplaceService = {
 
   // Deals
   getDeals: async (filters?: DealFilters): Promise<ApiResponse<Deal[]>> => {
-    const queryParams = filters
-      ? '?' + new URLSearchParams(filters as Record<string, string>).toString()
-      : ''
+    let queryParams = ''
+    if (filters) {
+      const params = new URLSearchParams()
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params.append(key, String(value))
+        }
+      })
+      queryParams = params.toString() ? '?' + params.toString() : ''
+    }
+    console.log(`/deals${queryParams}`)
     return await apiRequest<Deal[]>(`/deals${queryParams}`)
   },
 

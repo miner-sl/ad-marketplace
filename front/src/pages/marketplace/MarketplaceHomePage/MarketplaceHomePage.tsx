@@ -22,7 +22,7 @@ import styles from './MarketplaceHomePage.module.scss';
 export const MarketplaceHomePage = () => {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<'channels' | 'campaigns'>('channels')
-  const { user: currentUser } = useUser()
+  // const { user: currentUser } = useUser()
 
   const tabs = [
     { id: 1, label: 'Channels', value: 'channels' },
@@ -119,7 +119,7 @@ export const MarketplaceHomePage = () => {
           <BlockNew gap={8} row>
             <Button
               type="basic"
-              onClick={() => navigate(ROUTES_NAME.MARKETPLACE_CHANNEL_OWNER_MY_DEALS)}
+              onClick={() => navigate(ROUTES_NAME.MARKETPLACE_ADVERTISER_MY_DEALS)}
             >
               My Deals
             </Button>

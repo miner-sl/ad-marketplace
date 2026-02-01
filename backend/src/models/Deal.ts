@@ -141,13 +141,19 @@ export class DealModel {
     return deal;
   }
 
-  static async findByUser(userId: number): Promise<Deal[]> {
-    const result = await db.query(
-      `SELECT * FROM deals 
-       WHERE channel_owner_id = $1 OR advertiser_id = $1
-       ORDER BY created_at DESC`,
-      [userId]
-    );
+  static async findByUser(userId: number, status?: string): Promise<Deal[]> {
+    let query = `SELECT * FROM deals 
+       WHERE (channel_owner_id = $1 OR advertiser_id = $1)`;
+    const params: any[] = [userId];
+    
+    if (status) {
+      query += ` AND status = $2`;
+      params.push(status);
+    }
+    
+    query += ` ORDER BY created_at DESC`;
+    
+    const result = await db.query(query, params);
     return result.rows;
   }
 

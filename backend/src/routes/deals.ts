@@ -23,7 +23,7 @@ dealsRouter.get('/', validateQuery(listDealsQuerySchema), async (req, res) => {
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
-      deals = await DealModel.findByUser(user.id);
+      deals = await DealModel.findByUser(user.id, status as string | undefined);
     } else {
       deals = await DealRepository.listDealsWithFilters({
         status: status as string | undefined,

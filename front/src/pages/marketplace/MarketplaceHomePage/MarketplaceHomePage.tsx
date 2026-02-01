@@ -75,7 +75,7 @@ export const MarketplaceHomePage = () => {
           </BlockNew>
         </BlockNew>
 
-        <BlockNew gap={12} padding="0 16px">
+        <BlockNew gap={4}>
           <BlockNew gap={8} row>
             <Button
               type="basic"

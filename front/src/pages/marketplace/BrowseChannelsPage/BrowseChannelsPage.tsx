@@ -22,16 +22,11 @@ export const BrowseChannelsPage = () => {
       <PageLayout>
         <TelegramBackButton />
         <BlockNew gap={16} className={styles.container}>
-          <BlockNew padding="0 16px">
-            <Text type="hero" weight="bold">
-              Browse Channels
-            </Text>
-            <BlockNew marginValue={8}>
-              <Text type="text" color="secondary">
-                Find channels for your advertising campaigns
-              </Text>
-            </BlockNew>
-          </BlockNew>
+          {/*<BlockNew>*/}
+          {/*  <Text type="title2" weight="bold">*/}
+          {/*    Browse Channels*/}
+          {/*  </Text>*/}
+          {/*</BlockNew>*/}
 
           {channelsLoading ? (
             <Text type="text" color="secondary" align="center">

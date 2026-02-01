@@ -91,7 +91,7 @@ dealsRouter.get('/:id', async (req, res) => {
     const advertiser = await UserModel.findById(deal.advertiser_id);
     const advertiserInfo = advertiser ? {
       id: advertiser.id,
-      telegram_id: advertiser.telegram_id,
+      telegram_id: Number(advertiser.telegram_id),
       username: advertiser.username,
       first_name: advertiser.first_name,
       last_name: advertiser.last_name,

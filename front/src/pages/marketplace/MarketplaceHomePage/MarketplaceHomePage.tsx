@@ -15,7 +15,7 @@ import {
   useCampaignsQuery,
 } from '@store-new'
 import { useUser } from '@store'
-import {ROUTES_NAME} from "../../../routes/routes";
+import {ROUTES_NAME} from '../../../routes';
 
 import styles from './MarketplaceHomePage.module.scss';
 
@@ -26,7 +26,7 @@ export const MarketplaceHomePage = () => {
 
   const tabs = [
     { id: 1, label: 'Channels', value: 'channels' },
-    { id: 2, label: 'Campaigns', value: 'campaigns' },
+    // { id: 2, label: 'Campaigns', value: 'campaigns' },
   ]
 
   const handleChangeActiveTab = (value: string) => {
@@ -37,7 +37,6 @@ export const MarketplaceHomePage = () => {
     limit: 20,
   })
 
-  console.log({channels, channelsLoading, channelsError, channelsStatus});
   const { data: campaigns, isLoading: campaignsLoading } = useCampaignsQuery({
     status: 'active',
     limit: 20,
@@ -77,16 +76,16 @@ export const MarketplaceHomePage = () => {
           <ChannelCard key={channel.id} channel={channel} />
       ))}
     </BlockNew>,
-    <BlockNew gap={8}>
-      {(!campaigns || campaigns.length === 0) && (
-          <Text type="text" color="secondary" align="center">
-            No campaigns available
-          </Text>
-      )}
-      {campaigns?.map((campaign) => (
-          <CampaignCard key={campaign.id} campaign={campaign} />
-      ))}
-    </BlockNew>
+    // <BlockNew gap={8}>
+    //   {(!campaigns || campaigns.length === 0) && (
+    //       <Text type="text" color="secondary" align="center">
+    //         No campaigns available
+    //       </Text>
+    //   )}
+    //   {campaigns?.map((campaign) => (
+    //       <CampaignCard key={campaign.id} campaign={campaign} />
+    //   ))}
+    // </BlockNew>
   ];
   return (
     <Page back={false}>
@@ -126,13 +125,13 @@ export const MarketplaceHomePage = () => {
             </Button>
             <Button
               type="basic"
-              onClick={() => navigate('/')}
+              onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CHANNELS)}
             >
               My Channels
             </Button>
             <Button
               type="basic"
-              onClick={() => navigate('/')}
+              onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CAMPAIGNS)}
             >
               My Campaigns
             </Button>

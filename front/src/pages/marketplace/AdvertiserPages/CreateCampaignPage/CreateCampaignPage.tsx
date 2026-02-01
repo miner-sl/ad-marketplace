@@ -63,7 +63,7 @@ export const CreateCampaignPage = () => {
         <TelegramBackButton />
         <BlockNew gap={16} className={styles.container}>
         <BlockNew padding="0 16px">
-          <Text type="hero" weight="bold">
+          <Text type="title" weight="bold">
             Create Campaign
           </Text>
         </BlockNew>

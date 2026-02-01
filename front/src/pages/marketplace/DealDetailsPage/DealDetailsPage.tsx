@@ -1,6 +1,6 @@
 import {useParams} from 'react-router-dom'
 import {openTelegramLink} from '@tma.js/sdk-react'
-import {BlockNew, Button, DealStatusBadge, PageLayout, Page, TelegramBackButton, Text, ChannelLink} from '@components'
+import {BlockNew, Button, DealStatusBadge, PageLayout, Page, TelegramBackButton, TelegramMainButton, Text, ChannelLink, useToast} from '@components'
 import {
   useAcceptDealMutation,
   useApproveCreativeMutation,
@@ -30,6 +30,7 @@ export const DealDetailsPage = () => {
   const creative = undefined;
   // const submitCreativeMutation = useSubmitCreativeMutation()
   const {copy} = useClipboard()
+  const {showToast} = useToast()
   if (isLoading || !deal) {
     return (
       <Page back>
@@ -122,9 +123,24 @@ export const DealDetailsPage = () => {
       // TODO: Implement API call to send message/request changes
       // For now, this is a placeholder
       console.log('Request changes:', notes)
-      alert('Request changes functionality will be implemented soon')
+      showToast({ type: 'error', message: 'Request changes functionality will be implemented soon' })
     }
   }
+
+  const handlePayDeal = () => {
+    if (!deal.escrow_address) {
+      showToast({ type: 'error', message: 'Escrow address not available' })
+      return
+    }
+    // Copy escrow address to clipboard
+    copy(deal.escrow_address, `send ${deal.price_ton} TON to the escrow address. Escrow address copied`)
+    // TODO: Open TON wallet or payment interface
+  }
+
+  const isAdvertiserUser = typeof deal.advertiser === 'object' && deal.advertiser !== null
+    ? deal.advertiser.telegram_id === user?.id 
+    : false
+  const showPaymentButton = isAdvertiserUser && deal.status === 'payment_pending' && deal.escrow_address !== undefined;
 
   return (
     <Page back>
@@ -133,7 +149,7 @@ export const DealDetailsPage = () => {
         <BlockNew gap={16} className={styles.container}>
           <BlockNew padding="0 16px">
             <BlockNew row justify="between" align="center" gap={12}>
-              <Text type="hero">
+              <Text type="title">
                 Deal #{deal.id}
               </Text>
               <DealStatusBadge status={deal.status}/>
@@ -305,6 +321,14 @@ export const DealDetailsPage = () => {
           </BlockNew>
         </BlockNew>
       </PageLayout>
+
+      {showPaymentButton && (
+        <TelegramMainButton
+          text={`Pay ${deal.price_ton} TON`}
+          onClick={handlePayDeal}
+          isVisible={true}
+        />
+      )}
     </Page>
   )
 }

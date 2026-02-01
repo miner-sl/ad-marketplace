@@ -1,0 +1,42 @@
+.container {
+  max-width: 400px;
+  width: 100%;
+  padding: 24px;
+}
+
+.errorDetails {
+  width: 100%;
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--color-backgroundSecondary, #f5f5f5);
+  border-radius: 8px;
+  text-align: left;
+}
+
+.stackTrace {
+  margin-top: 12px;
+  
+  summary {
+    cursor: pointer;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  
+  pre {
+    margin: 0;
+    padding: 12px;
+    background: var(--color-backgroundTertiary, #e0e0e0);
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-top: 8px;
+}

@@ -38,13 +38,17 @@ export async function init(options: {
     mockTelegramEnv({
       onEvent(event, next) {
         if (event.name === 'web_app_request_theme') {
+          // @ts-ignore
           let tp: ThemeParams = {};
           if (firstThemeSent) {
+            // @ts-ignore
             tp = themeParams.state();
           } else {
             firstThemeSent = true;
+            // @ts-ignore
             tp ||= retrieveLaunchParams().tgWebAppThemeParams;
           }
+          // @ts-ignore
           return emitEvent('theme_changed', { theme_params: tp });
         }
 

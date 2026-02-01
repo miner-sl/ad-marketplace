@@ -22,8 +22,8 @@ interface ToastContextInterface {
 }
 
 const ToastContext = React.createContext<ToastContextInterface>({
-  showToast: (options: ToastOptions) => {},
-  hideToast: (id: string | number) => {},
+  showToast: (_: ToastOptions) => {},
+  hideToast: (_: string | number) => {},
   hideToasts: () => {},
 })
 

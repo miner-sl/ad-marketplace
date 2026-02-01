@@ -1,61 +1,44 @@
 import {useCallback, useState} from 'react'
-import { useNavigate } from 'react-router-dom'
-import {
-  BlockNew,
-  PageLayout,
-  Page,
-  TelegramMainButton,
-  Button,
-  Text,
-  TabsContainer,
-} from '@components'
-import { ChannelCard, CampaignCard, Skeleton } from '@components'
-import {
-  useChannelsQuery,
-  useCampaignsQuery,
-} from '@store-new'
-import { useUser } from '@store'
-import {ROUTES_NAME} from '../../../routes';
+import {useNavigate} from 'react-router-dom'
+
+import {BlockNew, Button, ChannelCard, Page, PageLayout, Skeleton, TelegramMainButton, Text,} from '@components'
+import {useCampaignsQuery, useChannelsQuery,} from '@store-new'
+import {ROUTES_NAME} from '@routes';
 
 import styles from './MarketplaceHomePage.module.scss';
 
 export const MarketplaceHomePage = () => {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<'channels' | 'campaigns'>('channels')
+  const [activeTab, _] = useState<'channels' | 'campaigns'>('channels')
   // const { user: currentUser } = useUser()
 
   const tabs = [
     { id: 1, label: 'Channels', value: 'channels' },
     // { id: 2, label: 'Campaigns', value: 'campaigns' },
   ]
-
-  const handleChangeActiveTab = (value: string) => {
-    setActiveTab(value as 'channels' | 'campaigns')
-  }
+  //
+  // const handleChangeActiveTab = (value: string) => {
+  //   setActiveTab(value as 'channels' | 'campaigns')
+  // }
 
   const { data: channels, isLoading: channelsLoading, error: channelsError, status: channelsStatus } = useChannelsQuery({
     limit: 20,
   })
 
-  const { data: campaigns, isLoading: campaignsLoading } = useCampaignsQuery({
+  // const { data: campaigns, isLoading: campaignsLoading } = useCampaignsQuery({
+  const { isLoading: campaignsLoading } = useCampaignsQuery({
     status: 'active',
     limit: 20,
   })
 
-  console.log('MarketplaceHomePage render:', {
-    channelsStatus,
-    channelsLoading,
-    channelsError,
-    channels,
-  })
-
-  const handleCreateListing = () => {
-    navigate('/marketplace/channel-owner/create-listing')
-  }
-
-  const handleCreateCampaign = () => {
-    navigate('/marketplace/advertiser/create-campaign')
-  }
+  //
+  // const handleCreateListing = () => {
+  //   navigate('/marketplace/channel-owner/create-listing')
+  // }
+  //
+  // const handleCreateCampaign = () => {
+  //   navigate('/marketplace/advertiser/create-campaign')
+  // }
 
   const handleAddChat = useCallback(
     () => navigate('/admin/add-telegram-chat'),

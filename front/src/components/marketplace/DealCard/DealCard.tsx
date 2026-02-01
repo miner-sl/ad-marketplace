@@ -34,7 +34,7 @@ export const DealCard = ({deal, onClick}: DealCardProps) => {
         <Block gap={2}>
           <Block row justify="between" align="start" gap={2}>
             <div style={{flex: 1}}>
-              <Block gap={1}>
+              <Block gap={2}>
                 <Text type="title2" weight="bold">
                   Deal #{deal.id}
                 </Text>

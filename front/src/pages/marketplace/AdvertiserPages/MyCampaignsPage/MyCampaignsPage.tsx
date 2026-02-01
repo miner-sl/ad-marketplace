@@ -8,13 +8,12 @@ import {
   Text,
 } from '@components'
 import { useCampaignsQuery } from '@store-new'
-import { useTelegramUser } from '@hooks'
 import { ROUTES_NAME } from '@routes'
+
 import styles from './MyCampaignsPage.module.scss'
 
 export const MyCampaignsPage = () => {
   const navigate = useNavigate()
-  const user = useTelegramUser()
   const { data: campaigns, isLoading } = useCampaignsQuery()
 
   // Filter campaigns by advertiser_id
@@ -51,13 +50,12 @@ export const MyCampaignsPage = () => {
                     // Navigate to campaign details if route exists
                     // navigate(`/marketplace/campaigns/${campaign.id}`)
                   }}
-                  style={{ cursor: 'pointer' }}
                 >
                   <Text type="title2" weight="bold">
                     {campaign.title}
                   </Text>
                   {campaign.description && (
-                    <Text type="caption" color="secondary" marginValue={8}>
+                    <Text type="caption" color="secondary">
                       {campaign.description.slice(0, 100)}
                       {campaign.description.length > 100 ? '...' : ''}
                     </Text>

@@ -27,4 +27,5 @@ export const ROUTES_NAME = {
   MARKETPLACE_DEAL_DETAILS: '/marketplace/deals/:id',
   MARKETPLACE_CHANNEL_DETAILS: '/marketplace/channels/:id',
   MARKETPLACE_REQUEST_POST: '/marketplace/channels/:id/request-post',
+  ONBOARDING: '/onboarding',
 }

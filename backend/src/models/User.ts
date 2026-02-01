@@ -116,6 +116,100 @@ export class UserModel {
     });
   }
 
+  static async findOrCreateWithRoles(data: {
+    telegram_id: number;
+    username?: string;
+    first_name?: string;
+    last_name?: string;
+    is_channel_owner?: boolean;
+    is_advertiser?: boolean;
+  }): Promise<User> {
+    return await withTx(async (client) => {
+      // Lock or check for existing user atomically
+      const existing = await client.query(
+        `SELECT * FROM users WHERE telegram_id = $1 FOR UPDATE`,
+        [data.telegram_id]
+      );
+      
+      let user: User;
+      
+      if (existing.rows.length > 0) {
+        // Update user info and roles
+        const updateFields: string[] = [];
+        const updateValues: any[] = [];
+        let paramCount = 1;
+
+        if (data.username !== undefined) {
+          updateFields.push(`username = $${paramCount++}`);
+          updateValues.push(data.username);
+        }
+        if (data.first_name !== undefined) {
+          updateFields.push(`first_name = $${paramCount++}`);
+          updateValues.push(data.first_name);
+        }
+        if (data.last_name !== undefined) {
+          updateFields.push(`last_name = $${paramCount++}`);
+          updateValues.push(data.last_name);
+        }
+        if (data.is_channel_owner !== undefined) {
+          updateFields.push(`is_channel_owner = $${paramCount++}`);
+          updateValues.push(data.is_channel_owner);
+        }
+        if (data.is_advertiser !== undefined) {
+          updateFields.push(`is_advertiser = $${paramCount++}`);
+          updateValues.push(data.is_advertiser);
+        }
+
+        updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+        updateValues.push(data.telegram_id);
+
+        if (updateFields.length === 1) {
+          // Only updated_at, no other fields to update
+          const result = await client.query(
+            `UPDATE users 
+             SET updated_at = CURRENT_TIMESTAMP
+             WHERE telegram_id = $1
+             RETURNING *`,
+            [data.telegram_id]
+          );
+          user = result.rows[0];
+        } else {
+          const result = await client.query(
+            `UPDATE users 
+             SET ${updateFields.join(', ')}
+             WHERE telegram_id = $${paramCount}
+             RETURNING *`,
+            updateValues
+          );
+          user = result.rows[0];
+        }
+      } else {
+        // Create new user with roles
+        const result = await client.query(
+          `INSERT INTO users (telegram_id, username, first_name, last_name, is_channel_owner, is_advertiser)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           RETURNING *`,
+          [
+            data.telegram_id,
+            data.username,
+            data.first_name,
+            data.last_name,
+            data.is_channel_owner ?? false,
+            data.is_advertiser ?? false,
+          ]
+        );
+        
+        if (result.rows.length === 0) {
+          throw new Error(`Failed to create user with telegram_id: ${data.telegram_id}`);
+        }
+        
+        user = result.rows[0];
+      }
+      
+      return user;
+    });
+  }
+
   static async updateWalletAddress(telegramId: number, walletAddress: string): Promise<User> {
     return await withTx(async (client) => {
       const result = await client.query(

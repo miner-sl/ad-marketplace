@@ -13,6 +13,8 @@ import type {
   SetChannelPricingRequest,
   ChannelPricing,
   Creative,
+  RegisterUserRequest,
+  User,
 } from '@types'
 import { isProd } from '@utils'
 
@@ -272,5 +274,26 @@ export const MarketplaceService = {
 
   getDealCreative: async (dealId: number): Promise<ApiResponse<Creative>> => {
     return await apiRequest<Creative>(`/deals/${dealId}/creative`)
+  },
+
+  getUser: async (telegramId: number): Promise<ApiResponse<{ registered: boolean; user: User | null }>> => {
+    const queryParams = new URLSearchParams({
+      telegram_id: telegramId.toString(),
+    })
+    return await apiRequest<{ registered: boolean; user: User | null }>(`/user/me?${queryParams.toString()}`)
+  },
+
+  registerUser: async (request: RegisterUserRequest): Promise<ApiResponse<{ registered: boolean; user: User | null }>> => {
+    return await apiRequest<{ registered: boolean; user: User | null }>('/user/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        telegram_id: request.user_id,
+        username: request.username,
+        first_name: request.first_name,
+        last_name: request.last_name,
+        is_channel_owner: request.roles.includes('channel_owner'),
+        is_advertiser: request.roles.includes('advertiser'),
+      }),
+    })
   },
 }

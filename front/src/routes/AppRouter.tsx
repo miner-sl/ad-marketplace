@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router-dom'
+import { Route, Routes } from 'react-router-dom';
 
 import {
   MarketplaceHomePage,
@@ -14,10 +14,11 @@ import {
   BrowseChannelsPage,
   RequestsPage,
   RequestPostPage,
-} from '../pages/marketplace'
-import { AddBotToChatPage } from '../pages'
+} from '../pages/marketplace';
+import { AddBotToChatPage } from '../pages';
+import { OnboardingPage} from '../pages/onboarding';
 
-import {ROUTES_NAME} from "./routes";
+import {ROUTES_NAME} from './routes';
 
 export {ROUTES_NAME};
 export default function AppRouter() {
@@ -78,6 +79,10 @@ export default function AppRouter() {
     <Route
       path={ROUTES_NAME.ADD_TELEGRAM_CHAT}
       element={<AddBotToChatPage />}
+    />
+    <Route
+      path={ROUTES_NAME.ONBOARDING}
+      element={<OnboardingPage />}
     />
    </Routes>
  );

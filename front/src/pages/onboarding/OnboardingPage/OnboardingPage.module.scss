@@ -1,0 +1,27 @@
+.container {
+  padding-bottom: 100px;
+}
+
+.roleButton {
+  width: 100%;
+  padding: 20px;
+  border-radius: 12px;
+  border: 2px solid var(--color-backgroundTertiary);
+  background: var(--color-backgroundSecondary);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.roleButton:hover {
+  background: var(--color-backgroundTertiary);
+  border-color: var(--color-accentsBrandCommunity);
+}
+
+.roleButtonActive {
+  border-color: var(--color-accentsBrandCommunity);
+  background: rgba(33, 150, 243, 0.1);
+}

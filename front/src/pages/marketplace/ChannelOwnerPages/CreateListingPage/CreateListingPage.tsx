@@ -6,7 +6,6 @@ import {
   Page,
   TelegramBackButton,
   TelegramMainButton,
-  Button,
   Text,
   ListInput,
 } from '@components'

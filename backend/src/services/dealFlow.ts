@@ -1,5 +1,6 @@
 import { DealModel } from '../models/Deal';
 import { ChannelModel } from '../models/Channel';
+import { UserModel } from '../models/User';
 import { TONService } from './ton';
 import { CreativeService } from './creative';
 import { PostService } from './post';
@@ -9,6 +10,7 @@ import db from '../db/connection';
 export class DealFlowService {
   /**
    * Initialize/create a new deal
+   * Uses transaction to ensure atomicity when creating deal, setting publish_date, and storing postText
    */
   static async initializeDeal(data: {
     deal_type: 'listing' | 'campaign';
@@ -20,8 +22,80 @@ export class DealFlowService {
     ad_format: string;
     price_ton: number;
     timeout_hours?: number;
+    publish_date?: Date;
+    postText?: string;
   }): Promise<any> {
-    return await DealModel.create(data);
+    return await withTx(async (client) => {
+      // Validate channel exists and channel_owner_id matches
+      const channelCheck = await client.query(
+        `SELECT id, owner_id FROM channels WHERE id = $1`,
+        [data.channel_id]
+      );
+
+      if (!channelCheck.rows || channelCheck.rows.length === 0) {
+        throw new Error(`Channel with id ${data.channel_id} not found`);
+      }
+
+      const channel = channelCheck.rows[0];
+      if (channel.owner_id !== data.channel_owner_id) {
+        throw new Error(`Channel owner mismatch. Channel ${data.channel_id} is owned by user ${channel.owner_id}, not ${data.channel_owner_id}`);
+      }
+
+      // Get user from database by telegram_id (advertiser_id is telegram_id)
+      // Use transaction client to ensure atomicity
+      const userResult = await client.query(
+        'SELECT * FROM users WHERE telegram_id = $1',
+        [data.advertiser_id]
+      );
+
+      if (!userResult.rows || userResult.rows.length === 0) {
+        throw new Error(`User with telegram_id ${data.advertiser_id} not found. Please register first.`);
+      }
+
+      // Use the user's internal database ID for advertiser_id
+      const advertiserDbId = userResult.rows[0].id;
+
+      // Create deal within transaction
+      const timeoutHours = data.timeout_hours || 72;
+      const timeoutAt = new Date();
+      timeoutAt.setUTCHours(timeoutAt.getUTCHours() + timeoutHours);
+      const utcTimeoutAt = new Date(timeoutAt.toISOString());
+
+      // Insert deal with optional scheduled_post_time
+      const dealResult = await client.query(
+        `INSERT INTO deals (
+          deal_type, listing_id, campaign_id, channel_id, channel_owner_id,
+          advertiser_id, ad_format, price_ton, timeout_at, scheduled_post_time
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *`,
+        [
+          data.deal_type,
+          data.listing_id,
+          data.campaign_id,
+          data.channel_id,
+          data.channel_owner_id,
+          advertiserDbId, // Use internal database ID
+          data.ad_format,
+          data.price_ton,
+          utcTimeoutAt,
+          data.publish_date || null,
+        ]
+      );
+
+      const deal = dealResult.rows[0];
+      const dealId = deal.id;
+
+      // Insert postText as initial message if provided
+      if (data.postText) {
+        await client.query(
+          `INSERT INTO deal_messages (deal_id, sender_id, message_text)
+           VALUES ($1, $2, $3)`,
+          [dealId, advertiserDbId, data.postText] // Use internal database ID
+        );
+      }
+
+      return deal;
+    });
   }
 
   /**
@@ -51,7 +125,7 @@ export class DealFlowService {
         `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
         [dealId]
       );
-      
+
       const deal = dealResult.rows[0];
       if (!deal || deal.channel_owner_id !== channelOwnerId) {
         throw new Error('Deal not found or unauthorized');
@@ -99,7 +173,7 @@ export class DealFlowService {
       }
 
       const updated = updateResult.rows[0];
-      
+
       // Insert message in same transaction
       await client.query(
         `INSERT INTO deal_messages (deal_id, sender_id, message_text)
@@ -122,7 +196,7 @@ export class DealFlowService {
         `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
         [dealId]
       );
-      
+
       const deal = dealResult.rows[0];
       if (!deal) {
         throw new Error('Deal not found');
@@ -139,7 +213,7 @@ export class DealFlowService {
           deal.escrow_address,
           deal.price_ton.toString()
         );
-        
+
         if (!paymentCheck.received) {
           throw new Error('Payment not confirmed on blockchain');
         }
@@ -204,7 +278,7 @@ export class DealFlowService {
       });
 
       await CreativeService.submit(dealId);
-      
+
       // Update deal status atomically
       const updateResult = await client.query(
         `UPDATE deals 
@@ -243,11 +317,11 @@ export class DealFlowService {
       }
 
       await CreativeService.approve(dealId);
-      
+
       // Check if payment was already confirmed by checking payment_confirmed_at
       // If payment confirmed, keep paid status, otherwise move to creative_approved
       const finalStatus = deal.payment_confirmed_at ? 'paid' : 'creative_approved';
-      
+
       // Atomic update
       const updateResult = await client.query(
         `UPDATE deals 
@@ -289,7 +363,7 @@ export class DealFlowService {
       }
 
       await CreativeService.requestRevision(dealId, notes);
-      
+
       // Atomic update
       const updateResult = await client.query(
         `UPDATE deals 

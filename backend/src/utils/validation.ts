@@ -18,6 +18,8 @@ export const createDealSchema = z.object({
   advertiser_id: z.number(),
   ad_format: z.string(),
   price_ton: z.number().positive(),
+  publish_date: z.string().datetime().optional(),
+  postText: z.string().optional(),
 });
 
 export const createCampaignSchema = z.object({
@@ -40,4 +42,25 @@ export const submitCreativeSchema = z.object({
 
 export const confirmPaymentSchema = z.object({
   tx_hash: z.string().min(1),
+});
+
+export const listDealsQuerySchema = z.object({
+  user_id: z.string().regex(/^\d+$/).optional(),
+  status: z.enum([
+    'pending',
+    'negotiating',
+    'approved',
+    'payment_pending',
+    'paid',
+    'creative_submitted',
+    'creative_approved',
+    'scheduled',
+    'posted',
+    'verified',
+    'completed',
+    'cancelled',
+    'refunded',
+  ]).optional(),
+  deal_type: z.enum(['listing', 'campaign']).optional(),
+  limit: z.string().regex(/^\d+$/).transform(Number).optional(),
 });

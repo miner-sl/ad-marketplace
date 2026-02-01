@@ -1,0 +1,108 @@
+.container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background-color: var(--color-input);
+  border-radius: 10px;
+}
+
+.height-44 {
+  min-height: 44px;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  flex: 1;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  input {
+    text-align: right;
+  }
+}
+
+.disabled {
+  opacity: 0.5;
+  cursor: default !important;
+
+  * {
+    cursor: default !important;
+  }
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.chevron {
+  width: 7px;
+  max-width: 7px;
+  min-width: 7px;
+  height: 12px;
+  max-height: 12px;
+  min-height: 12px;
+
+  svg {
+    height: 100%;
+    width: 100%;
+  }
+}
+
+.dark {
+  svg {
+    path {
+      stroke: #545458;
+    }
+  }
+}
+
+.dragIcon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.dragIcon::before,
+.dragIcon::after,
+.dragIcon span {
+  content: '';
+  display: block;
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1.5px;
+  background: var(--color-textIconsTertiary);
+  border-radius: 20px;
+}
+
+.dragIcon::before {
+  top: 3px;
+}
+
+.dragIcon span {
+  top: 7px;
+  position: absolute;
+}
+
+.dragIcon::after {
+  top: 11px;
+}

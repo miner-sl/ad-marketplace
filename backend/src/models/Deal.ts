@@ -93,6 +93,54 @@ export class DealModel {
     return result.rows[0] || null;
   }
 
+  static async findByIdWithChannel(id: number): Promise<any | null> {
+    const result = await db.query(
+      `SELECT 
+        d.*,
+        c.id as c_id,
+        c.owner_id as c_owner_id,
+        c.telegram_channel_id as c_telegram_channel_id,
+        c.username as c_username,
+        c.title as c_title,
+        c.description as c_description,
+        c.bot_admin_id as c_bot_admin_id,
+        c.is_verified as c_is_verified,
+        c.is_active as c_is_active,
+        c.created_at as c_created_at,
+        c.updated_at as c_updated_at
+      FROM deals d
+      LEFT JOIN channels c ON d.channel_id = c.id
+      WHERE d.id = $1`,
+      [id]
+    );
+    
+    if (!result.rows || result.rows.length === 0) {
+      return null;
+    }
+    
+    const row = result.rows[0];
+    
+    // Extract deal fields (all columns that don't start with 'c_')
+    const deal: any = {};
+    const channel: any = {};
+    
+    for (const key in row) {
+      if (key.startsWith('c_')) {
+        const channelKey = key.replace('c_', '');
+        channel[channelKey] = row[key];
+      } else {
+        deal[key] = row[key];
+      }
+    }
+    
+    // Only add channel if it has an id (meaning the join found a channel)
+    if (channel.id) {
+      deal.channel = channel;
+    }
+    
+    return deal;
+  }
+
   static async findByUser(userId: number): Promise<Deal[]> {
     const result = await db.query(
       `SELECT * FROM deals 

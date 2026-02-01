@@ -1,0 +1,1 @@
+export { MyDealsPage } from './MyDealsPage'

@@ -3,29 +3,37 @@ import { DealModel } from '../models/Deal';
 import { DealRepository } from '../repositories/DealRepository';
 import { CreativeRepository } from '../repositories/CreativeRepository';
 import { DealFlowService } from '../services/dealFlow';
-import { validate } from '../middleware/validation';
-import { createDealSchema, confirmPaymentSchema, submitCreativeSchema } from '../utils/validation';
+import { UserModel } from '../models/User';
+import { validate, validateQuery } from '../middleware/validation';
+import { createDealSchema, confirmPaymentSchema, submitCreativeSchema, listDealsQuerySchema } from '../utils/validation';
 
 const dealsRouter = Router();
 
 // List deals
-dealsRouter.get('/', async (req, res) => {
+dealsRouter.get('/', validateQuery(listDealsQuerySchema), async (req, res) => {
   try {
-    const { user_id, status, deal_type } = req.query;
+    const { user_id, status, deal_type, limit } = req.query;
     let deals;
 
     if (user_id) {
-      deals = await DealModel.findByUser(parseInt(user_id as string));
+      const telegramId = req.query.user_id as string;
+      console.log(req.query);
+      const user = await UserModel.findByTelegramId(Number(telegramId));
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      deals = await DealModel.findByUser(user.id);
     } else {
       deals = await DealRepository.listDealsWithFilters({
         status: status as string | undefined,
         deal_type: deal_type as string | undefined,
-        limit: 100,
+        limit: (limit as unknown as number) || 20,
       });
     }
 
     res.json(deals);
   } catch (error: any) {
+    console.log(error)
     res.status(500).json({ error: error.message });
   }
 });
@@ -33,7 +41,7 @@ dealsRouter.get('/', async (req, res) => {
 // Get deal details
 dealsRouter.get('/:id', async (req, res) => {
   try {
-    const deal = await DealModel.findById(parseInt(req.params.id));
+    const deal = await DealModel.findByIdWithChannel(parseInt(req.params.id));
     if (!deal) {
       return res.status(404).json({ error: 'Deal not found' });
     }
@@ -64,6 +72,8 @@ dealsRouter.post('/', validate(createDealSchema), async (req, res) => {
       advertiser_id,
       ad_format,
       price_ton,
+      publish_date,
+      postText,
     } = req.body;
 
     const result = await DealFlowService.initializeDeal({
@@ -75,6 +85,8 @@ dealsRouter.post('/', validate(createDealSchema), async (req, res) => {
       advertiser_id,
       ad_format,
       price_ton: parseFloat(price_ton),
+      publish_date: publish_date ? new Date(publish_date) : undefined,
+      postText,
     });
 
     res.json(result);

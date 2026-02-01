@@ -1,0 +1,20 @@
+.container {
+  padding-bottom: 80px;
+}
+
+.formatOption {
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: var(--color-background-secondary);
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: var(--color-background-tertiary);
+  }
+
+  &.selected {
+    background: var(--color-accent);
+    opacity: 0.8;
+  }
+}

@@ -159,8 +159,7 @@ export class ChannelRepository {
    */
   static async findByIdWithDetails(channelId: number): Promise<any | null> {
     const result = await db.query(
-      `SELECT c.*, cs.*, 
-       (SELECT json_agg(cp.*) FROM channel_pricing cp WHERE cp.channel_id = c.id AND cp.is_active = TRUE) as pricing
+      `SELECT c.*, cs.*
        FROM channels c
        LEFT JOIN LATERAL (
          SELECT * FROM channel_stats 
@@ -171,9 +170,32 @@ export class ChannelRepository {
        WHERE c.id = $1`,
       [channelId]
     );
+    
     if (!result?.rows || result.rows.length === 0) {
       return null;
     }
-    return result.rows[0] || null;
+    
+    const channel = result.rows[0];
+    
+    // Fetch pricing separately
+    const pricingResult = await db.query(
+      `SELECT 
+        id,
+        channel_id,
+        ad_format,
+        price_ton,
+        currency,
+        is_active,
+        created_at,
+        updated_at
+       FROM channel_pricing 
+       WHERE channel_id = $1 AND is_active = TRUE`,
+      [channelId]
+    );
+    
+    // Add pricing array to channel
+    channel.pricing = pricingResult?.rows || [];
+    
+    return channel;
   }
 }

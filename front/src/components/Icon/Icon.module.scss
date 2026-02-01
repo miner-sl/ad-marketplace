@@ -1,0 +1,100 @@
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  svg {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+.color-danger {
+  svg {
+    g {
+      opacity: 1;
+    }
+    path {
+      fill: var(--color-accentsRed);
+    }
+  }
+}
+
+.color-tertiary {
+  svg {
+    g {
+      opacity: 1;
+    }
+    path {
+      fill: var(--color-textIconsTertiary);
+    }
+  }
+}
+
+.color-primary {
+  svg {
+    g {
+      opacity: 1;
+    }
+    path {
+      fill: var(--tg-theme-button-text-color);
+    }
+  }
+}
+
+.color-secondary {
+  svg {
+    g {
+      opacity: 1;
+    }
+    path {
+      fill: var(--color-foreground-primary);
+    }
+  }
+}
+
+.size-112 {
+  width: 112px;
+  height: 112px;
+}
+
+.size-100 {
+  width: 100px;
+  height: 100px;
+}
+
+.size-28 {
+  width: 28px;
+  height: 28px;
+}
+
+.size-24 {
+  width: 24px;
+  height: 24px;
+}
+
+.size-20 {
+  width: 20px;
+  height: 20px;
+}
+
+.size-18 {
+  width: 18px;
+  height: 18px;
+}
+
+.size-16 {
+  width: 16px;
+  height: 16px;
+}
+
+.size-12 {
+  width: 12px;
+  height: 12px;
+}
+
+.size-40 {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+}

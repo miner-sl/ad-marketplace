@@ -47,7 +47,7 @@ channelsRouter.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Channel not found' });
     }
 
-    res.json(channel);
+    res.json({...channel, id: channel.channel_id});
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

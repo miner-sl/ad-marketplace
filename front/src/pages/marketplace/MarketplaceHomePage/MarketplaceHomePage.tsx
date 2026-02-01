@@ -113,7 +113,7 @@ export const MarketplaceHomePage = () => {
               type="basic"
               onClick={() => navigate('/requests')}
             >
-              Ad Requests
+              Incoming Ads
             </Button>
           </BlockNew>
           <BlockNew gap={8} row>
@@ -138,23 +138,23 @@ export const MarketplaceHomePage = () => {
           </BlockNew>
         </BlockNew>
 
-        <BlockNew justify="between" align="center" row padding="0 16px">
-          <TabsContainer
-            tabs={tabs}
-            activeTab={activeTab}
-            onChangeTab={handleChangeActiveTab as (value: string) => void}
-          />
-          {currentUser && (
-            <Button
-              type="primary"
-              onClick={
-                activeTab === 'channels' ? handleCreateListing : handleCreateCampaign
-              }
-            >
-              {activeTab === 'channels' ? 'List Your Channel' : 'Create Campaign'}
-            </Button>
-          )}
-        </BlockNew>
+        {/*<BlockNew justify="between" align="center" row padding="0 16px">*/}
+        {/*  <TabsContainer*/}
+        {/*    tabs={tabs}*/}
+        {/*    activeTab={activeTab}*/}
+        {/*    onChangeTab={handleChangeActiveTab as (value: string) => void}*/}
+        {/*  />*/}
+        {/*  {currentUser && (*/}
+        {/*    <Button*/}
+        {/*      type="primary"*/}
+        {/*      onClick={*/}
+        {/*        activeTab === 'channels' ? handleCreateListing : handleCreateCampaign*/}
+        {/*      }*/}
+        {/*    >*/}
+        {/*      {activeTab === 'channels' ? 'List Your Channel' : 'Create Campaign'}*/}
+        {/*    </Button>*/}
+        {/*  )}*/}
+        {/*</BlockNew>*/}
 
         {isLoading ? (
             <Skeleton />

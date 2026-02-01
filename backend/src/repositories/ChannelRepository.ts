@@ -120,6 +120,7 @@ export class ChannelRepository {
 
   /**
    * List channels with filters (subscribers, price, ad_format)
+   * Returns channels grouped by id with pricing array
    */
   static async listChannelsWithFilters(filters: ChannelListFilters): Promise<any[]> {
     const {
@@ -132,8 +133,26 @@ export class ChannelRepository {
       offset = 0,
     } = filters;
 
+    let pricingConditions = '';
+    const pricingParams: any[] = [];
+    let pricingParamCount = 1;
+
+    if (ad_format) {
+      pricingConditions += ` AND cp_filter.ad_format = $${pricingParamCount++}`;
+      pricingParams.push(ad_format);
+    }
+    if (min_price !== undefined) {
+      pricingConditions += ` AND cp_filter.price_ton >= $${pricingParamCount++}`;
+      pricingParams.push(min_price);
+    }
+    if (max_price !== undefined) {
+      pricingConditions += ` AND cp_filter.price_ton <= $${pricingParamCount++}`;
+      pricingParams.push(max_price);
+    }
+
+    // Query to get unique channels with stats
     let query = `
-      SELECT c.*, cs.subscribers_count, cs.average_views, cp.price_ton, cp.ad_format
+      SELECT DISTINCT c.*, cs.subscribers_count, cs.average_views
       FROM channels c
       LEFT JOIN LATERAL (
         SELECT * FROM channel_stats 
@@ -141,7 +160,6 @@ export class ChannelRepository {
         ORDER BY stats_date DESC 
         LIMIT 1
       ) cs ON true
-      LEFT JOIN channel_pricing cp ON cp.channel_id = c.id AND cp.is_active = TRUE
       WHERE c.is_active = TRUE
     `;
     const params: any[] = [];
@@ -155,24 +173,65 @@ export class ChannelRepository {
       query += ` AND cs.subscribers_count <= $${paramCount++}`;
       params.push(max_subscribers);
     }
-    if (ad_format) {
-      query += ` AND cp.ad_format = $${paramCount++}`;
-      params.push(ad_format);
-    }
-    if (min_price !== undefined) {
-      query += ` AND cp.price_ton >= $${paramCount++}`;
-      params.push(min_price);
-    }
-    if (max_price !== undefined) {
-      query += ` AND cp.price_ton <= $${paramCount++}`;
-      params.push(max_price);
+
+    // Add pricing filter condition if any pricing filters exist
+    if (pricingConditions) {
+      query += ` AND EXISTS (
+        SELECT 1 FROM channel_pricing cp_filter 
+        WHERE cp_filter.channel_id = c.id 
+        AND cp_filter.is_active = TRUE
+        ${pricingConditions}
+      )`;
+      params.push(...pricingParams);
+      paramCount += pricingParams.length;
     }
 
     query += ` ORDER BY c.created_at DESC LIMIT $${paramCount++} OFFSET $${paramCount++}`;
     params.push(limit, offset);
 
-    const result = await db.query(query, params);
-    return result?.rows || [];
+    const channelsResult = await db.query(query, params);
+    const channels = channelsResult?.rows || [];
+
+    if (channels.length === 0) {
+      return [];
+    }
+
+    // Get all pricing for these channels
+    const channelIds = channels.map((c: any) => c.id);
+    const pricingQuery = `
+      SELECT cp.*
+      FROM channel_pricing cp
+      WHERE cp.channel_id = ANY($1::int[])
+      AND cp.is_active = TRUE
+      ORDER BY cp.channel_id, cp.ad_format
+    `;
+    const pricingResult = await db.query(pricingQuery, [channelIds]);
+    const allPricing = pricingResult?.rows || [];
+
+    // Group pricing by channel_id
+    const pricingMap = new Map<number, any[]>();
+    for (const pricing of allPricing) {
+      const channelId = pricing.channel_id;
+      if (!pricingMap.has(channelId)) {
+        pricingMap.set(channelId, []);
+      }
+      pricingMap.get(channelId)!.push({
+        id: pricing.id,
+        channel_id: pricing.channel_id,
+        ad_format: pricing.ad_format,
+        price_ton: parseFloat(pricing.price_ton),
+        currency: pricing.currency,
+        is_active: pricing.is_active,
+        created_at: pricing.created_at,
+        updated_at: pricing.updated_at,
+      });
+    }
+
+    // Combine channels with their pricing
+    return channels.map((channel: any) => ({
+      ...channel,
+      pricing: pricingMap.get(channel.id) || [],
+    }));
   }
 
   /**

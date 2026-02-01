@@ -90,7 +90,7 @@ export const MarketplaceHomePage = () => {
   return (
     <Page back={false}>
       <PageLayout>
-      <TelegramMainButton text="Add Group or Channel" onClick={handleAddChat} />
+      <TelegramMainButton text="Add bot to Channel" onClick={handleAddChat} />
 
       <BlockNew gap={12} className={styles.chatsBlock}>
         <BlockNew>

@@ -64,9 +64,16 @@ async function apiRequest<T>(
 export const MarketplaceService = {
   // Channels
   getChannels: async (filters?: ChannelFilters): Promise<ApiResponse<Channel[]>> => {
-    const queryParams = filters
-      ? '?' + new URLSearchParams(filters as Record<string, string>).toString()
-      : ''
+    let queryParams = ''
+    if (filters) {
+      const params = new URLSearchParams()
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params.append(key, String(value))
+        }
+      })
+      queryParams = params.toString() ? '?' + params.toString() : ''
+    }
     return await apiRequest<Channel[]>(`/channels${queryParams}`)
   },
 

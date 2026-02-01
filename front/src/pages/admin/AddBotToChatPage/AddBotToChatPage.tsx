@@ -196,7 +196,7 @@ export const AddBotToChatPage = () => {
           text={
             isCheckingNewChat || isCheckingChatPermissions
               ? 'Cancel'
-              : 'Add Group or Channel'
+              : 'Add bot to Channel'
           }
           onClick={handleClick}
         />

@@ -5,8 +5,10 @@ import {
   CreateListingPage,
   MyListingsPage,
   MyDealsPage as ChannelOwnerMyDealsPage,
+  MyChannelsPage,
   CreateCampaignPage,
   AdvertiserMyDealsPage,
+  MyCampaignsPage,
   DealDetailsPage,
   ChannelDetailsPage,
   BrowseChannelsPage,
@@ -41,14 +43,22 @@ export default function AppRouter() {
        path={ROUTES_NAME.MARKETPLACE_ADVERTISER_CREATE_CAMPAIGN}
        element={<CreateCampaignPage />}
      />
-     <Route
-       path={ROUTES_NAME.MARKETPLACE_ADVERTISER_MY_DEALS}
-       element={<AdvertiserMyDealsPage />}
-     />
-     <Route
-       path={ROUTES_NAME.MARKETPLACE_DEAL_DETAILS}
-       element={<DealDetailsPage />}
-     />
+    <Route
+      path={ROUTES_NAME.MARKETPLACE_ADVERTISER_MY_DEALS}
+      element={<AdvertiserMyDealsPage />}
+    />
+    <Route
+      path={ROUTES_NAME.MARKETPLACE_MY_CHANNELS}
+      element={<MyChannelsPage />}
+    />
+    <Route
+      path={ROUTES_NAME.MARKETPLACE_MY_CAMPAIGNS}
+      element={<MyCampaignsPage />}
+    />
+    <Route
+      path={ROUTES_NAME.MARKETPLACE_DEAL_DETAILS}
+      element={<DealDetailsPage />}
+    />
     <Route
       path={ROUTES_NAME.MARKETPLACE_CHANNEL_DETAILS}
       element={<ChannelDetailsPage />}

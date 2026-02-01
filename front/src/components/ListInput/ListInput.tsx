@@ -21,6 +21,9 @@ export interface ListInputProps {
   readOnly?: boolean
   name?: string
   id?: string
+  step?: string | number
+  min?: string | number
+  max?: string | number
   inputMode?:
     | 'none'
     | 'text'
@@ -48,6 +51,9 @@ export const ListInput: React.FC<ListInputProps> = ({
   readOnly = false,
   name,
   id,
+  step,
+  min,
+  max,
   textColor = 'primary',
   inputMode,
   after,
@@ -81,6 +87,9 @@ export const ListInput: React.FC<ListInputProps> = ({
         readOnly={readOnly}
         name={name}
         id={id}
+        step={step}
+        min={min}
+        max={max}
         inputMode={inputMode}
       />
       <div>{after}</div>

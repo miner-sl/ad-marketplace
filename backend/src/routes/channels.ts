@@ -22,10 +22,18 @@ channelsRouter.get('/', async (req, res) => {
     } = req.query;
 
     const filters = {
-      min_subscribers: min_subscribers ? parseInt(min_subscribers as string) : undefined,
-      max_subscribers: max_subscribers ? parseInt(max_subscribers as string) : undefined,
-      min_price: min_price ? parseFloat(min_price as string) : undefined,
-      max_price: max_price ? parseFloat(max_price as string) : undefined,
+      min_subscribers: min_subscribers !== undefined && min_subscribers !== null && min_subscribers !== '' 
+        ? parseInt(min_subscribers as string) 
+        : undefined,
+      max_subscribers: max_subscribers !== undefined && max_subscribers !== null && max_subscribers !== '' 
+        ? parseInt(max_subscribers as string) 
+        : undefined,
+      min_price: min_price !== undefined && min_price !== null && min_price !== '' 
+        ? parseFloat(min_price as string) 
+        : undefined,
+      max_price: max_price !== undefined && max_price !== null && max_price !== '' 
+        ? parseFloat(max_price as string) 
+        : undefined,
       ad_format: ad_format as string | undefined,
       limit: parseInt(limit as string),
       offset: parseInt(offset as string),

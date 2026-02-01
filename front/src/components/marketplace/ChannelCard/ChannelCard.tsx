@@ -30,6 +30,8 @@ export const ChannelCard = ({
   const postPricing = channel.pricing?.find((p) => p.ad_format === 'post')
   const subscribers = channel.stats?.subscribers_count || 0
   const avgViews = channel.stats?.average_views || 0
+  const availableFormats = channel.pricing?.map((p) => p.ad_format) || []
+  const uniqueFormats = Array.from(new Set(availableFormats))
 
   return (
     <div className={styles.root}>
@@ -49,6 +51,15 @@ export const ChannelCard = ({
                 <span className={styles.priceBadge}>
                   {channel.price_ton} TON
                 </span>
+              )}
+              {uniqueFormats.length > 0 && (
+                <>
+                  {uniqueFormats.map((format) => (
+                    <span key={format} className={styles.formatBadge}>
+                      {format}
+                    </span>
+                  ))}
+                </>
               )}
             </Block>
             {channel.description && (

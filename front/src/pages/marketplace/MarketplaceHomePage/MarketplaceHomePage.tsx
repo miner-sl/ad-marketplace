@@ -93,8 +93,8 @@ export const MarketplaceHomePage = () => {
       <PageLayout>
       <TelegramMainButton text="Add Group or Channel" onClick={handleAddChat} />
 
-      <BlockNew gap={16}>
-        <BlockNew padding="0 16px">
+      <BlockNew gap={12} className={styles.chatsBlock}>
+        <BlockNew>
           <BlockNew marginValue={8}>
             <Text type="text" color="secondary">
               Connect channel owners with advertisers

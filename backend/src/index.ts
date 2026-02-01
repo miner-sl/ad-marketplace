@@ -8,6 +8,7 @@ import * as path from 'path';
 import channelsRouter from './routes/channels';
 import dealsRouter from './routes/deals';
 import campaignsRouter from './routes/campaigns';
+import userRouter from './routes/user';
 import bot from './bot';
 import { CronJobs } from './cron/jobs';
 import logger from './utils/logger';
@@ -19,7 +20,6 @@ const app = express();
 const PORT = env.PORT;
 const isProd = env.NODE_ENV === 'production';
 
-// Middleware
 app.use(requestIdMiddleware);
 app.use(helmet({
   contentSecurityPolicy: isProd ? undefined : false,
@@ -32,7 +32,6 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Request logging middleware
 app.use((req, res, next) => {
   logger.debug('Incoming request', {
     method: req.method,
@@ -43,7 +42,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: isProd ? 100 : 1000, // More lenient in dev
@@ -63,7 +61,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Readiness check (checks database connection)
 app.get('/ready', async (req, res) => {
   try {
     await db.query('SELECT 1');
@@ -92,7 +89,6 @@ app.get('/live', (req, res) => {
   });
 });
 
-// Swagger documentation
 const swaggerDocument = YAML.load(path.join(__dirname, '../swagger.yaml'));
 app.use('/api-docs', swaggerUi.serve as any, swaggerUi.setup(swaggerDocument) as any);
 
@@ -100,6 +96,7 @@ app.use('/api-docs', swaggerUi.serve as any, swaggerUi.setup(swaggerDocument) as
 app.use('/api/channels', channelsRouter);
 app.use('/api/deals', dealsRouter);
 app.use('/api/campaigns', campaignsRouter);
+app.use('/api/user', userRouter);
 
 // Webhook for Telegram bot
 app.post('/webhook', async (req, res) => {
@@ -119,7 +116,6 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-// Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || 'Internal server error';
@@ -142,30 +138,14 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-// Start server
-const server = app.listen(PORT, () => {
-  logger.info('Server started', {
-    port: PORT,
-    environment: env.NODE_ENV,
-    nodeVersion: process.version,
-  });
-
-  // Start cron jobs
-  try {
-    CronJobs.startAll();
-    logger.info('Cron jobs started');
-  } catch (error: any) {
-    logger.error('Failed to start cron jobs', { error: error.message });
-  }
-
-  // Launch bot
+function runTgBot() {
   if (isProd && env.TELEGRAM_WEBHOOK_URL) {
     bot.telegram.setWebhook(env.TELEGRAM_WEBHOOK_URL)
       .then(() => {
-        logger.info('Telegram webhook set successfully', { url: env.TELEGRAM_WEBHOOK_URL });
+        logger.info('Telegram webhook set successfully', {url: env.TELEGRAM_WEBHOOK_URL});
       })
       .catch((error: any) => {
-        logger.error('Failed to set webhook', { error: error.message });
+        logger.error('Failed to set webhook', {error: error.message});
       });
   } else {
     // Use polling in development
@@ -174,12 +154,27 @@ const server = app.listen(PORT, () => {
         logger.info('Bot started with polling');
       })
       .catch((error: any) => {
-        logger.error('Failed to start bot', { error: error.message });
+        logger.error('Failed to start bot', {error: error.message});
       });
   }
+}
+
+const server = app.listen(PORT, () => {
+  logger.info('Server started', {
+    port: PORT,
+    environment: env.NODE_ENV,
+    nodeVersion: process.version,
+  });
+
+  try {
+    CronJobs.startAll();
+    logger.info('Cron jobs started');
+  } catch (error: any) {
+    logger.error('Failed to start cron jobs', { error: error.message });
+  }
+  runTgBot();
 });
 
-// Graceful shutdown
 let shutdownInProgress = false;
 
 async function gracefulShutdown(signal: string) {
@@ -191,12 +186,10 @@ async function gracefulShutdown(signal: string) {
   shutdownInProgress = true;
   logger.info(`Received ${signal}, starting graceful shutdown...`);
 
-  // Stop accepting new connections
   server.close(() => {
     logger.info('HTTP server closed');
   });
 
-  // Stop bot
   try {
     await bot.stop(signal);
     logger.info('Bot stopped');
@@ -204,7 +197,6 @@ async function gracefulShutdown(signal: string) {
     logger.error('Error stopping bot', { error: error.message });
   }
 
-  // Stop cron jobs
   try {
     CronJobs.stopAll();
     logger.info('Cron jobs stopped');
@@ -212,7 +204,6 @@ async function gracefulShutdown(signal: string) {
     logger.error('Error stopping cron jobs', { error: error.message });
   }
 
-  // Close database connections
   try {
     await db.pool.end();
     logger.info('Database connections closed');
@@ -227,13 +218,11 @@ async function gracefulShutdown(signal: string) {
 process.once('SIGINT', () => gracefulShutdown('SIGINT'));
 process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
-// Handle uncaught exceptions
 process.on('uncaughtException', (error: Error) => {
   logger.error('Uncaught exception', { error: error.message, stack: error.stack });
   gracefulShutdown('uncaughtException');
 });
 
-// Handle unhandled promise rejections
 process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
   logger.error('Unhandled promise rejection', {
     reason: reason?.message || reason,

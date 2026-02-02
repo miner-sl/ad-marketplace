@@ -188,20 +188,45 @@ export class DealModel {
 
       const deal = dealCheck.rows[0];
       
+      // Idempotency check: if payment already confirmed, return existing deal
+      if (deal.payment_tx_hash && deal.status !== 'payment_pending') {
+        const logger = (await import('../utils/logger')).default;
+        logger.info(`Payment already confirmed for Deal #${id}`, {
+          dealId: id,
+          existingTxHash: deal.payment_tx_hash,
+          currentStatus: deal.status,
+        });
+        return deal;
+      }
+      
       // Check status atomically
       if (deal.status !== 'payment_pending') {
         throw new Error(`Cannot confirm payment in status: ${deal.status}`);
       }
 
+      // Atomic update: check both status AND payment_tx_hash IS NULL
       const result = await client.query(
         `UPDATE deals 
          SET status = 'paid', payment_tx_hash = $1, payment_confirmed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $2 AND status = 'payment_pending'
+         WHERE id = $2 AND status = 'payment_pending' AND payment_tx_hash IS NULL
          RETURNING *`,
         [txHash, id]
       );
       
       if (result.rows.length === 0) {
+        // Payment was confirmed by another process - re-query to get current state
+        const recheck = await client.query(
+          `SELECT * FROM deals WHERE id = $1`,
+          [id]
+        );
+        if (recheck.rows.length > 0 && recheck.rows[0].payment_tx_hash) {
+          const logger = (await import('../utils/logger')).default;
+          logger.info(`Payment was confirmed by another process for Deal #${id}`, {
+            dealId: id,
+            existingTxHash: recheck.rows[0].payment_tx_hash,
+          });
+          return recheck.rows[0];
+        }
         throw new Error(`Deal #${id} status changed during payment confirmation`);
       }
       

@@ -180,7 +180,7 @@ export class DealFlowService {
 
   /**
    * Advertiser confirms payment (manual confirmation)
-   * Uses atomic UPDATE to prevent race conditions and double processing
+   * Uses atomic UPDATE with idempotency checks to prevent race conditions and double processing
    */
   static async confirmPayment(dealId: number, txHash: string): Promise<any> {
     return await withTx(async (client) => {
@@ -195,13 +195,23 @@ export class DealFlowService {
         throw new Error('Deal not found');
       }
 
+      // Idempotency check: if payment already confirmed, return existing deal
+      if (deal.payment_tx_hash && deal.status !== 'payment_pending') {
+        logger.info(`Payment already confirmed for Deal #${dealId}`, {
+          dealId,
+          existingTxHash: deal.payment_tx_hash,
+          currentStatus: deal.status,
+        });
+        return deal;
+      }
+
       // Check status atomically
       if (deal.status !== 'payment_pending') {
         throw new Error(`Cannot confirm payment in status: ${deal.status}`);
       }
 
-      // Verify payment on blockchain
-      if (deal.escrow_address) {
+      // Verify payment on blockchain (only if not already confirmed)
+      if (deal.escrow_address && !deal.payment_tx_hash) {
         const paymentCheck = await TONService.checkPayment(
           deal.escrow_address,
           deal.price_ton.toString()
@@ -213,22 +223,38 @@ export class DealFlowService {
       }
 
       // Atomic update: set payment info and status in one query
+      // Check both status AND payment_tx_hash IS NULL to prevent overwrites
       const finalStatus = deal.scheduled_post_time ? 'scheduled' : 'paid';
       const updateResult = await client.query(
         `UPDATE deals 
          SET status = $1, payment_tx_hash = $2, payment_confirmed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $3 AND status = 'payment_pending'
+         WHERE id = $3 AND status = 'payment_pending' AND payment_tx_hash IS NULL
          RETURNING *`,
         [finalStatus, txHash, dealId]
       );
 
       if (updateResult.rows.length === 0) {
+        // Payment was confirmed by another process - re-query to get current state
+        const recheck = await client.query(
+          `SELECT * FROM deals WHERE id = $1`,
+          [dealId]
+        );
+        if (recheck.rows.length > 0) {
+          const currentDeal = recheck.rows[0];
+          if (currentDeal.payment_tx_hash) {
+            logger.info(`Payment was confirmed by another process for Deal #${dealId}`, {
+              dealId,
+              existingTxHash: currentDeal.payment_tx_hash,
+            });
+            return currentDeal;
+          }
+        }
         throw new Error('Payment already confirmed or deal status changed');
       }
 
       const updated = updateResult.rows[0];
 
-      // Insert message in same transaction
+      // Insert message in same transaction (only if this is a new confirmation)
       await client.query(
         `INSERT INTO deal_messages (deal_id, sender_id, message_text)
          VALUES ($1, $2, $3)`,

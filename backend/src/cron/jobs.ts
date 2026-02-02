@@ -1,14 +1,18 @@
 import * as cron from 'node-cron';
-import { DealModel } from '../models/Deal';
-import { DealRepository } from '../repositories/DealRepository';
+import { Context } from 'telegraf';
+
 import { TONService } from '../services/ton';
 import { TelegramService } from '../services/telegram';
 import { DealFlowService } from '../services/dealFlow';
+import { BotHandlers } from '../bot/handlers';
+
+import { DealRepository } from '../repositories/DealRepository';
+
+import { DealModel } from '../models/Deal';
 import { ChannelModel } from '../models/Channel';
 import { UserModel } from '../models/User';
+
 import db from '../db/connection';
-import { BotHandlers } from '../bot/handlers';
-import { Context } from 'telegraf';
 import logger from '../utils/logger';
 import { withTx } from '../utils/transaction';
 
@@ -84,6 +88,17 @@ export class CronJobs {
         // Process deals
         for (const deal of deals) {
           try {
+            // Idempotency check: skip if payment already confirmed
+            // This prevents multiple cron instances from processing the same deal
+            if (deal.payment_tx_hash && deal.status !== 'payment_pending') {
+              logger.debug(`Deal #${deal.id} payment already confirmed, skipping`, {
+                dealId: deal.id,
+                existingTxHash: deal.payment_tx_hash,
+                status: deal.status,
+              });
+              continue;
+            }
+
             // Payment check is done outside transaction to avoid long-running locks
             const paymentCheck = await TONService.checkPayment(
               deal.escrow_address,
@@ -93,13 +108,15 @@ export class CronJobs {
             if (paymentCheck.received) {
               logger.info(`Payment detected for Deal #${deal.id}`, { dealId: deal.id, amount: paymentCheck.amount });
 
-              // Confirm payment (atomic operation with status check inside)
+              // Confirm payment (atomic operation with idempotency check inside)
               const txHash = paymentCheck.txHash || `auto_${Date.now()}`;
+              let confirmedDeal;
               try {
-                await DealFlowService.confirmPayment(deal.id, txHash);
+                confirmedDeal = await DealFlowService.confirmPayment(deal.id, txHash);
                 logger.info(`Deal #${deal.id} payment confirmed`, { dealId: deal.id, txHash });
               } catch (error: any) {
-                // If already confirmed, skip
+                // If already confirmed, confirmPayment returns the existing deal instead of throwing
+                // But handle any other errors
                 if (error.message.includes('already confirmed') || error.message.includes('status changed')) {
                   logger.debug(`Deal #${deal.id} payment already confirmed`, { dealId: deal.id });
                   continue;
@@ -107,33 +124,43 @@ export class CronJobs {
                 throw error;
               }
 
-              // Get users from batch-fetched map
-              const advertiser = usersMap.get(deal.advertiser_id);
-              const channelOwner = usersMap.get(deal.channel_owner_id);
+              // Only send notifications if this was a new confirmation
+              // Check if the returned deal has the same tx hash we just set
+              if (confirmedDeal && confirmedDeal.payment_tx_hash === txHash) {
+                // Get users from batch-fetched map
+                const advertiser = usersMap.get(deal.advertiser_id);
+                const channelOwner = usersMap.get(deal.channel_owner_id);
 
-              // Notify advertiser
-              if (advertiser) {
-                await TelegramService.bot.sendMessage(
-                  advertiser.telegram_id,
-                  `✅ Payment confirmed for Deal #${deal.id}!\n\n` +
-                  `Amount: ${deal.price_ton} TON\n` +
-                  `The channel owner will now prepare the creative.\n\n` +
-                  `Use /deal ${deal.id} to view details.`
-                ).catch((err: any) => {
-                  logger.warn(`Failed to notify advertiser for Deal #${deal.id}`, { dealId: deal.id, error: err.message });
-                });
-              }
+                // Notify advertiser
+                if (advertiser) {
+                  await TelegramService.bot.sendMessage(
+                    advertiser.telegram_id,
+                    `✅ Payment confirmed for Deal #${deal.id}!\n\n` +
+                    `Amount: ${deal.price_ton} TON\n` +
+                    `The channel owner will now prepare the creative.\n\n` +
+                    `Use /deal ${deal.id} to view details.`
+                  ).catch((err: any) => {
+                    logger.warn(`Failed to notify advertiser for Deal #${deal.id}`, { dealId: deal.id, error: err.message });
+                  });
+                }
 
-              // Notify channel owner
-              if (channelOwner) {
-                await TelegramService.bot.sendMessage(
-                  channelOwner.telegram_id,
-                  `✅ Payment received for Deal #${deal.id}!\n\n` +
-                  `Amount: ${deal.price_ton} TON\n` +
-                  `You can now submit the creative.\n\n` +
-                  `Use /deal ${deal.id} to view details.`
-                ).catch((err: any) => {
-                  logger.warn(`Failed to notify channel owner for Deal #${deal.id}`, { dealId: deal.id, error: err.message });
+                // Notify channel owner
+                if (channelOwner) {
+                  await TelegramService.bot.sendMessage(
+                    channelOwner.telegram_id,
+                    `✅ Payment received for Deal #${deal.id}!\n\n` +
+                    `Amount: ${deal.price_ton} TON\n` +
+                    `You can now submit the creative.\n\n` +
+                    `Use /deal ${deal.id} to view details.`
+                  ).catch((err: any) => {
+                    logger.warn(`Failed to notify channel owner for Deal #${deal.id}`, { dealId: deal.id, error: err.message });
+                  });
+                }
+              } else {
+                logger.debug(`Deal #${deal.id} payment was confirmed by another process, skipping notifications`, {
+                  dealId: deal.id,
+                  returnedTxHash: confirmedDeal?.payment_tx_hash,
+                  attemptedTxHash: txHash,
                 });
               }
             }
@@ -156,7 +183,7 @@ export class CronJobs {
    * Optimized: Batch fetches channels, creatives, and users to avoid N+1 queries
    */
   private static startAutoPostJob() {
-    const job = cron.schedule('*/5 * * * *', async () => {
+    const job = cron.schedule('*/1 * * * *', async () => {
       try {
         logger.debug('Checking for scheduled posts...');
 
@@ -178,6 +205,7 @@ export class CronJobs {
         const now = new Date();
 
         for (const deal of deals) {
+          console.log(`Processing deal for auto-post`, { dealId: deal.id, status: deal.status });
           logger.debug(`Processing deal for auto-post`, { dealId: deal.id, status: deal.status });
           try {
             // Double-check that scheduled_post_time has passed
@@ -653,65 +681,117 @@ export class CronJobs {
             }
 
             try {
+              let txHash: string | null = null;
+
               await withTx(async (client) => {
                 const dealCheck = await client.query(
                   `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
                   [deal.id]
                 );
 
-                if (dealCheck.rows.length === 0 || dealCheck.rows[0].status !== 'verified') {
-                  logger.debug(`Deal #${deal.id} already processed`, { dealId: deal.id });
+                if (dealCheck.rows.length === 0) {
+                  logger.debug(`Deal #${deal.id} not found`, { dealId: deal.id });
                   return;
                 }
 
-                await client.query(
-                  `UPDATE deals 
-                   SET status = 'completed', updated_at = CURRENT_TIMESTAMP
-                   WHERE id = $1 AND status = 'verified'
-                   RETURNING *`,
-                  [deal.id]
+                const currentDeal = dealCheck.rows[0];
+
+                if (currentDeal.status === 'completed' && currentDeal.payment_tx_hash) {
+                  logger.debug(`Deal #${deal.id} already has funds released`, {
+                    dealId: deal.id,
+                    existingTxHash: currentDeal.payment_tx_hash,
+                  });
+                  txHash = currentDeal.payment_tx_hash;
+                  return;
+                }
+
+                if (currentDeal.status !== 'verified') {
+                  logger.debug(`Deal #${deal.id} not in verified status`, {
+                    dealId: deal.id,
+                    status: currentDeal.status,
+                  });
+                  return;
+                }
+
+                // Release funds BEFORE updating status
+                // This ensures if release fails, status stays verified
+                if (!currentDeal.channel_owner_wallet_address) {
+                  logger.warn(`Deal #${deal.id}: Missing channel owner wallet address`, { dealId: deal.id });
+                  return;
+                }
+
+                txHash = await TONService.releaseFunds(
+                  deal.id,
+                  currentDeal.channel_owner_wallet_address as string, // Type assertion safe after null check
+                  currentDeal.price_ton.toString(),
+                  `Auto-release: Buyer did not confirm within timeout period (Deal #${deal.id})`,
+                  false // Already checked idempotency above
                 );
+
+                // Update status and record tx hash atomically
+                // Note: We update payment_tx_hash with the release tx hash when completing the deal
+                const updateResult = await client.query(
+                  `UPDATE deals 
+                   SET status = 'completed', payment_tx_hash = $1, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = $2 AND status = 'verified' AND status != 'completed'
+                   RETURNING *`,
+                  [txHash, deal.id]
+                );
+
+                if (updateResult.rows.length === 0) {
+                  // Another process released funds between our check and update
+                  // Re-query to get the existing tx hash
+                  const recheck = await client.query(
+                    `SELECT payment_tx_hash, status FROM deals WHERE id = $1`,
+                    [deal.id]
+                  );
+                  if (recheck.rows.length > 0 && recheck.rows[0].status === 'completed' && recheck.rows[0].payment_tx_hash) {
+                    txHash = recheck.rows[0].payment_tx_hash;
+                    logger.warn(`Funds were released by another process for Deal #${deal.id}`, {
+                      dealId: deal.id,
+                      existingTxHash: txHash,
+                    });
+                  } else {
+                    throw new Error(`Failed to update deal status for Deal #${deal.id}`);
+                  }
+                }
               });
 
-              const txHash = await TONService.releaseFunds(
-                deal.id,
-                deal.channel_owner_wallet_address,
-                deal.price_ton.toString(),
-                `Auto-release: Buyer did not confirm within timeout period (Deal #${deal.id})`
-              );
-
-              logger.info(`Auto-released funds for Deal #${deal.id}`, {
-                dealId: deal.id,
-                txHash,
-                reason: 'Buyer did not confirm within timeout period',
-              });
-
-              const advertiser = usersMap.get(deal.advertiser_id);
-              const channelOwner = usersMap.get(deal.channel_owner_id);
-
-              if (advertiser) {
-                await TelegramService.bot.sendMessage(
-                  advertiser.telegram_id,
-                  `⏰ Deal #${deal.id} Auto-Completed\n\n` +
-                  `You did not confirm publication within the timeout period.\n` +
-                  `Funds have been automatically released to the channel owner.\n\n` +
-                  `Use /deal ${deal.id} to view details.`
-                ).catch((err: any) => {
-                  logger.warn(`Failed to notify advertiser for Deal #${deal.id}`, { dealId: deal.id, error: err.message });
+              // Only send notifications if we actually released funds (or found existing release)
+              if (txHash) {
+                logger.info(`Auto-released funds for Deal #${deal.id}`, {
+                  dealId: deal.id,
+                  txHash,
+                  reason: 'Buyer did not confirm within timeout period',
                 });
-              }
 
-              if (channelOwner) {
-                await TelegramService.bot.sendMessage(
-                  channelOwner.telegram_id,
-                  `✅ Deal #${deal.id} Auto-Completed\n\n` +
-                  `The advertiser did not confirm publication within the timeout period.\n` +
-                  `Funds (${deal.price_ton} TON) have been automatically released to your wallet.\n\n` +
-                  `Transaction: ${txHash}\n\n` +
-                  `Use /deal ${deal.id} to view details.`
-                ).catch((err: any) => {
-                  logger.warn(`Failed to notify channel owner for Deal #${deal.id}`, { dealId: deal.id, error: err.message });
-                });
+                const advertiser = usersMap.get(deal.advertiser_id);
+                const channelOwner = usersMap.get(deal.channel_owner_id);
+
+                if (advertiser) {
+                  await TelegramService.bot.sendMessage(
+                    advertiser.telegram_id,
+                    `⏰ Deal #${deal.id} Auto-Completed\n\n` +
+                    `You did not confirm publication within the timeout period.\n` +
+                    `Funds have been automatically released to the channel owner.\n\n` +
+                    `Use /deal ${deal.id} to view details.`
+                  ).catch((err: any) => {
+                    logger.warn(`Failed to notify advertiser for Deal #${deal.id}`, { dealId: deal.id, error: err.message });
+                  });
+                }
+
+                if (channelOwner && txHash) {
+                  await TelegramService.bot.sendMessage(
+                    channelOwner.telegram_id,
+                    `✅ Deal #${deal.id} Auto-Completed\n\n` +
+                    `The advertiser did not confirm publication within the timeout period.\n` +
+                    `Funds (${deal.price_ton} TON) have been automatically released to your wallet.\n\n` +
+                    `Transaction: ${txHash}\n\n` +
+                    `Use /deal ${deal.id} to view details.`
+                  ).catch((err: any) => {
+                    logger.warn(`Failed to notify channel owner for Deal #${deal.id}`, { dealId: deal.id, error: err.message });
+                  });
+                }
               }
             } catch (dbError: any) {
               throw dbError;

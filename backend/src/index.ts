@@ -14,6 +14,7 @@ import logger from './utils/logger';
 import env from './utils/env';
 import { requestIdPlugin } from './middleware/requestId';
 import db from './db/connection';
+import {getWorkerId, isPrimaryWorker} from "./utils/cluster.util";
 
 const PORT = env.PORT;
 const isProd = env.NODE_ENV === 'production';
@@ -179,6 +180,14 @@ async function buildApp() {
 }
 
 function runTgBot() {
+  if (!isPrimaryWorker()) {
+    const workerId = getWorkerId();
+    this.logger.log(
+      `Worker ${String(workerId)}: Skipping Telegram setup (handled by primary worker)`,
+    );
+    return;
+  }
+
   const workerId = cluster.worker?.id || 0;
   
   if (isProd && env.TELEGRAM_WEBHOOK_URL) {

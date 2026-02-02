@@ -21,6 +21,7 @@
 │  Cron Jobs      │
 │  (Auto-post,    │
 │   Verification) │
+│   Ton Indexer)  │
 └─────────────────┘
 ```
 

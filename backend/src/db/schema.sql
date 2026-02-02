@@ -163,3 +163,11 @@ CREATE INDEX IF NOT EXISTS idx_deals_scheduled_post_time ON deals(scheduled_post
 CREATE INDEX IF NOT EXISTS idx_campaigns_advertiser_id ON campaigns(advertiser_id);
 CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(status);
 CREATE INDEX IF NOT EXISTS idx_channel_stats_channel_id ON channel_stats(channel_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_deals_unique_payment_tx_hash
+ON deals(id, payment_tx_hash)
+WHERE payment_tx_hash IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_deals_unique_post_message_id
+ON deals(id, post_message_id)
+WHERE post_message_id IS NOT NULL;

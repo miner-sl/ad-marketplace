@@ -15,6 +15,7 @@ import { UserModel } from '../models/User';
 import db from '../db/connection';
 import logger from '../utils/logger';
 import { withTx } from '../utils/transaction';
+import {isPrimaryWorker} from "../utils/cluster.util";
 
 export class CronJobs {
   private static jobs: cron.ScheduledTask[] = [];
@@ -23,6 +24,9 @@ export class CronJobs {
    * Start all cron jobs
    */
   static startAll() {
+    if (!isPrimaryWorker()) {
+      return;
+    }
     logger.info('Starting cron jobs...');
 
     // Check for payments every 2 minutes

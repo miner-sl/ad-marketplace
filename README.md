@@ -45,7 +45,7 @@ https://core.telegram.org/type/MessageEntity
 - **Framework**: Express.js
 - **Database**: PostgreSQL
 - **Telegram**: Telegraf + node-telegram-bot-api
-- **Blockchain**: TON (The Open Network)
+- **Blockx1hain**: TON (The Open Network)
 - **Task Scheduling**: node-cron
 
 ### Project Structure

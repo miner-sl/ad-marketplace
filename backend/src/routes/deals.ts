@@ -72,23 +72,22 @@ const dealsRouter: FastifyPluginAsync = async (fastify) => {
         const telegramId = Number(telegramIdStr);
         if (!isNaN(telegramId)) {
           user = await UserModel.findByTelegramId(telegramId);
-          if (user) {
-            const isAuthorized =
-              deal.channel_owner_id === user.id ||
-              deal.advertiser_id === user.id;
+          // if (user) {
+            // console.log(deal, user.id);
+            // const isAuthorized =
+            //   deal.channel_owner_id === user.id ||
+            //   deal.advertiser_id === user.id;
 
-            if (!isAuthorized) {
-              return reply.code(403).send({ error: 'Unauthorized: You are not authorized to view this deal' });
-            }
-          }
+            // if (!isAuthorized) {
+            //   return reply.code(403).send({ error: 'Unauthorized: You are not authorized to view this deal' });
+            // }
+          // }
         }
       }
 
-      // Get messages and creative using repositories
       const messages = await DealRepository.getMessages(deal.id);
       const creative = await CreativeRepository.findByDeal(deal.id);
 
-      // Fetch advertiser information
       const advertiser = await UserModel.findById(deal.advertiser_id);
       const advertiserInfo = advertiser ? {
         id: advertiser.id,
@@ -100,7 +99,8 @@ const dealsRouter: FastifyPluginAsync = async (fastify) => {
         is_advertiser: advertiser.is_advertiser,
       } : null;
 
-      // Remove sensitive field before sending response
+      // TODO: Remove sensitive fields before sending the response
+      // TODO: Select only the required fields in the SQL query
       const { channel_owner_wallet_address, ...dealWithoutWallet } = deal;
 
       return {

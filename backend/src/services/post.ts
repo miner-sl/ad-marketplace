@@ -3,18 +3,23 @@ import db from '../db/connection';
 import logger from '../utils/logger';
 import { env } from '../utils/env';
 import { withTx } from '../utils/transaction';
+import { distributedLock } from '../utils/lock';
 
 export class PostService {
   /**
    * Publish post to channel
    * Returns post link and message ID
-   * Uses FOR UPDATE lock to prevent race conditions between manual and auto-publish
+   * Uses distributed lock + FOR UPDATE lock to prevent race conditions between manual and auto-publish
    */
   static async publishPost(dealId: number, channelId: number, postText: string): Promise<{
     messageId: number;
     postLink: string;
   }> {
-    return await withTx(async (client) => {
+    return await distributedLock.withLock(
+      dealId,
+      'publish_post',
+      async () => {
+        return await withTx(async (client) => {
       try {
         const dealResult = await client.query(
           `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
@@ -140,6 +145,9 @@ export class PostService {
         throw error;
       }
     });
+      },
+      { ttl: 30000 }
+    );
   }
 
   /**

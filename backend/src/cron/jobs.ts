@@ -15,7 +15,8 @@ import { UserModel } from '../models/User';
 import db from '../db/connection';
 import logger from '../utils/logger';
 import { withTx } from '../utils/transaction';
-import {isPrimaryWorker} from "../utils/cluster.util";
+import { distributedLock } from '../utils/lock';
+import { isPrimaryWorker } from '../utils/cluster.util';
 
 export class CronJobs {
   private static jobs: cron.ScheduledTask[] = [];
@@ -29,6 +30,8 @@ export class CronJobs {
     }
     logger.info('Starting cron jobs...');
 
+    // TODO maybe need to merge some jobs into one
+    // TODO scalable jobs
     // Check for payments every 2 minutes
     this.startPaymentCheckJob();
 
@@ -73,6 +76,7 @@ export class CronJobs {
           `SELECT * FROM deals 
            WHERE status = 'payment_pending' 
            AND escrow_address IS NOT NULL
+           AND payment_tx_hash IS NULL
            ORDER BY created_at ASC`
         );
 
@@ -81,7 +85,6 @@ export class CronJobs {
           return;
         }
 
-        // Batch fetch all users at once (solves N+1 problem)
         const userIds = new Set<number>();
         deals.forEach((deal: any) => {
           userIds.add(deal.advertiser_id);
@@ -89,11 +92,8 @@ export class CronJobs {
         });
         const usersMap = await UserModel.findByIds(Array.from(userIds));
 
-        // Process deals
         for (const deal of deals) {
           try {
-            // Idempotency check: skip if payment already confirmed
-            // This prevents multiple cron instances from processing the same deal
             if (deal.payment_tx_hash && deal.status !== 'payment_pending') {
               logger.debug(`Deal #${deal.id} payment already confirmed, skipping`, {
                 dealId: deal.id,
@@ -112,15 +112,20 @@ export class CronJobs {
             if (paymentCheck.received) {
               logger.info(`Payment detected for Deal #${deal.id}`, { dealId: deal.id, amount: paymentCheck.amount });
 
-              // Confirm payment (atomic operation with idempotency check inside)
+              // Confirm payment with distributed lock (atomic operation with idempotency check inside)
+              // The distributed lock is already handled inside confirmPayment
               const txHash = paymentCheck.txHash || `auto_${Date.now()}`;
               let confirmedDeal;
               try {
                 confirmedDeal = await DealFlowService.confirmPayment(deal.id, txHash);
                 logger.info(`Deal #${deal.id} payment confirmed`, { dealId: deal.id, txHash });
               } catch (error: any) {
-                // If already confirmed, confirmPayment returns the existing deal instead of throwing
-                // But handle any other errors
+                if (error.message?.includes('Failed to acquire distributed lock')) {
+                  logger.debug(`Deal #${deal.id} payment confirmation skipped (locked by another instance)`, {
+                    dealId: deal.id,
+                  });
+                  continue;
+                }
                 if (error.message.includes('already confirmed') || error.message.includes('status changed')) {
                   logger.debug(`Deal #${deal.id} payment already confirmed`, { dealId: deal.id });
                   continue;
@@ -128,14 +133,10 @@ export class CronJobs {
                 throw error;
               }
 
-              // Only send notifications if this was a new confirmation
-              // Check if the returned deal has the same tx hash we just set
               if (confirmedDeal && confirmedDeal.payment_tx_hash === txHash) {
-                // Get users from batch-fetched map
                 const advertiser = usersMap.get(deal.advertiser_id);
                 const channelOwner = usersMap.get(deal.channel_owner_id);
 
-                // Notify advertiser
                 if (advertiser) {
                   await TelegramService.bot.sendMessage(
                     advertiser.telegram_id,
@@ -148,7 +149,6 @@ export class CronJobs {
                   });
                 }
 
-                // Notify channel owner
                 if (channelOwner) {
                   await TelegramService.bot.sendMessage(
                     channelOwner.telegram_id,
@@ -301,7 +301,6 @@ export class CronJobs {
           return;
         }
 
-        // Batch fetch all users at once (solves N+1 problem)
         const userIds = new Set<number>();
         expiredDeals.forEach((deal: any) => {
           userIds.add(deal.advertiser_id);
@@ -315,11 +314,9 @@ export class CronJobs {
 
             logger.info(`Cancelled expired Deal #${deal.id}`, { dealId: deal.id });
 
-            // Get users from batch-fetched map
             const advertiser = usersMap.get(deal.advertiser_id);
             const channelOwner = usersMap.get(deal.channel_owner_id);
 
-            // Notify both parties
             if (advertiser) {
               await TelegramService.bot.sendMessage(
                 advertiser.telegram_id,
@@ -369,7 +366,6 @@ export class CronJobs {
           return;
         }
 
-        // Batch fetch all users at once (solves N+1 problem)
         const userIds = new Set<number>();
         deals.forEach((deal: any) => {
           userIds.add(deal.advertiser_id);
@@ -391,7 +387,6 @@ export class CronJobs {
 
             const channelId = deal.telegram_channel_id;
 
-            // Verify that verification period has passed
             if (!deal.post_verification_until) {
               logger.warn(`Deal #${deal.id}: Missing post_verification_until`, { dealId: deal.id });
               continue;
@@ -401,7 +396,6 @@ export class CronJobs {
             const now = new Date();
 
             if (verificationUntil > now) {
-              // Verification period hasn't passed yet
               const remainingMs = verificationUntil.getTime() - now.getTime();
               const remainingHours = Math.ceil(remainingMs / (1000 * 60 * 60));
               logger.debug(`Deal #${deal.id}: Verification period not yet complete`, {
@@ -413,7 +407,6 @@ export class CronJobs {
               continue;
             }
 
-            // Verification period has passed - now verify post exists
             let postExists = false;
 
             try {
@@ -489,7 +482,6 @@ export class CronJobs {
               }
 
               if (!publicationDurationMet) {
-                // Duration not met yet - notify channel owner
                 logger.info(`Deal #${deal.id}: Post verified but duration requirement not met`, {
                   dealId: deal.id,
                   daysSinceFirstPublication: Math.floor(daysSinceFirstPublication),
@@ -559,7 +551,6 @@ export class CronJobs {
                 });
               }
 
-              // Notify channel owner
               if (channelOwner) {
                 await TelegramService.bot.sendMessage(
                   channelOwner.telegram_id,
@@ -579,11 +570,9 @@ export class CronJobs {
               // Refund to advertiser (would need advertiser wallet address in production)
               logger.warn(`Deal #${deal.id}: Post not found, marked for refund`, { dealId: deal.id });
 
-              // Get users from batch-fetched map
               const advertiser = usersMap.get(deal.advertiser_id);
               const channelOwner = usersMap.get(deal.channel_owner_id);
 
-              // Notify both parties
               if (advertiser) {
                 await TelegramService.bot.sendMessage(
                   advertiser.telegram_id,
@@ -687,79 +676,98 @@ export class CronJobs {
             try {
               let txHash: string | null = null;
 
-              await withTx(async (client) => {
-                const dealCheck = await client.query(
-                  `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
-                  [deal.id]
-                );
-
-                if (dealCheck.rows.length === 0) {
-                  logger.debug(`Deal #${deal.id} not found`, { dealId: deal.id });
-                  return;
-                }
-
-                const currentDeal = dealCheck.rows[0];
-
-                if (currentDeal.status === 'completed' && currentDeal.payment_tx_hash) {
-                  logger.debug(`Deal #${deal.id} already has funds released`, {
-                    dealId: deal.id,
-                    existingTxHash: currentDeal.payment_tx_hash,
-                  });
-                  txHash = currentDeal.payment_tx_hash;
-                  return;
-                }
-
-                if (currentDeal.status !== 'verified') {
-                  logger.debug(`Deal #${deal.id} not in verified status`, {
-                    dealId: deal.id,
-                    status: currentDeal.status,
-                  });
-                  return;
-                }
-
-                // Release funds BEFORE updating status
-                // This ensures if release fails, status stays verified
-                if (!currentDeal.channel_owner_wallet_address) {
-                  logger.warn(`Deal #${deal.id}: Missing channel owner wallet address`, { dealId: deal.id });
-                  return;
-                }
-
-                txHash = await TONService.releaseFunds(
+              // Use distributed lock to prevent concurrent fund releases across multiple servers
+              try {
+                await distributedLock.withLock(
                   deal.id,
-                  currentDeal.channel_owner_wallet_address as string, // Type assertion safe after null check
-                  currentDeal.price_ton.toString(),
-                  `Auto-release: Buyer did not confirm within timeout period (Deal #${deal.id})`,
-                  false // Already checked idempotency above
-                );
+                  'auto_release',
+                  async () => {
+                    await withTx(async (client) => {
+                      const dealCheck = await client.query(
+                        `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
+                        [deal.id]
+                      );
 
-                // Update status and record tx hash atomically
-                // Note: We update payment_tx_hash with the release tx hash when completing the deal
-                const updateResult = await client.query(
-                  `UPDATE deals 
-                   SET status = 'completed', payment_tx_hash = $1, updated_at = CURRENT_TIMESTAMP
-                   WHERE id = $2 AND status = 'verified' AND status != 'completed'
-                   RETURNING *`,
-                  [txHash, deal.id]
-                );
+                      if (dealCheck.rows.length === 0) {
+                        logger.debug(`Deal #${deal.id} not found`, { dealId: deal.id });
+                        return;
+                      }
 
-                if (updateResult.rows.length === 0) {
-                  // Another process released funds between our check and update
-                  // Re-query to get the existing tx hash
-                  const recheck = await client.query(
-                    `SELECT payment_tx_hash, status FROM deals WHERE id = $1`,
-                    [deal.id]
-                  );
-                  if (recheck.rows.length > 0 && recheck.rows[0].status === 'completed' && recheck.rows[0].payment_tx_hash) {
-                    txHash = recheck.rows[0].payment_tx_hash;
-                    logger.warn(`Funds were released by another process for Deal #${deal.id}`, {
-                      dealId: deal.id,
-                      existingTxHash: txHash,
+                      const currentDeal = dealCheck.rows[0];
+
+                      if (currentDeal.status === 'completed' && currentDeal.payment_tx_hash) {
+                        logger.debug(`Deal #${deal.id} already has funds released`, {
+                          dealId: deal.id,
+                          existingTxHash: currentDeal.payment_tx_hash,
+                        });
+                        txHash = currentDeal.payment_tx_hash;
+                        return;
+                      }
+
+                      if (currentDeal.status !== 'verified') {
+                        logger.debug(`Deal #${deal.id} not in verified status`, {
+                          dealId: deal.id,
+                          status: currentDeal.status,
+                        });
+                        return;
+                      }
+
+                      // Release funds BEFORE updating status
+                      // This ensures if release fails, status stays verified
+                      if (!currentDeal.channel_owner_wallet_address) {
+                        logger.warn(`Deal #${deal.id}: Missing channel owner wallet address`, { dealId: deal.id });
+                        return;
+                      }
+
+                      txHash = await TONService.releaseFunds(
+                        deal.id,
+                        currentDeal.channel_owner_wallet_address as string,
+                        currentDeal.price_ton.toString(),
+                        `Auto-release: Buyer did not confirm within timeout period (Deal #${deal.id})`,
+                        false // Already checked idempotency above
+                      );
+
+                      // Update status and record tx hash atomically
+                      // Note: We update payment_tx_hash with the release tx hash when completing the deal
+                      const updateResult = await client.query(
+                        `UPDATE deals 
+                         SET status = 'completed', payment_tx_hash = $1, updated_at = CURRENT_TIMESTAMP
+                         WHERE id = $2 AND status = 'verified' AND status != 'completed'
+                         RETURNING *`,
+                        [txHash, deal.id]
+                      );
+
+                      if (updateResult.rows.length === 0) {
+                        // Another process released funds between our check and update
+                        // Re-query to get the existing tx hash
+                        const recheck = await client.query(
+                          `SELECT payment_tx_hash, status FROM deals WHERE id = $1`,
+                          [deal.id]
+                        );
+                        if (recheck.rows.length > 0 && recheck.rows[0].status === 'completed' && recheck.rows[0].payment_tx_hash) {
+                          txHash = recheck.rows[0].payment_tx_hash;
+                          logger.warn(`Funds were released by another process for Deal #${deal.id}`, {
+                            dealId: deal.id,
+                            existingTxHash: txHash,
+                          });
+                        } else {
+                          throw new Error(`Failed to update deal status for Deal #${deal.id}`);
+                        }
+                      }
                     });
-                  } else {
-                    throw new Error(`Failed to update deal status for Deal #${deal.id}`);
-                  }
+                  },
+                  { ttl: 60000 } // 60 seconds in milliseconds (fund release takes longer)
+                );
+              } catch (lockError: any) {
+                // If lock acquisition failed, another instance is processing this deal
+                if (lockError.message?.includes('Failed to acquire distributed lock')) {
+                  logger.debug(`Deal #${deal.id} auto-release skipped (locked by another instance)`, {
+                    dealId: deal.id,
+                  });
+                  continue;
                 }
-              });
+                throw lockError;
+              }
 
               // Only send notifications if we actually released funds (or found existing release)
               if (txHash) {

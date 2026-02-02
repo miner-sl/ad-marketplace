@@ -9,6 +9,7 @@ import db from '../db/connection';
 import { DealRepository } from '../repositories/DealRepository';
 import { ChannelRepository } from '../repositories/ChannelRepository';
 import logger from '../utils/logger';
+import { distributedLock } from '../utils/lock';
 
 export class DealFlowService {
   /**
@@ -29,7 +30,6 @@ export class DealFlowService {
     postText?: string;
   }): Promise<any> {
     return await withTx(async (client) => {
-      // Validate channel exists and channel_owner_id matches
       const channelCheck = await client.query(
         `SELECT id, owner_id FROM channels WHERE id = $1`,
         [data.channel_id]
@@ -45,7 +45,6 @@ export class DealFlowService {
       }
 
       // Get user from database by telegram_id (advertiser_id is telegram_id)
-      // Use transaction client to ensure atomicity
       const userResult = await client.query(
         'SELECT * FROM users WHERE telegram_id = $1',
         [data.advertiser_id]
@@ -55,16 +54,13 @@ export class DealFlowService {
         throw new Error(`User with telegram_id ${data.advertiser_id} not found. Please register first.`);
       }
 
-      // Use the user's internal database ID for advertiser_id
       const advertiserDbId = userResult.rows[0].id;
 
-      // Create deal within transaction
       const timeoutHours = data.timeout_hours || 72;
       const timeoutAt = new Date();
       timeoutAt.setUTCHours(timeoutAt.getUTCHours() + timeoutHours);
       const utcTimeoutAt = new Date(timeoutAt.toISOString());
 
-      // Insert deal with optional scheduled_post_time
       const dealResult = await client.query(
         `INSERT INTO deals (
           deal_type, listing_id, campaign_id, channel_id, channel_owner_id,
@@ -77,7 +73,7 @@ export class DealFlowService {
           data.campaign_id,
           data.channel_id,
           data.channel_owner_id,
-          advertiserDbId, // Use internal database ID
+          advertiserDbId,
           data.ad_format,
           data.price_ton,
           utcTimeoutAt,
@@ -88,12 +84,11 @@ export class DealFlowService {
       const deal = dealResult.rows[0];
       const dealId = deal.id;
 
-      // Insert postText as initial message if provided
       if (data.postText) {
         await client.query(
           `INSERT INTO deal_messages (deal_id, sender_id, message_text)
            VALUES ($1, $2, $3)`,
-          [dealId, advertiserDbId, data.postText] // Use internal database ID
+          [dealId, advertiserDbId, data.postText]
         );
       }
 
@@ -101,9 +96,6 @@ export class DealFlowService {
     });
   }
 
-  /**
-   * Schedule post for a deal
-   */
   static async schedulePost(dealId: number, postTime: Date): Promise<any> {
     const deal = await DealModel.findById(dealId);
     if (!deal) {
@@ -133,12 +125,10 @@ export class DealFlowService {
       );
 
       const deal = dealResult.rows[0];
-      console.log({ deal });
       if (!deal || deal.channel_owner_id !== user.id) {
         throw new Error('Deal not found or unauthorized');
       }
 
-      // Verify user is still admin of the channel (for financial operations)
       if (telegramUserId) {
         const isAdmin = await ChannelModel.verifyAdminStatus(
           deal.channel_id,
@@ -180,100 +170,95 @@ export class DealFlowService {
 
   /**
    * Advertiser confirms payment (manual confirmation)
-   * Uses atomic UPDATE with idempotency checks to prevent race conditions and double processing
+   * Uses distributed lock + atomic UPDATE with idempotency checks to prevent race conditions
    */
   static async confirmPayment(dealId: number, txHash: string): Promise<any> {
-    return await withTx(async (client) => {
-      // Lock deal row to prevent race conditions
-      const dealResult = await client.query(
-        `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
-        [dealId]
-      );
+    return await distributedLock.withLock(
+      dealId,
+      'confirm_payment',
+      async () => {
+        return await withTx(async (client) => {
+          const dealResult = await client.query(
+            `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
+            [dealId]
+          );
 
-      const deal = dealResult.rows[0];
-      if (!deal) {
-        throw new Error('Deal not found');
-      }
-
-      // Idempotency check: if payment already confirmed, return existing deal
-      if (deal.payment_tx_hash && deal.status !== 'payment_pending') {
-        logger.info(`Payment already confirmed for Deal #${dealId}`, {
-          dealId,
-          existingTxHash: deal.payment_tx_hash,
-          currentStatus: deal.status,
-        });
-        return deal;
-      }
-
-      // Check status atomically
-      if (deal.status !== 'payment_pending') {
-        throw new Error(`Cannot confirm payment in status: ${deal.status}`);
-      }
-
-      // Verify payment on blockchain (only if not already confirmed)
-      if (deal.escrow_address && !deal.payment_tx_hash) {
-        const paymentCheck = await TONService.checkPayment(
-          deal.escrow_address,
-          deal.price_ton.toString()
-        );
-
-        if (!paymentCheck.received) {
-          throw new Error('Payment not confirmed on blockchain');
-        }
-      }
-
-      // Atomic update: set payment info and status in one query
-      // Check both status AND payment_tx_hash IS NULL to prevent overwrites
-      const finalStatus = deal.scheduled_post_time ? 'scheduled' : 'paid';
-      const updateResult = await client.query(
-        `UPDATE deals 
-         SET status = $1, payment_tx_hash = $2, payment_confirmed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $3 AND status = 'payment_pending' AND payment_tx_hash IS NULL
-         RETURNING *`,
-        [finalStatus, txHash, dealId]
-      );
-
-      if (updateResult.rows.length === 0) {
-        // Payment was confirmed by another process - re-query to get current state
-        const recheck = await client.query(
-          `SELECT * FROM deals WHERE id = $1`,
-          [dealId]
-        );
-        if (recheck.rows.length > 0) {
-          const currentDeal = recheck.rows[0];
-          if (currentDeal.payment_tx_hash) {
-            logger.info(`Payment was confirmed by another process for Deal #${dealId}`, {
-              dealId,
-              existingTxHash: currentDeal.payment_tx_hash,
-            });
-            return currentDeal;
+          const deal = dealResult.rows[0];
+          if (!deal) {
+            throw new Error('Deal not found');
           }
-        }
-        throw new Error('Payment already confirmed or deal status changed');
-      }
 
-      const updated = updateResult.rows[0];
+          if (deal.payment_tx_hash && deal.status !== 'payment_pending') {
+            logger.info(`Payment already confirmed for Deal #${dealId}`, {
+              dealId,
+              existingTxHash: deal.payment_tx_hash,
+              currentStatus: deal.status,
+            });
+            return deal;
+          }
 
-      // Insert message in same transaction (only if this is a new confirmation)
-      await client.query(
-        `INSERT INTO deal_messages (deal_id, sender_id, message_text)
-         VALUES ($1, $2, $3)`,
-        [dealId, deal.advertiser_id, `Payment confirmed: ${txHash}`]
-      );
+          if (deal.status !== 'payment_pending') {
+            throw new Error(`Cannot confirm payment in status: ${deal.status}`);
+          }
 
-      return updated;
-    });
+          if (deal.escrow_address && !deal.payment_tx_hash) {
+            const paymentCheck = await TONService.checkPayment(
+              deal.escrow_address,
+              deal.price_ton.toString()
+            );
+
+            if (!paymentCheck.received) {
+              throw new Error('Payment not confirmed on blockchain');
+            }
+          }
+
+          const finalStatus = deal.scheduled_post_time ? 'scheduled' : 'paid';
+          const updateResult = await client.query(
+            `UPDATE deals 
+            SET status = $1, payment_tx_hash = $2, payment_confirmed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $3 AND status = 'payment_pending' AND payment_tx_hash IS NULL
+            RETURNING *`,
+            [finalStatus, txHash, dealId]
+          );
+
+          if (updateResult.rows.length === 0) {
+            const recheck = await client.query(
+              `SELECT * FROM deals WHERE id = $1`,
+              [dealId]
+            );
+            if (recheck.rows.length > 0) {
+              const currentDeal = recheck.rows[0];
+              if (currentDeal.payment_tx_hash) {
+                logger.info(`Payment was confirmed by another process for Deal #${dealId}`, {
+                  dealId,
+                  existingTxHash: currentDeal.payment_tx_hash,
+                });
+                return currentDeal;
+              }
+            }
+            throw new Error('Payment already confirmed or deal status changed');
+          }
+
+          const updated = updateResult.rows[0];
+
+          await client.query(
+            `INSERT INTO deal_messages (deal_id, sender_id, message_text)
+            VALUES ($1, $2, $3)`,
+            [dealId, deal.advertiser_id, `Payment confirmed: ${txHash}`]
+          );
+
+          return updated;
+        });
+      },
+      { ttl: 30000 }
+    );
   }
 
-  /**
-   * Submit creative for review
-   */
   static async submitCreative(dealId: number, submittedBy: number, content: {
     contentType: string;
     contentData: Record<string, any>;
   }): Promise<any> {
     return await withTx(async (client) => {
-      // Lock deal row
       const dealResult = await client.query(
         `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
         [dealId]
@@ -288,7 +273,6 @@ export class DealFlowService {
         throw new Error(`Cannot submit creative in status: ${deal.status}`);
       }
 
-      // Create creative (this should also use transaction, but for now we'll do it here)
       await CreativeService.create({
         deal_id: dealId,
         submitted_by: submittedBy,
@@ -298,7 +282,6 @@ export class DealFlowService {
 
       await CreativeService.submit(dealId);
 
-      // Update deal status atomically
       const updateResult = await client.query(
         `UPDATE deals 
          SET status = 'creative_submitted', updated_at = CURRENT_TIMESTAMP
@@ -320,7 +303,6 @@ export class DealFlowService {
    */
   static async approveCreative(dealId: number, advertiserId: number): Promise<any> {
     return await withTx(async (client) => {
-      // Lock deal row
       const dealResult = await client.query(
         `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
         [dealId]
@@ -337,11 +319,8 @@ export class DealFlowService {
 
       await CreativeService.approve(dealId);
 
-      // Check if payment was already confirmed by checking payment_confirmed_at
-      // If payment confirmed, keep paid status, otherwise move to creative_approved
       const finalStatus = deal.payment_confirmed_at ? 'paid' : 'creative_approved';
 
-      // Atomic update
       const updateResult = await client.query(
         `UPDATE deals 
          SET status = $1, updated_at = CURRENT_TIMESTAMP
@@ -354,7 +333,6 @@ export class DealFlowService {
         throw new Error('Deal status changed during creative approval');
       }
 
-      // Insert message in same transaction
       await client.query(
         `INSERT INTO deal_messages (deal_id, sender_id, message_text)
          VALUES ($1, $2, $3)`,
@@ -370,7 +348,6 @@ export class DealFlowService {
    */
   static async requestRevision(dealId: number, requestedBy: number, notes: string): Promise<any> {
     return await withTx(async (client) => {
-      // Lock deal row
       const dealResult = await client.query(
         `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
         [dealId]
@@ -383,7 +360,6 @@ export class DealFlowService {
 
       await CreativeService.requestRevision(dealId, notes);
 
-      // Atomic update
       const updateResult = await client.query(
         `UPDATE deals 
          SET status = 'negotiating', updated_at = CURRENT_TIMESTAMP
@@ -396,7 +372,6 @@ export class DealFlowService {
         throw new Error(`Deal #${dealId} not found`);
       }
 
-      // Insert message in same transaction
       await client.query(
         `INSERT INTO deal_messages (deal_id, sender_id, message_text)
          VALUES ($1, $2, $3)`,
@@ -423,7 +398,6 @@ export class DealFlowService {
     briefText: string;
   }): Promise<any> {
     return await withTx(async (client) => {
-      // Create deal
       const timeoutHours = data.timeout_hours || 72;
       const timeoutAt = new Date();
       timeoutAt.setUTCHours(timeoutAt.getUTCHours() + timeoutHours);
@@ -450,7 +424,6 @@ export class DealFlowService {
 
       const deal = dealResult.rows[0];
 
-      // Save brief as first message
       await client.query(
         `INSERT INTO deal_messages (deal_id, sender_id, message_text)
          VALUES ($1, $2, $3)`,
@@ -489,98 +462,99 @@ export class DealFlowService {
 
   /**
    * Confirm publication and release funds
-   * Uses transaction with FOR UPDATE lock to prevent race conditions
+   * Uses distributed lock + transaction with FOR UPDATE lock to prevent race conditions
    * Includes idempotency check to prevent double releases
    */
   static async confirmPublication(dealId: number, advertiserId: number): Promise<{
     txHash: string;
   }> {
-    return await withTx(async (client) => {
-      // Lock deal row to prevent concurrent modifications
-      const dealCheck = await client.query(
-        `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
-        [dealId]
-      );
+    return await distributedLock.withLock(
+      dealId,
+      'release_funds',
+      async () => {
+        return await withTx(async (client) => {
+          const dealCheck = await client.query(
+            `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
+            [dealId]
+          );
 
-      if (dealCheck.rows.length === 0) {
-        throw new Error('Deal not found');
-      }
+          if (dealCheck.rows.length === 0) {
+            throw new Error('Deal not found');
+          }
 
-      const deal = dealCheck.rows[0];
+          const deal = dealCheck.rows[0];
 
-      // Authorization check
-      if (deal.advertiser_id !== advertiserId) {
-        throw new Error('Unauthorized');
-      }
+          if (deal.advertiser_id !== advertiserId) {
+            throw new Error('Unauthorized');
+          }
 
-      // Status check
-      if (deal.status !== 'verified') {
-        throw new Error(`Deal is not in verified status. Current status: ${deal.status}`);
-      }
+          if (deal.status !== 'verified') {
+            throw new Error(`Deal is not in verified status. Current status: ${deal.status}`);
+          }
 
-      // Idempotency check: if funds were already released, return existing tx hash
-      if (deal.status === 'completed' && deal.payment_tx_hash) {
-        logger.info(`Funds already released for Deal #${dealId}`, {
-          dealId,
-          existingTxHash: deal.payment_tx_hash,
-        });
-        return { txHash: deal.payment_tx_hash };
-      }
+          if (deal.status === 'completed' && deal.payment_tx_hash) {
+            logger.info(`Funds already released for Deal #${dealId}`, {
+              dealId,
+              existingTxHash: deal.payment_tx_hash,
+            });
+            return { txHash: deal.payment_tx_hash };
+          }
 
-      // Validate required fields
-      if (!deal.escrow_address || !deal.channel_owner_wallet_address) {
-        throw new Error('Escrow address or channel owner wallet address not set');
-      }
+          if (!deal.escrow_address || !deal.channel_owner_wallet_address) {
+            throw new Error('Escrow address or channel owner wallet address not set');
+          }
 
-      if (!deal.post_message_id || !deal.channel_id) {
-        throw new Error('Post information is missing');
-      }
+          if (!deal.post_message_id || !deal.channel_id) {
+            throw new Error('Post information is missing');
+          }
 
-      // Verify channel access (outside transaction to avoid long locks)
-      const hasAccess = await PostService.verifyChannelAccess(deal.channel_id);
-      if (!hasAccess) {
-        throw new Error('Cannot verify channel access. The bot cannot access the channel.');
-      }
+          const hasAccess = await PostService.verifyChannelAccess(deal.channel_id);
+          if (!hasAccess) {
+            throw new Error('Cannot verify channel access. The bot cannot access the channel.');
+          }
 
-      // Release funds BEFORE updating status (if release fails, status stays verified)
-      // Pass checkIdempotency=false since we already checked above
-      const txHash = await TONService.releaseFunds(
-        dealId,
-        deal.channel_owner_wallet_address,
-        deal.price_ton.toString(),
-        `Payment for Deal #${dealId}`,
-        false // Already checked idempotency above
-      );
-
-      // Update status and record tx hash atomically
-      // Note: We update payment_tx_hash with the release tx hash when completing the deal
-      const updateResult = await client.query(
-        `UPDATE deals 
-         SET status = 'completed', payment_tx_hash = $1, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $2 AND status = 'verified' AND status != 'completed'
-         RETURNING *`,
-        [txHash, dealId]
-      );
-
-      if (updateResult.rows.length === 0) {
-        // Another process released funds between our check and update
-        // Re-query to get the existing tx hash
-        const recheck = await client.query(
-          `SELECT payment_tx_hash, status FROM deals WHERE id = $1`,
-          [dealId]
-        );
-        if (recheck.rows.length > 0 && recheck.rows[0].status === 'completed' && recheck.rows[0].payment_tx_hash) {
-          logger.warn(`Funds were released by another process for Deal #${dealId}`, {
+          // Release funds BEFORE updating status (if release fails, status stays verified)
+          // Pass checkIdempotency=false since we already checked above
+          const txHash = await TONService.releaseFunds(
             dealId,
-            existingTxHash: recheck.rows[0].payment_tx_hash,
-          });
-          return { txHash: recheck.rows[0].payment_tx_hash };
-        }
-        throw new Error('Failed to update deal status. Funds may have been released by another process.');
-      }
+            deal.channel_owner_wallet_address,
+            deal.price_ton.toString(),
+            `Payment for Deal #${dealId}`,
+            false // Already checked idempotency above
+          );
 
-      return { txHash };
-    });
+          // Update status and record tx hash atomically
+          // Note: We update payment_tx_hash with the release tx hash when completing the deal
+          const updateResult = await client.query(
+            `UPDATE deals 
+             SET status = 'completed', payment_tx_hash = $1, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $2 AND status = 'verified' AND status != 'completed'
+             RETURNING *`,
+            [txHash, dealId]
+          );
+
+          if (updateResult.rows.length === 0) {
+            // Another process released funds between our check and update
+            // Re-query to get the existing tx hash
+            const recheck = await client.query(
+              `SELECT payment_tx_hash, status FROM deals WHERE id = $1`,
+              [dealId]
+            );
+            if (recheck.rows.length > 0 && recheck.rows[0].status === 'completed' && recheck.rows[0].payment_tx_hash) {
+              logger.warn(`Funds were released by another process for Deal #${dealId}`, {
+                dealId,
+                existingTxHash: recheck.rows[0].payment_tx_hash,
+              });
+              return { txHash: recheck.rows[0].payment_tx_hash };
+            }
+            throw new Error('Failed to update deal status. Funds may have been released by another process.');
+          }
+
+          return { txHash };
+        });
+      },
+      { ttl: 60000 }
+    );
   }
 
   /**
@@ -710,20 +684,17 @@ export class DealFlowService {
    * Returns deals extended with channel info as nested channel field
    */
   static async findDealRequestByTelegramId(telegramId: number, limit: number = 20): Promise<any[]> {
-    // Find user by Telegram ID
     const user = await UserModel.findByTelegramId(telegramId);
     if (!user) {
       throw new Error('User not found');
     }
 
-    // Get pending deals for user's channels
     const deals = await DealRepository.findPendingForChannelOwner(user.id, limit);
 
     if (deals.length === 0) {
       return [];
     }
 
-    // Batch fetch channels and briefs to avoid N+1 queries
     const channelIds = deals.map(deal => deal.channel_id);
     const dealIds = deals.map(deal => deal.id);
 
@@ -757,7 +728,7 @@ export class DealFlowService {
       throw new Error('Escrow or recipient address not set');
     }
 
-    // Verify post exists (simplified for MVP)
+    // TODO Verify post exists (simplified for MVP)
     const verified = true; // Would check actual post in production
 
     if (verified) {

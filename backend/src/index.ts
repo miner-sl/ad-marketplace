@@ -14,7 +14,8 @@ import logger from './utils/logger';
 import env from './utils/env';
 import { requestIdPlugin } from './middleware/requestId';
 import db from './db/connection';
-import {getWorkerId, isPrimaryWorker} from "./utils/cluster.util";
+import { closeRedis } from './utils/redis';
+import { getWorkerId, isPrimaryWorker } from "./utils/cluster.util";
 
 const PORT = env.PORT;
 const isProd = env.NODE_ENV === 'production';
@@ -128,7 +129,6 @@ async function buildApp() {
       },
     });
 
-    // Register route handlers
     await fastify.register(channelsRouter, { prefix: '/channels' });
     await fastify.register(dealsRouter, { prefix: '/deals' });
     await fastify.register(campaignsRouter, { prefix: '/campaigns' });
@@ -277,6 +277,13 @@ async function bootstrap(): Promise<void> {
       logger.info('Database connections closed');
     } catch (error: any) {
       logger.error('Error closing database connections', { error: error.message });
+    }
+
+    try {
+      await closeRedis();
+      logger.info('Redis connection closed');
+    } catch (error: any) {
+      logger.error('Error closing Redis connection', { error: error.message });
     }
 
     logger.info('Graceful shutdown completed');

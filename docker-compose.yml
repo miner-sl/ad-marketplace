@@ -37,6 +37,7 @@ services:
       DEAL_TIMEOUT_HOURS: ${DEAL_TIMEOUT_HOURS:-72}
       MIN_PUBLICATION_DURATION_DAYS: ${MIN_PUBLICATION_DURATION_DAYS:-7}
       VERIFIED_TIMEOUT_HOURS: ${VERIFIED_TIMEOUT_HOURS:-168}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
     ports:
       - "3000:3000"
     depends_on:
@@ -49,6 +50,27 @@ services:
     networks:
       - ad-marketplace-network
     command: npm run dev
+
+  redis:
+    image: redis:8-alpine
+    container_name: auction-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ad-marketplace-network
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD}
+      - --appendonly
+      - yes
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   cron:
     build:
@@ -84,6 +106,7 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   ad-marketplace-network:

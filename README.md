@@ -12,6 +12,7 @@ A Node.js backend for a Telegram Mini App marketplace connecting channel owners 
 https://core.telegram.org/type/MessageEntity
 - [ ] fix transactions operation
 - [ ] telegram post analytics
+- [ ] use usdt for prices
 - [ ] refunds/release funds in ton
 - [ ] Release funds to channel owner check transaction really exist
 - [ ] /check payments without mock transactions
@@ -21,7 +22,7 @@ https://core.telegram.org/type/MessageEntity
 - [ ] mini app
 - [ ] check that user really admin before send to their address money
 - [ ] deploy to vps workflow
-- 
+
 ## Features
 
 - **Dual Marketplace Model**: Both channel owner listings and advertiser campaign requests

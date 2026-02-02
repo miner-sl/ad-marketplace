@@ -132,36 +132,13 @@ Deal (1) ──< (N) DealMessage
 ```
 
 ## Security Considerations
-
 1. **Admin Verification**: Before financial operations, re-verify user is still channel admin
 2. **Escrow Isolation**: Each deal has its own escrow address
 3. **Payment Verification**: Blockchain verification before status change
 4. **Post Verification**: Verify post exists before releasing funds
-5. **Rate Limiting**: API rate limits to prevent abuse
-6. **Input Validation**: Zod schemas for all inputs
-
-## Scalability Considerations
-
-1. **Database Indexes**: Key fields indexed for performance
-2. **Cron Jobs**: Background processing for heavy operations
-3. **Caching**: Channel stats cached to reduce API calls
-4. **Connection Pooling**: PostgreSQL connection pool
-5. **Stateless API**: Stateless design for horizontal scaling
-
-## Error Handling
-
-- Try-catch blocks in all async operations
-- Database transaction rollback on errors
-- Graceful degradation (e.g., stats unavailable)
-- Logging for debugging
-- User-friendly error messages
 
 ## Future Enhancements
 
-1. **Smart Contracts**: TON smart contracts for escrow
 2. **WebSockets**: Real-time deal updates
 3. **Caching Layer**: Redis for frequently accessed data
-4. **Message Queue**: RabbitMQ/Kafka for async processing
-5. **Microservices**: Split into smaller services
-6. **GraphQL API**: More flexible querying
 7. **Analytics**: Advanced analytics and reporting

@@ -798,14 +798,46 @@ export class TONService {
    * @param recipientAddress Recipient TON address
    * @param amount Amount in TON (e.g., "25.5")
    * @param comment Optional comment for transaction
+   * @param checkIdempotency If true, checks if funds were already released (default: true)
+   * @returns Transaction hash, or existing tx hash if already released
    */
   static async releaseFunds(
     dealId: number,
     recipientAddress: string,
     amount: string,
-    comment?: string
+    comment?: string,
+    checkIdempotency: boolean = true
   ): Promise<string> {
     try {
+      // Idempotency check: verify funds haven't already been released
+      if (checkIdempotency) {
+        const dealCheck = await db.query(
+          `SELECT payment_tx_hash, status FROM deals WHERE id = $1`,
+          [dealId]
+        );
+
+        if (dealCheck.rows.length > 0) {
+          const deal = dealCheck.rows[0];
+          
+          // If deal is completed and has payment_tx_hash, funds were already released
+          if (deal.status === 'completed' && deal.payment_tx_hash) {
+            logger.warn(`Funds already released for Deal #${dealId}`, {
+              dealId,
+              existingTxHash: deal.payment_tx_hash,
+            });
+            return deal.payment_tx_hash;
+          }
+
+          // If deal is not in a state that allows release, throw error
+          if (deal.status !== 'verified' && deal.status !== 'completed') {
+            throw new Error(
+              `Cannot release funds for Deal #${dealId} in status: ${deal.status}. ` +
+              `Funds can only be released for verified or completed deals.`
+            );
+          }
+        }
+      }
+
       // Get escrow wallet for the deal
       const escrowWallet = await this.getEscrowWallet(dealId);
       if (!escrowWallet) {
@@ -852,40 +884,6 @@ export class TONService {
       });
       throw new Error(`Failed to release funds: ${error.message}`);
     }
-  }
-
-  /**
-   * Release funds from escrow address (backward compatibility)
-   * @deprecated Use releaseFunds(dealId, recipientAddress, amount) instead
-   */
-  static async releaseFundsByAddress(
-    escrowAddress: string,
-    recipientAddress: string,
-    amount: string
-  ): Promise<string> {
-    // Try to find deal by escrow address
-    const result = await db.query(
-      'SELECT deal_id FROM escrow_wallets WHERE address = $1',
-      [escrowAddress]
-    );
-
-    if (result.rows.length === 0) {
-      throw new Error(`Escrow wallet not found for address: ${escrowAddress}`);
-    }
-
-    return await this.releaseFunds(result.rows[0].deal_id, recipientAddress, amount);
-  }
-
-  /**
-   * Refund funds from escrow to advertiser
-   */
-  static async refundFunds(
-    escrowAddress: string,
-    advertiserAddress: string,
-    amount: string
-  ): Promise<string> {
-    // Similar to releaseFunds but refunds to advertiser
-    return `tx_${Date.now()}`;
   }
 
   /**

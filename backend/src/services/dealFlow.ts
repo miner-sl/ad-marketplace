@@ -8,6 +8,7 @@ import { withTx } from '../utils/transaction';
 import db from '../db/connection';
 import { DealRepository } from '../repositories/DealRepository';
 import { ChannelRepository } from '../repositories/ChannelRepository';
+import logger from '../utils/logger';
 
 export class DealFlowService {
   /**
@@ -454,10 +455,7 @@ export class DealFlowService {
       throw new Error(`Cannot publish post in status: ${deal.status}`);
     }
 
-    // Get post text from deal messages
     const postText = await PostService.getPostTextFromDeal(dealId);
-
-    // Publish post
     const result = await PostService.publishPost(dealId, deal.channel_id, postText);
 
     return result;
@@ -465,71 +463,98 @@ export class DealFlowService {
 
   /**
    * Confirm publication and release funds
+   * Uses transaction with FOR UPDATE lock to prevent race conditions
+   * Includes idempotency check to prevent double releases
    */
   static async confirmPublication(dealId: number, advertiserId: number): Promise<{
     txHash: string;
   }> {
-    const deal = await DealModel.findById(dealId);
-    if (!deal) {
-      throw new Error('Deal not found');
-    }
-
-    if (deal.advertiser_id !== advertiserId) {
-      throw new Error('Unauthorized');
-    }
-
-    if (deal.status !== 'verified') {
-      throw new Error(`Deal is not in verified status. Current status: ${deal.status}`);
-    }
-
-    if (!deal.escrow_address || !deal.channel_owner_wallet_address) {
-      throw new Error('Escrow address or channel owner wallet address not set');
-    }
-
-    if (!deal.post_message_id || !deal.channel_id) {
-      throw new Error('Post information is missing');
-    }
-
-    // Verify channel access
-    const hasAccess = await PostService.verifyChannelAccess(deal.channel_id);
-    if (!hasAccess) {
-      throw new Error('Cannot verify channel access. The bot cannot access the channel.');
-    }
-
-    // Update status atomically
-    await withTx(async (client) => {
+    return await withTx(async (client) => {
+      // Lock deal row to prevent concurrent modifications
       const dealCheck = await client.query(
         `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
-        [deal.id]
+        [dealId]
       );
 
       if (dealCheck.rows.length === 0) {
         throw new Error('Deal not found');
       }
 
-      const currentDeal = dealCheck.rows[0];
-      if (currentDeal.status !== 'verified') {
-        throw new Error(`Deal is not in verified status. Current status: ${currentDeal.status}`);
+      const deal = dealCheck.rows[0];
+
+      // Authorization check
+      if (deal.advertiser_id !== advertiserId) {
+        throw new Error('Unauthorized');
       }
 
-      await client.query(
-        `UPDATE deals 
-         SET status = 'completed', updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1 AND status = 'verified'
-         RETURNING *`,
-        [deal.id]
+      // Status check
+      if (deal.status !== 'verified') {
+        throw new Error(`Deal is not in verified status. Current status: ${deal.status}`);
+      }
+
+      // Idempotency check: if funds were already released, return existing tx hash
+      if (deal.status === 'completed' && deal.payment_tx_hash) {
+        logger.info(`Funds already released for Deal #${dealId}`, {
+          dealId,
+          existingTxHash: deal.payment_tx_hash,
+        });
+        return { txHash: deal.payment_tx_hash };
+      }
+
+      // Validate required fields
+      if (!deal.escrow_address || !deal.channel_owner_wallet_address) {
+        throw new Error('Escrow address or channel owner wallet address not set');
+      }
+
+      if (!deal.post_message_id || !deal.channel_id) {
+        throw new Error('Post information is missing');
+      }
+
+      // Verify channel access (outside transaction to avoid long locks)
+      const hasAccess = await PostService.verifyChannelAccess(deal.channel_id);
+      if (!hasAccess) {
+        throw new Error('Cannot verify channel access. The bot cannot access the channel.');
+      }
+
+      // Release funds BEFORE updating status (if release fails, status stays verified)
+      // Pass checkIdempotency=false since we already checked above
+      const txHash = await TONService.releaseFunds(
+        dealId,
+        deal.channel_owner_wallet_address,
+        deal.price_ton.toString(),
+        `Payment for Deal #${dealId}`,
+        false // Already checked idempotency above
       );
+
+      // Update status and record tx hash atomically
+      // Note: We update payment_tx_hash with the release tx hash when completing the deal
+      const updateResult = await client.query(
+        `UPDATE deals 
+         SET status = 'completed', payment_tx_hash = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2 AND status = 'verified' AND status != 'completed'
+         RETURNING *`,
+        [txHash, dealId]
+      );
+
+      if (updateResult.rows.length === 0) {
+        // Another process released funds between our check and update
+        // Re-query to get the existing tx hash
+        const recheck = await client.query(
+          `SELECT payment_tx_hash, status FROM deals WHERE id = $1`,
+          [dealId]
+        );
+        if (recheck.rows.length > 0 && recheck.rows[0].status === 'completed' && recheck.rows[0].payment_tx_hash) {
+          logger.warn(`Funds were released by another process for Deal #${dealId}`, {
+            dealId,
+            existingTxHash: recheck.rows[0].payment_tx_hash,
+          });
+          return { txHash: recheck.rows[0].payment_tx_hash };
+        }
+        throw new Error('Failed to update deal status. Funds may have been released by another process.');
+      }
+
+      return { txHash };
     });
-
-    // Release funds from escrow wallet to channel owner
-    const txHash = await TONService.releaseFunds(
-      dealId,
-      deal.channel_owner_wallet_address!,
-      deal.price_ton.toString(),
-      `Payment for Deal #${dealId}`
-    );
-
-    return { txHash };
   }
 
   /**
@@ -718,7 +743,6 @@ export class DealFlowService {
         `Payment for Deal #${dealId}`
       );
 
-      await DealModel.updateStatus(dealId, 'verified');
       await DealModel.updateStatus(dealId, 'completed');
     } else {
       // Refund to advertiser

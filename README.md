@@ -5,6 +5,7 @@ A Node.js backend for a Telegram Mini App marketplace connecting channel owners 
 ## Features
 - [ ] distributed lock (redis)
 - [ ] jwt auth
+- [ ] kms for store secret of escrow
 - [ ] sick ui
 - [ ] notification queue (?)
 - [ ] scheduler post verification, auto publication

@@ -5,9 +5,10 @@ A Node.js backend for a Telegram Mini App marketplace connecting channel owners 
 ## Features
 - [ ] distributed lock (redis)
 - [ ] jwt auth
-- [ ] kms for store secret of escrow
+- [ ] Store escrow wallet secret in KMS/HSM/encrypted at database (?)
 - [ ] sick ui
 - [ ] notification queue (?)
+- [ ] ads payments by advertiser (integrate tonconnect)
 - [ ] scheduler post verification, auto publication
 - [ ] support all telegram message entities in post (emoji, animated/premium emoji, markdown formatting and etc)
 https://core.telegram.org/type/MessageEntity

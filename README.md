@@ -3,7 +3,7 @@
 A Node.js backend for a Telegram Mini App marketplace connecting channel owners and advertisers with TON blockchain escrow functionality.
 
 ## Features
-- [ ] distributed lock (redis)
+- [X] distributed lock (redis)
 - [ ] jwt auth
 - [ ] Store escrow wallet secret in KMS/HSM/encrypted at database (?)
 - [ ] sick ui

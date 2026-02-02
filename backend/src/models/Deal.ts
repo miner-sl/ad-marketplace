@@ -159,6 +159,14 @@ export class DealModel {
 
   static async updateStatus(id: number, status: DealStatus): Promise<Deal> {
     return await withTx(async (client) => {
+      const row = await client.query(
+        `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
+        [id]
+      );
+  
+      if (row.rows.length === 0) {
+        throw new Error(`Deal #${id} not found`);
+      }
       const result = await client.query(
         `UPDATE deals SET status = $1, updated_at = CURRENT_TIMESTAMP
          WHERE id = $2

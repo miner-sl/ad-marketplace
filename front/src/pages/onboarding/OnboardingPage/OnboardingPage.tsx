@@ -1,24 +1,26 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 
 import {
   BlockNew,
   PageLayout,
   Page,
   Text,
-  Button,
   TelegramMainButton,
   useToast,
 } from '@components';
 import { useTelegramUser } from '@hooks';
 import { useRegisterUserMutation } from '@store-new';
 import { ROUTES_NAME } from '@routes';
+import { TANSTACK_KEYS } from '@utils';
 import type { UserRole } from '@types';
 
 import styles from './OnboardingPage.module.scss'
 
 export const OnboardingPage = () => {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const telegramUser = useTelegramUser()
   const registerUserMutation = useRegisterUserMutation()
   const [selectedRoles, setSelectedRoles] = useState<UserRole[]>([])
@@ -38,7 +40,7 @@ export const OnboardingPage = () => {
     }
 
     try {
-      await registerUserMutation.mutateAsync({
+      const result = await registerUserMutation.mutateAsync({
         user_id: telegramUser.id,
         username: telegramUser.username,
         first_name: telegramUser.first_name || '',
@@ -46,8 +48,12 @@ export const OnboardingPage = () => {
         roles: selectedRoles,
       })
 
-      // Navigate to home after registration
-      navigate(ROUTES_NAME.MARKETPLACE_HOME, { replace: true })
+      if (!result.registered === true) {
+        showToast({ message: 'Registration failed', type: 'error' });
+        return;
+      }
+      queryClient.setQueryData(TANSTACK_KEYS.USER_ME(telegramUser.id), result);
+      navigate(ROUTES_NAME.MARKETPLACE_HOME, { replace: true });
     } catch (error) {
       showToast({message: error instanceof Error ? error?.message : 'Failed to register user', type: 'error' });
       console.error('Failed to register user:', error)
@@ -97,16 +103,6 @@ export const OnboardingPage = () => {
             <Text type="caption" color="secondary" align="center">
               You can select both roles if you want to both own channels and advertise
             </Text>
-          </BlockNew>
-
-          <BlockNew padding="16px">
-            <Button
-              type="primary"
-              onClick={handleContinue}
-              disabled={selectedRoles.length === 0 || registerUserMutation.isPending}
-            >
-              {registerUserMutation.isPending ? 'Registering...' : 'Register'}
-            </Button>
           </BlockNew>
         </BlockNew>
 

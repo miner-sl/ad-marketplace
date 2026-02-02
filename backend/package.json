@@ -7,6 +7,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "cron:dev": "tsx watch src/cron-service.ts",
+    "cron:start": "node dist/cron-service.js",
     "migrate": "tsx src/db/migrate.ts",
     "migrate:run": "tsx src/db/run_migrations.ts",
     "test": "jest",

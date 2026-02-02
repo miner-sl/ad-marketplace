@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import swaggerUi from 'swagger-ui-express';
 import YAML from 'yamljs';
 import * as path from 'path';
+
 import channelsRouter from './routes/channels';
 import dealsRouter from './routes/deals';
 import campaignsRouter from './routes/campaigns';
@@ -116,7 +117,7 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, req: express.Request, res: express.Response) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || 'Internal server error';
 
@@ -166,11 +167,13 @@ const server = app.listen(PORT, () => {
     nodeVersion: process.version,
   });
 
-  try {
-    CronJobs.startAll();
-    logger.info('Cron jobs started');
-  } catch (error: any) {
-    logger.error('Failed to start cron jobs', { error: error.message });
+  if (!isProd) {
+    try {
+      CronJobs.startAll();
+      logger.info('Cron jobs started');
+    } catch (error: any) {
+      logger.error('Failed to start cron jobs', { error: error.message });
+    }
   }
   runTgBot();
 });
@@ -198,13 +201,6 @@ async function gracefulShutdown(signal: string) {
   }
 
   try {
-    CronJobs.stopAll();
-    logger.info('Cron jobs stopped');
-  } catch (error: any) {
-    logger.error('Error stopping cron jobs', { error: error.message });
-  }
-
-  try {
     await db.pool.end();
     logger.info('Database connections closed');
   } catch (error: any) {
@@ -223,7 +219,7 @@ process.on('uncaughtException', (error: Error) => {
   gracefulShutdown('uncaughtException');
 });
 
-process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+process.on('unhandledRejection', (reason: any) => {
   logger.error('Unhandled promise rejection', {
     reason: reason?.message || reason,
     stack: reason?.stack,

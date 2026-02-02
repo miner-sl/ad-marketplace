@@ -50,6 +50,38 @@ services:
       - ad-marketplace-network
     command: npm run dev
 
+  cron:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ad-marketplace-cron
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://admarketplace:admarketplace123@postgres:5432/ad_marketplace
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TON_NETWORK: ${TON_NETWORK:-testnet}
+      TON_API_KEY: ${TON_API_KEY}
+      TON_WALLET_MNEMONIC: ${TON_WALLET_MNEMONIC:-}
+      DEAL_TIMEOUT_HOURS: ${DEAL_TIMEOUT_HOURS:-72}
+      MIN_PUBLICATION_DURATION_DAYS: ${MIN_PUBLICATION_DURATION_DAYS:-7}
+      VERIFIED_TIMEOUT_HOURS: ${VERIFIED_TIMEOUT_HOURS:-168}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/dist:/app/dist
+      - /app/node_modules
+    networks:
+      - ad-marketplace-network
+    command: npm run cron:dev
+    healthcheck:
+      test: ["CMD", "node", "dist/scripts/healthcheck.js"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
 volumes:
   postgres_data:
 

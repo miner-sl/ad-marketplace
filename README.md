@@ -3,13 +3,18 @@
 A Node.js backend for a Telegram Mini App marketplace connecting channel owners and advertisers with TON blockchain escrow functionality.
 
 ## Features
+- [ ] distributed lock (redis)
+- [ ] jwt auth
+- [ ] sick ui
+- [ ] notification queue (?)
+- [ ] scheduler post verification, auto publication
 - [ ] support all telegram message entities in post (emoji, animated/premium emoji, markdown formatting and etc)
 https://core.telegram.org/type/MessageEntity
 - [ ] fix transactions operation
 - [ ] telegram post analytics
 - [ ] refunds/release funds in ton
 - [ ] Release funds to channel owner check transaction really exist
-- [ ] /check payments  without mock transactions
+- [ ] /check payments without mock transactions
 - [ ] setup post publication time
 - [ ] check edit post text,
 - [ ] attach media, photos, formatted with telegram entities

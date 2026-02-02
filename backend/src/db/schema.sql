@@ -5,6 +5,9 @@ CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(255),
     first_name VARCHAR(255),
     last_name VARCHAR(255),
+    photo_url VARCHAR(500), -- Telegram user photo URL
+    language_code VARCHAR(10), -- Telegram user language code
+    is_premium BOOLEAN DEFAULT FALSE, -- Telegram Premium status
     wallet_address VARCHAR(255), -- TON wallet address for receiving payments
     is_channel_owner BOOLEAN DEFAULT FALSE,
     is_advertiser BOOLEAN DEFAULT FALSE,

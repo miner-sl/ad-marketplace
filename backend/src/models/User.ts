@@ -7,6 +7,9 @@ export interface User {
   username?: string;
   first_name?: string;
   last_name?: string;
+  photo_url?: string;
+  language_code?: string;
+  is_premium?: boolean;
   wallet_address?: string;
   is_channel_owner: boolean;
   is_advertiser: boolean;
@@ -20,6 +23,9 @@ export class UserModel {
       'SELECT * FROM users WHERE telegram_id = $1',
       [telegramId]
     );
+    if (!result?.rows || result.rows.length === 0) {
+      return null;
+    }
     return result.rows[0] || null;
   }
 
@@ -28,6 +34,9 @@ export class UserModel {
       'SELECT * FROM users WHERE id = $1',
       [id]
     );
+    if (!result?.rows || result.rows.length === 0) {
+      return null;
+    }
     return result.rows[0] || null;
   }
 
@@ -36,19 +45,99 @@ export class UserModel {
     username?: string;
     first_name?: string;
     last_name?: string;
+    photo_url?: string;
+    language_code?: string;
+    is_premium?: boolean;
   }): Promise<User> {
     return await withTx(async (client) => {
       const result = await client.query(
-        `INSERT INTO users (telegram_id, username, first_name, last_name)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO users (telegram_id, username, first_name, last_name, photo_url, language_code, is_premium)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING *`,
-        [data.telegram_id, data.username, data.first_name, data.last_name]
+        [
+          data.telegram_id, 
+          data.username, 
+          data.first_name, 
+          data.last_name,
+          data.photo_url,
+          data.language_code,
+          data.is_premium ?? false,
+        ]
       );
       
       if (result.rows.length === 0) {
         throw new Error(`Failed to create user with telegram_id: ${data.telegram_id}`);
       }
       
+      return result.rows[0];
+    });
+  }
+
+  static async update(data: {
+    telegram_id: number;
+    username?: string;
+    first_name?: string;
+    last_name?: string;
+    photo_url?: string;
+    language_code?: string;
+    is_premium?: boolean;
+  }): Promise<User> {
+    return await withTx(async (client) => {
+      const updateFields: string[] = [];
+      const updateValues: any[] = [];
+      let paramCount = 1;
+
+      if (data.username !== undefined) {
+        updateFields.push(`username = $${paramCount++}`);
+        updateValues.push(data.username);
+      }
+      if (data.first_name !== undefined) {
+        updateFields.push(`first_name = $${paramCount++}`);
+        updateValues.push(data.first_name);
+      }
+      if (data.last_name !== undefined) {
+        updateFields.push(`last_name = $${paramCount++}`);
+        updateValues.push(data.last_name);
+      }
+      if (data.photo_url !== undefined) {
+        updateFields.push(`photo_url = $${paramCount++}`);
+        updateValues.push(data.photo_url);
+      }
+      if (data.language_code !== undefined) {
+        updateFields.push(`language_code = $${paramCount++}`);
+        updateValues.push(data.language_code);
+      }
+      if (data.is_premium !== undefined) {
+        updateFields.push(`is_premium = $${paramCount++}`);
+        updateValues.push(data.is_premium);
+      }
+
+      updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+      updateValues.push(data.telegram_id);
+
+      if (updateFields.length === 1) {
+        // Only updated_at
+        const result = await client.query(
+          `UPDATE users SET updated_at = CURRENT_TIMESTAMP
+           WHERE telegram_id = $1
+           RETURNING *`,
+          [data.telegram_id]
+        );
+        return result.rows[0];
+      }
+
+      const result = await client.query(
+        `UPDATE users 
+         SET ${updateFields.join(', ')}
+         WHERE telegram_id = $${paramCount}
+         RETURNING *`,
+        updateValues
+      );
+
+      if (result.rows.length === 0) {
+        throw new Error(`User with telegram_id ${data.telegram_id} not found`);
+      }
+
       return result.rows[0];
     });
   }
@@ -60,7 +149,6 @@ export class UserModel {
     last_name?: string;
   }): Promise<User> {
     return await withTx(async (client) => {
-      // Lock or check for existing user atomically
       const existing = await client.query(
         `SELECT * FROM users WHERE telegram_id = $1 FOR UPDATE`,
         [data.telegram_id]
@@ -78,7 +166,6 @@ export class UserModel {
         return result.rows[0];
       }
       
-      // Create new user
       const result = await client.query(
         `INSERT INTO users (telegram_id, username, first_name, last_name)
          VALUES ($1, $2, $3, $4)

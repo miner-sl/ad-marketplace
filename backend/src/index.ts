@@ -8,6 +8,7 @@ import channelsRouter from './routes/channels';
 import dealsRouter from './routes/deals';
 import campaignsRouter from './routes/campaigns';
 import userRouter from './routes/user';
+import authRouter from './routes/auth';
 import bot from './bot';
 import { CronJobs } from './cron/jobs';
 import logger from './utils/logger';
@@ -56,7 +57,7 @@ async function buildApp() {
   });
 
   // Health check endpoints
-  app.get('/health', async (request, reply) => {
+  app.get('/health', async (request) => {
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
@@ -86,7 +87,7 @@ async function buildApp() {
   });
 
   // Liveness check
-  app.get('/live', async (request, reply) => {
+  app.get('/live', async (request) => {
     return {
       status: 'alive',
       timestamp: new Date().toISOString(),
@@ -116,6 +117,9 @@ async function buildApp() {
     transformStaticCSP: (header: any) => header,
   });
 
+  // Auth routes (no rate limiting for login endpoints)
+  await app.register(authRouter, { prefix: '/api/auth' });
+
   // API routes with rate limiting
   await app.register(async function (fastify) {
     // Register rate limiting for all routes in this scope (/api)
@@ -129,6 +133,7 @@ async function buildApp() {
       },
     });
 
+    // Register route handlers
     await fastify.register(channelsRouter, { prefix: '/channels' });
     await fastify.register(dealsRouter, { prefix: '/deals' });
     await fastify.register(campaignsRouter, { prefix: '/campaigns' });

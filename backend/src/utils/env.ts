@@ -12,6 +12,10 @@ interface EnvConfig {
   TELEGRAM_BOT_TOKEN: string;
   TELEGRAM_WEBHOOK_URL?: string;
   
+  // JWT
+  JWT_SECRET: string;
+  JWT_EXPIRES_IN?: string;
+  
   // Database
   DATABASE_URL?: string;
   DB_HOST?: string;
@@ -64,6 +68,9 @@ export const env: EnvConfig = {
   
   TELEGRAM_BOT_TOKEN: getEnvVar('TELEGRAM_BOT_TOKEN', true),
   TELEGRAM_WEBHOOK_URL: getEnvVar('TELEGRAM_WEBHOOK_URL', false),
+  
+  JWT_SECRET: getEnvVar('JWT_SECRET', true),
+  JWT_EXPIRES_IN: getEnvVar('JWT_EXPIRES_IN', false, '7d'),
   
   DATABASE_URL: getEnvVar('DATABASE_URL', false),
   DB_HOST: getEnvVar('DB_HOST', false, 'localhost'),

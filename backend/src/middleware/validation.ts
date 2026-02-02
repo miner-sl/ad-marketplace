@@ -1,36 +1,34 @@
-import { Request, Response, NextFunction } from 'express';
+import { FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 
-export function validate(schema: z.ZodSchema) {
-  return (req: Request, res: Response, next: NextFunction) => {
+export function validateBody(schema: z.ZodSchema) {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      schema.parse(req.body);
-      next();
+      schema.parse(request.body);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({
+        return reply.status(400).send({
           error: 'Validation failed',
           details: error.errors,
         });
       }
-      next(error);
+      throw error;
     }
   };
 }
 
 export function validateQuery(schema: z.ZodSchema) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      req.query = schema.parse(req.query);
-      next();
+      request.query = schema.parse(request.query);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({
+        return reply.status(400).send({
           error: 'Validation failed',
           details: error.errors,
         });
       }
-      next(error);
+      throw error;
     }
   };
 }

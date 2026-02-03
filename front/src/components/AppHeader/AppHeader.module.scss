@@ -1,0 +1,41 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--color-background, #ffffff);
+  border-bottom: 1px solid var(--color-backgroundTertiary, #e0e0e0);
+  padding: 6px 12px;
+}
+
+.container {
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.logo {
+  cursor: pointer;
+  user-select: none;
+  text-decoration: none;
+  display: flex;
+  //align-items: center;
+}
+
+.userInfo {
+  flex-shrink: 0;
+  width: fit-content !important;
+}
+
+.avatarLink {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: opacity 0.2s;
+
+  &:hover {
+    opacity: 0.8;
+  }
+
+  &:active {
+    opacity: 0.6;
+  }
+}

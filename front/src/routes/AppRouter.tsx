@@ -15,7 +15,7 @@ import {
   RequestsPage,
   RequestPostPage,
 } from '../pages/marketplace';
-import { AddBotToChatPage } from '../pages';
+import { AddBotToChatPage, ProfilePage } from '../pages';
 import { OnboardingPage} from '../pages/onboarding';
 
 import {ROUTES_NAME} from './routes';
@@ -83,6 +83,10 @@ export default function AppRouter() {
     <Route
       path={ROUTES_NAME.ONBOARDING}
       element={<OnboardingPage />}
+    />
+    <Route
+      path={ROUTES_NAME.PROFILE}
+      element={<ProfilePage />}
     />
    </Routes>
  );

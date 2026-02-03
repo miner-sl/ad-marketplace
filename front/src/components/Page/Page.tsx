@@ -1,13 +1,15 @@
+import { type PropsWithChildren, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { backButton } from '@tma.js/sdk-react';
-import { type PropsWithChildren, useEffect } from 'react';
-import {OnboardingGuard} from "../OnboardingGuard";
 
-export function Page({ children, back = true }: PropsWithChildren<{
+import {OnboardingGuard} from '../OnboardingGuard';
+
+export function Page({ children, back = true, guard = true }: PropsWithChildren<{
   /**
    * True if it is allowed to go back from this page.
    */
   back?: boolean
+  guard?: boolean
 }>) {
   const navigate = useNavigate();
 
@@ -21,5 +23,10 @@ export function Page({ children, back = true }: PropsWithChildren<{
     backButton.hide();
   }, [back, navigate]);
 
-  return <OnboardingGuard>{children}</OnboardingGuard>;
+
+  if (guard) {
+    return <OnboardingGuard>{children}</OnboardingGuard>;
+  }
+
+  return <>{children}</>
 }

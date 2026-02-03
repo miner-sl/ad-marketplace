@@ -2,13 +2,22 @@ export type UserRole = 'channel_owner' | 'advertiser'
 
 export type User = {
   id: number
-  telegram_id: number
+  telegram_id?: number
+  telegramId?: number
   username?: string
   first_name?: string
+  firstName?: string
   last_name?: string
-  is_channel_owner: boolean
-  is_advertiser: boolean
-  created_at: string
+  lastName?: string
+  is_channel_owner?: boolean
+  isChannelOwner?: boolean
+  is_advertiser?: boolean
+  isAdvertiser?: boolean
+  created_at?: string
+  createdAt?: string
+  photoUrl?: string
+  languageCode?: string
+  isPremium?: boolean
 }
 
 export interface RegisterUserRequest {

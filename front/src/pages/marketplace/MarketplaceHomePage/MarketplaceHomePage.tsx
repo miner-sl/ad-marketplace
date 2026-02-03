@@ -21,7 +21,7 @@ export const MarketplaceHomePage = () => {
   //   setActiveTab(value as 'channels' | 'campaigns')
   // }
 
-  const { data: channels, isLoading: channelsLoading, error: channelsError, status: channelsStatus } = useChannelsQuery({
+  const { data: channels, isLoading: channelsLoading } = useChannelsQuery({
     limit: 20,
   })
 
@@ -77,10 +77,18 @@ export const MarketplaceHomePage = () => {
 
       <BlockNew gap={12} className={styles.chatsBlock}>
         <BlockNew>
-          <BlockNew marginValue={8}>
+          <BlockNew marginValue={8} row gap={8} justify="between" align="center">
             <Text type="text" color="secondary">
               Connect channel owners with advertisers
             </Text>
+            <span
+              onClick={() => navigate(ROUTES_NAME.PROFILE)}
+              style={{ cursor: 'pointer' }}
+            >
+              <Text type="link" color="accent">
+                Profile
+              </Text>
+            </span>
           </BlockNew>
         </BlockNew>
 
@@ -117,6 +125,12 @@ export const MarketplaceHomePage = () => {
               onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CAMPAIGNS)}
             >
               My Campaigns
+            </Button>
+            <Button
+              type="basic"
+              onClick={() => navigate(ROUTES_NAME.PROFILE)}
+            >
+              Profile
             </Button>
           </BlockNew>
         </BlockNew>

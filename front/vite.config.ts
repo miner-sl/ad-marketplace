@@ -28,10 +28,12 @@ export default defineConfig({
       '@store': path.resolve(__dirname, './src/store'),
       '@store-new': path.resolve(__dirname, './src/store-new'),
       '@routes': path.resolve(__dirname, './src/routes'),
+      '@pages': path.resolve(__dirname, './src/pages'),
       '@services': path.resolve(__dirname, './src/services'),
       '@assets': path.resolve(__dirname, './src/assets'),
       '@hooks': path.resolve(__dirname, './src/common/hooks'),
       '@config': path.resolve(__dirname, './src/config'),
+      '@context': path.resolve(__dirname, './src/context'),
     },
   },
   css: {

@@ -15,8 +15,10 @@ import type {
   Creative,
   RegisterUserRequest,
   User,
+  LoginResponse,
+  TelegramWidgetUser,
 } from '@types'
-import { isProd } from '@utils'
+import { isProd, getToken } from '@utils'
 
 const API_BASE_URL = isProd
   ? 'https://api.example.com'
@@ -30,15 +32,20 @@ interface ApiResponse<T> {
 
 async function apiRequest<T>(
   endpoint: string,
-  options?: RequestInit
+  options?: RequestInit & { skipAuthCheck?: boolean }
 ): Promise<ApiResponse<T>> {
   try {
+    const token = getToken()
+    const headers = new Headers(options?.headers)
+    headers.set('Content-Type', 'application/json')
+
+    if (token && !options?.skipAuthCheck) {
+      headers.set('Authorization', `Bearer ${token}`)
+    }
+
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
+      headers,
     })
 
     if (!response.ok) {
@@ -294,6 +301,147 @@ export const MarketplaceService = {
         is_channel_owner: request.roles.includes('channel_owner'),
         is_advertiser: request.roles.includes('advertiser'),
       }),
+    })
+  },
+
+  // Auth methods
+  loginWithTelegramMiniApp: async (initData: string): Promise<LoginResponse> => {
+    const response = await apiRequest<{
+      accessToken: string
+      user: {
+        id: number
+        username?: string
+        telegramId: number
+        firstName?: string
+        lastName?: string
+        photoUrl?: string
+        languageCode?: string
+        isPremium?: boolean
+        isChannelOwner: boolean
+        isAdvertiser: boolean
+      }
+    }>('/auth/telegram/webapp', {
+      method: 'POST',
+      body: JSON.stringify({ initData }),
+      skipAuthCheck: true,
+    })
+    if (!response.ok || !response.data) {
+      throw new Error(response.error || 'Login failed')
+    }
+    // Convert backend format to frontend format
+    const backendData = response.data
+    return {
+      accessToken: backendData.accessToken,
+      user: {
+        id: backendData.user.id,
+        telegram_id: backendData.user.telegramId,
+        telegramId: backendData.user.telegramId,
+        username: backendData.user.username,
+        first_name: backendData.user.firstName,
+        firstName: backendData.user.firstName,
+        last_name: backendData.user.lastName,
+        lastName: backendData.user.lastName,
+        is_channel_owner: backendData.user.isChannelOwner,
+        isChannelOwner: backendData.user.isChannelOwner,
+        is_advertiser: backendData.user.isAdvertiser,
+        isAdvertiser: backendData.user.isAdvertiser,
+        photoUrl: backendData.user.photoUrl,
+        languageCode: backendData.user.languageCode,
+        isPremium: backendData.user.isPremium,
+      },
+    }
+  },
+
+  loginWithTelegramWidget: async (telegramUser: TelegramWidgetUser): Promise<LoginResponse> => {
+    const response = await apiRequest<{
+      accessToken: string
+      user: {
+        id: number
+        username?: string
+        telegramId: number
+        firstName?: string
+        lastName?: string
+        photoUrl?: string
+        languageCode?: string
+        isPremium?: boolean
+        isChannelOwner: boolean
+        isAdvertiser: boolean
+      }
+    }>('/auth/telegram/widget', {
+      method: 'POST',
+      body: JSON.stringify(telegramUser),
+      skipAuthCheck: true,
+    })
+    if (!response.ok || !response.data) {
+      throw new Error(response.error || 'Login failed')
+    }
+    // Convert backend format to frontend format
+    const backendData = response.data
+    return {
+      accessToken: backendData.accessToken,
+      user: {
+        id: backendData.user.id,
+        telegram_id: backendData.user.telegramId,
+        telegramId: backendData.user.telegramId,
+        username: backendData.user.username,
+        first_name: backendData.user.firstName,
+        firstName: backendData.user.firstName,
+        last_name: backendData.user.lastName,
+        lastName: backendData.user.lastName,
+        is_channel_owner: backendData.user.isChannelOwner,
+        isChannelOwner: backendData.user.isChannelOwner,
+        is_advertiser: backendData.user.isAdvertiser,
+        isAdvertiser: backendData.user.isAdvertiser,
+        photoUrl: backendData.user.photoUrl,
+        languageCode: backendData.user.languageCode,
+        isPremium: backendData.user.isPremium,
+      },
+    }
+  },
+
+  getMe: async (): Promise<User> => {
+    const response = await apiRequest<{
+      id: string
+      username?: string
+      telegramId: number
+      firstName?: string
+      lastName?: string
+      photoUrl?: string
+      languageCode?: string
+      isPremium?: boolean
+      isChannelOwner: boolean
+      isAdvertiser: boolean
+      createdAt: string
+    }>('/auth/me')
+    if (!response.ok || !response.data) {
+      throw new Error(response.error || 'Failed to get user')
+    }
+    // Convert backend format to frontend format
+    const backendUser = response.data
+    return {
+      id: Number(backendUser.id),
+      telegram_id: backendUser.telegramId,
+      telegramId: backendUser.telegramId,
+      username: backendUser.username,
+      first_name: backendUser.firstName,
+      firstName: backendUser.firstName,
+      last_name: backendUser.lastName,
+      lastName: backendUser.lastName,
+      is_channel_owner: backendUser.isChannelOwner,
+      isChannelOwner: backendUser.isChannelOwner,
+      is_advertiser: backendUser.isAdvertiser,
+      isAdvertiser: backendUser.isAdvertiser,
+      created_at: backendUser.createdAt,
+      createdAt: backendUser.createdAt,
+      photoUrl: backendUser.photoUrl,
+      languageCode: backendUser.languageCode,
+      isPremium: backendUser.isPremium,
+    }
+  },
+
+  logout: async (): Promise<void> => {
+    await apiRequest('/auth/logout', {
+      method: 'POST',
     })
   },
 }

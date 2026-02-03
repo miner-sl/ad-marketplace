@@ -1,3 +1,5 @@
 export * from './not-found'
 export * from './marketplace'
 export * from './admin'
+export * from './LoginPage'
+export * from './ProfilePage'

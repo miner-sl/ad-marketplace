@@ -1,19 +1,42 @@
-import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
 
-import {ThemeProvider} from "./context";
 import AppRouter from "@routes";
-import config from "./config";
-import { ToastProvider } from "@components";
-import { ErrorBoundary } from "@components";
+import {ErrorBoundary, SkeletonElement, ToastProvider, AppHeader} from "@components";
+import {LoginPage} from "@pages";
 
-const queryClient = new QueryClient()
+import {AuthProvider, ThemeProvider, useAuth} from "@context";
+import config from "./config";
+
+const queryClient = new QueryClient();
+
+function InnerApp () {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="container" style={{ paddingTop: '100px' }}>
+        <SkeletonElement />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
+
+  return (
+    <>
+      <AppHeader />
+      <AppRouter />
+    </>
+  );
+}
 
 function App() {
   return (
-    // Provide the client to your App
-    <ErrorBoundary>
-      <ThemeProvider>
+    <ThemeProvider>
+      <AuthProvider>
         <QueryClientProvider client={queryClient}>
           <TonConnectUIProvider
             manifestUrl={config.tonConnectManifestUrl}
@@ -22,14 +45,15 @@ function App() {
             }}
           >
             <ToastProvider>
-              <AppRouter/>
+              <ErrorBoundary>
+               <InnerApp />
+              </ErrorBoundary>
             </ToastProvider>
           </TonConnectUIProvider>
         </QueryClientProvider>
-      </ThemeProvider>
-    </ErrorBoundary>
-  )
+      </AuthProvider>
+    </ThemeProvider>
+  );
 }
-
 
 export default App;

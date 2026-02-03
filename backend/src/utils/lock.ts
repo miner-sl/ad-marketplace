@@ -16,6 +16,11 @@ export interface LockOptions {
   maxRetries?: number;
 }
 
+export interface LockResult {
+  acquired: boolean;
+  lockId?: string;
+}
+
 /**
  * Distributed lock service using Redlock algorithm
  * Redlock provides distributed locking across multiple Redis instances
@@ -66,6 +71,97 @@ export class DistributedLock {
         stack: error.stack,
       });
     });
+  }
+
+  /**
+   * Acquire a distributed lock
+   * @param dealId Deal ID
+   * @param operation Operation type
+   * @param options Lock options
+   * @returns Lock result with lockId if acquired
+   */
+  async acquire(
+    dealId: number,
+    operation: LockOperation,
+    options: LockOptions = {}
+  ): Promise<LockResult> {
+    const lockKey = `deal:${dealId}:operation:${operation}`;
+    const ttl = options.ttl || this.defaultTTL;
+    const maxRetries = options.maxRetries ?? this.defaultMaxRetries;
+    const retryDelay = options.retryDelay || this.defaultRetryDelay;
+
+    // Create temporary Redlock instance with custom retry settings if needed
+    // Redlock v5 acquire() doesn't take retry options, so we create a new instance
+    let redlockInstance = this.redlock;
+    
+    if (maxRetries > 0) {
+      const redis = getRedisClient();
+      redlockInstance = new Redlock(
+        [redis],
+        {
+          driftFactor: 0.01,
+          retryCount: maxRetries,
+          retryDelay: retryDelay,
+          retryJitter: 50,
+          automaticExtensionThreshold: 500,
+        }
+      );
+    }
+
+    try {
+      // Acquire lock using Redlock
+      // acquire(resources: string[], duration: number): Promise<Lock>
+      const lock = await redlockInstance.acquire([lockKey], ttl);
+
+      logger.debug(`Lock acquired`, {
+        lockKey,
+        lockId: lock.value,
+        dealId,
+        operation,
+        ttl,
+      });
+
+      return { 
+        acquired: true, 
+        lockId: lock.value // Redlock provides unique lock value
+      };
+    } catch (error: any) {
+      // Redlock throws error if lock cannot be acquired
+      if (error.name === 'LockError' || 
+          error.message?.includes('unable to acquire') ||
+          error.message?.includes('already locked')) {
+        logger.debug(`Failed to acquire lock`, {
+          lockKey,
+          dealId,
+          operation,
+          error: error.message,
+        });
+        return { acquired: false };
+      }
+
+      // For other errors (Redis connection issues), log and fail open
+      logger.error(`Error acquiring lock`, {
+        lockKey,
+        dealId,
+        operation,
+        error: error.message,
+      });
+
+      // If Redis is unavailable, fail open (allow operation to proceed)
+      // Database-level locks will still provide protection
+      if (error.message?.includes('ECONNREFUSED') || 
+          error.message?.includes('Connection is closed') ||
+          error.message?.includes('Connection lost')) {
+        logger.warn(`Redis unavailable, proceeding without distributed lock`, {
+          lockKey,
+          dealId,
+          operation,
+        });
+        return { acquired: true, lockId: 'redis-unavailable' };
+      }
+
+      throw error;
+    }
   }
 
   /**
@@ -231,6 +327,14 @@ export class DistributedLock {
       return false;
     }
   }
+
+  /**
+   * Get Redlock instance (for advanced usage)
+   */
+  getRedlock(): Redlock {
+    return this.redlock;
+  }
 }
 
+// Export singleton instance
 export const distributedLock = new DistributedLock();

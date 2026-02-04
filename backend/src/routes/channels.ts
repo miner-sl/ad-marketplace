@@ -8,7 +8,7 @@ import { ChannelService } from '../services/channel';
 import { topicsService } from '../services/topics';
 import { validateBody, validateQuery } from '../middleware/validation';
 import { authMiddleware } from '../middleware/auth';
-import { createChannelSchema, listChannelsQuerySchema } from '../utils/validation';
+import { createChannelSchema, listChannelsQuerySchema, setChannelPricingSchema, updateChannelStatusSchema } from '../utils/validation';
 import logger from '../utils/logger';
 
 const channelsRouter: FastifyPluginAsync = async (fastify) => {
@@ -37,7 +37,7 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
         max_price: query.max_price,
         ad_format: query.ad_format,
         search: query.search,
-        ownerTelegramId: query.ownerTelegramId
+        ownerId: query.ownerTelegramId
           ? request.user?.id
           : undefined,
         status: query.status,
@@ -151,19 +151,92 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
   });
 
   // Set pricing
-  fastify.post('/:id/pricing', async (request, reply) => {
+  fastify.post('/:id/pricing', {
+    preHandler: [authMiddleware, validateBody(setChannelPricingSchema)],
+  }, async (request, reply) => {
     try {
       const { id } = request.params as { id: string };
-      const { ad_format, price_ton, is_active } = request.body as any;
+      const channelId = parseInt(id);
+      const body = request.body as z.infer<typeof setChannelPricingSchema>;
+
+      const ownerId = await ChannelRepository.getOwnerId(channelId);
+      if (!ownerId) {
+        return reply.code(404).send({ error: 'Channel not found' });
+      }
+
+      if (ownerId !== request.user?.id) {
+        return reply.code(403).send({ 
+          error: 'Forbidden',
+          message: 'You do not have permission to set pricing for this channel' 
+        });
+      }
+
       const pricing = await ChannelModel.setPricing(
-        parseInt(id),
-        ad_format,
-        parseFloat(price_ton),
-        is_active !== undefined ? Boolean(is_active) : true
+        channelId,
+        body.ad_format,
+        body.price_ton,
+        body.is_active ?? true
       );
       return pricing;
     } catch (error: any) {
+      logger.error('Failed to set channel pricing', {
+        error: error.message,
+        stack: error.stack,
+        channelId: (request.params as { id: string }).id,
+        userId: request.user?.id,
+      });
       reply.code(500).send({ error: error.message });
+    }
+  });
+
+  // Update channel status (activate/deactivate)
+  fastify.patch('/:id/status', {
+    preHandler: [authMiddleware, validateBody(updateChannelStatusSchema)],
+  }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const channelId = parseInt(id);
+      const body = request.body as z.infer<typeof updateChannelStatusSchema>;
+
+      if (!request.user?.telegramId || !request.user?.id) {
+        return reply.code(401).send({ 
+          error: 'Unauthorized',
+          message: 'Telegram ID or user ID not found in token' 
+        });
+      }
+
+      const result = await ChannelService.updateChannelStatus(
+        channelId,
+        request.user.id,
+        request.user.telegramId,
+        body.is_active
+      );
+
+      if (!result.success) {
+        const statusCode = result.statusCode || 500;
+        return reply.code(statusCode).send({
+          error: result.error || 'Failed to update channel status',
+          message: result.message,
+        });
+      }
+
+      return {
+        id: result.channel!.id,
+        is_active: result.channel!.is_active,
+        message: result.channel!.is_active ? 'Channel activated successfully' : 'Channel deactivated successfully',
+      };
+    } catch (error: any) {
+      logger.error('Failed to update channel status', {
+        error: error.message,
+        stack: error.stack,
+        channelId: (request.params as { id: string }).id,
+        userId: request.user?.id,
+      });
+
+      reply.code(500).send({ 
+        error: 'Failed to update channel status',
+        message: error.message 
+      });
     }
   });
 
@@ -183,7 +256,7 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
       logger.error('Channel stats refresh endpoint error', {
         error: error.message,
         stack: error.stack,
-        channelId: request.id,
+        channelId: (request.params as { id: string }).id,
       });
       reply.code(500).send({ error: error.message });
     }

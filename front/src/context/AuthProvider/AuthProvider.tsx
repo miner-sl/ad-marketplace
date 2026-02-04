@@ -144,6 +144,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           message: error instanceof Error ? error.message : 'Login failed',
         })
         throw error
+      } finally {
+        setLoading(false);
       }
     },
     [showToast]
@@ -159,6 +161,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setToken(response.accessToken)
         setUser(response.user)
 
+        setLoading(false)
         // Store Telegram user ID
         if (currentTelegramUserId) {
           setStoredTelegramUserId(currentTelegramUserId)

@@ -1,3 +1,4 @@
+import type { PoolClient } from 'pg';
 import db from '../db/connection';
 import { withTx } from '../utils/transaction';
 
@@ -88,6 +89,34 @@ export class ChannelModel {
     return result.rows[0] || null;
   }
 
+  /**
+   * Find channel by ID with FOR UPDATE lock (for use within transactions)
+   * Returns channel data needed for status updates and ownership checks
+   */
+  static async findByIdForUpdate(
+    client: PoolClient,
+    channelId: number
+  ): Promise<{
+    id: number;
+    owner_id: number;
+    telegram_channel_id: number;
+    is_verified: boolean;
+    is_active: boolean;
+  } | null> {
+    const result = await client.query(
+      `SELECT id, owner_id, telegram_channel_id, is_verified, is_active 
+       FROM channels 
+       WHERE id = $1 FOR UPDATE`,
+      [channelId]
+    );
+
+    if (!result.rows || result.rows.length === 0) {
+      return null;
+    }
+
+    return result.rows[0];
+  }
+
   static async findByOwner(ownerId: number): Promise<Channel[]> {
     const result = await db.query(
       'SELECT * FROM channels WHERE owner_id = $1 ORDER BY created_at DESC',
@@ -104,11 +133,11 @@ export class ChannelModel {
          RETURNING *`,
         [botAdminId, channelId]
       );
-      
+
       if (result.rows.length === 0) {
         throw new Error(`Channel #${channelId} not found`);
       }
-      
+
       return result.rows[0];
     });
   }
@@ -147,6 +176,36 @@ export class ChannelModel {
     return result.rows[0] || null;
   }
 
+  /**
+   * Set pricing for a channel (internal method that accepts a client)
+   * Used when you want to include this operation in an existing transaction
+   */
+  static async setPricingWithClient(
+    client: PoolClient,
+    channelId: number,
+    format: string,
+    priceTon: number,
+    isActive: boolean = true
+  ): Promise<ChannelPricing> {
+    const result = await client.query(
+      `INSERT INTO channel_pricing (channel_id, ad_format, price_ton, is_active)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (channel_id, ad_format) 
+       DO UPDATE SET price_ton = $3, is_active = $4, updated_at = CURRENT_TIMESTAMP
+       RETURNING *`,
+      [channelId, format, priceTon, isActive]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error(`Failed to set pricing for Channel #${channelId}, format: ${format}`);
+    }
+
+    return result.rows[0];
+  }
+
+  /**
+   * Set pricing for a channel (creates its own transaction)
+   */
   static async setPricing(
     channelId: number,
     format: string,
@@ -154,20 +213,7 @@ export class ChannelModel {
     isActive: boolean = true
   ): Promise<ChannelPricing> {
     return await withTx(async (client) => {
-      const result = await client.query(
-        `INSERT INTO channel_pricing (channel_id, ad_format, price_ton, is_active)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (channel_id, ad_format) 
-         DO UPDATE SET price_ton = $3, is_active = $4, updated_at = CURRENT_TIMESTAMP
-         RETURNING *`,
-        [channelId, format, priceTon, isActive]
-      );
-      
-      if (result.rows.length === 0) {
-        throw new Error(`Failed to set pricing for Channel #${channelId}, format: ${format}`);
-      }
-      
-      return result.rows[0];
+      return await this.setPricingWithClient(client, channelId, format, priceTon, isActive);
     });
   }
 
@@ -177,6 +223,42 @@ export class ChannelModel {
       [channelId]
     );
     return result.rows;
+  }
+
+  /**
+   * Update channel active status (internal method that accepts a client)
+   * Used when you want to include this operation in an existing transaction
+   */
+  static async updateActiveStatusWithClient(
+    client: PoolClient,
+    channelId: number,
+    isActive: boolean
+  ): Promise<Channel> {
+    const result = await client.query(
+      `UPDATE channels 
+       SET is_active = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2
+       RETURNING *`,
+      [isActive, channelId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error(`Channel #${channelId} not found`);
+    }
+
+    return result.rows[0];
+  }
+
+  /**
+   * Update channel active status (creates its own transaction)
+   */
+  static async updateActiveStatus(
+    channelId: number,
+    isActive: boolean
+  ): Promise<Channel> {
+    return await withTx(async (client) => {
+      return await this.updateActiveStatusWithClient(client, channelId, isActive);
+    });
   }
 
   static async getPricingById(pricingId: number): Promise<(ChannelPricing & { owner_id: number }) | null> {

@@ -14,6 +14,7 @@ import config from '@config';
 import type { TelegramWidgetUser } from '@types';
 
 import styles from './LoginPage.module.scss';
+import {ROUTES_NAME} from "@routes";
 
 const BOT_USERNAME: string = config.botName;
 
@@ -44,8 +45,8 @@ export function LoginPage() {
       setError('')
 
       try {
-        await loginWithTelegramWidget(user)
-        navigate('/')
+        await loginWithTelegramWidget(user);
+        navigate(ROUTES_NAME.MARKETPLACE_HOME);
       } catch (err) {
         const errorMessage =
           err instanceof Error && err.message !== ''
@@ -100,7 +101,7 @@ export function LoginPage() {
     }
   }, [isTelegramMiniApp, handleTelegramAuth, showToast])
 
-  if (isTelegramMiniApp) {
+  if (isTelegramMiniApp && (!authLoading && !loading)) {
     return (
       <Page guard={false}>
         <PageLayout center>

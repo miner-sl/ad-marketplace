@@ -27,13 +27,13 @@ const authRouter: FastifyPluginAsync = async (fastify) => {
   fastify.post('/telegram/widget', async (request, reply) => {
     try {
       const body = telegramWidgetAuthSchema.parse(request.body);
-      
+
       // Validate Telegram auth data
       const validatedUser = telegramAuthService.validateWidgetAuth(body);
-      
+
       // Login and get JWT token
       const result = await authService.loginWithTelegramWidget(validatedUser);
-      
+
       return result;
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -42,12 +42,12 @@ const authRouter: FastifyPluginAsync = async (fastify) => {
           details: error.errors,
         });
       }
-      
+
       logger.error('Telegram widget auth failed', {
         error: error.message,
         stack: error.stack,
       });
-      
+
       return reply.code(401).send({
         error: 'Authentication failed',
         message: error.message || 'Invalid Telegram auth data',
@@ -59,13 +59,13 @@ const authRouter: FastifyPluginAsync = async (fastify) => {
   fastify.post('/telegram/webapp', async (request, reply) => {
     try {
       const body = telegramWebAppAuthSchema.parse(request.body);
-      
+
       // Validate Web App init data
       const validatedData = telegramAuthService.validateWebAppInitData(body.initData);
-      
+
       // Login and get JWT token
       const result = await authService.loginWithTelegramMiniApp(validatedData);
-      
+
       return result;
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -74,12 +74,12 @@ const authRouter: FastifyPluginAsync = async (fastify) => {
           details: error.errors,
         });
       }
-      
+
       logger.error('Telegram webapp auth failed', {
         error: error.message,
         stack: error.stack,
       });
-      
+
       return reply.code(401).send({
         error: 'Authentication failed',
         message: error.message || 'Invalid Telegram init data',
@@ -107,8 +107,8 @@ const authRouter: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      const user = await authService.validateUser(request.user.id);
-      
+      const user = await authService.getUser(request.user.id);
+
       if (!user) {
         return reply.code(404).send({
           error: 'User not found',
@@ -133,7 +133,7 @@ const authRouter: FastifyPluginAsync = async (fastify) => {
         error: error.message,
         userId: request.user?.id,
       });
-      
+
       return reply.code(500).send({
         error: 'Internal server error',
       });

@@ -103,6 +103,19 @@ export const MarketplaceService = {
     })
   },
 
+  updateChannelStatus: async (
+    id: number,
+    is_active: boolean
+  ): Promise<ApiResponse<{ id: number; is_active: boolean; message: string }>> => {
+    return await apiRequest<{ id: number; is_active: boolean; message: string }>(
+      `/channels/${id}/status`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ is_active }),
+      }
+    )
+  },
+
   // Channel Listings
   getChannelListings: async (filters?: {
     channel_id?: number
@@ -418,10 +431,11 @@ export const MarketplaceService = {
     }
     // Convert backend format to frontend format
     const backendUser = response.data
+    const telegramId = backendUser.telegramId && typeof backendUser.telegramId === 'string' ? parseInt(backendUser.telegramId) : backendUser.telegramId;
     return {
       id: Number(backendUser.id),
-      telegram_id: backendUser.telegramId,
-      telegramId: backendUser.telegramId,
+      telegram_id: telegramId,
+      telegramId: telegramId,
       username: backendUser.username,
       first_name: backendUser.firstName,
       firstName: backendUser.firstName,

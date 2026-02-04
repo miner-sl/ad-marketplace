@@ -115,6 +115,20 @@ export const useSetChannelPricingMutation = () => {
   })
 }
 
+export const useUpdateChannelStatusMutation = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) =>
+      channelsAPI.updateChannelStatus(id, is_active),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: TANSTACK_KEYS.CHANNEL(variables.id),
+      })
+      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.CHANNELS })
+    },
+  })
+}
+
 // Channel Listings
 export const useChannelListingsQuery = (filters?: {
   channel_id?: number

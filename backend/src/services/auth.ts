@@ -57,8 +57,8 @@ export class AuthService {
     } else {
       await UserModel.update({
         telegram_id: telegramUser.id,
-        username: telegramUser.username && telegramUser.username !== '' 
-          ? telegramUser.username 
+        username: telegramUser.username && telegramUser.username !== ''
+          ? telegramUser.username
           : user.username,
         first_name: telegramUser.first_name,
         last_name: telegramUser.last_name,
@@ -143,12 +143,6 @@ export class AuthService {
     return await UserModel.findById(userId);
   }
 
-  /**
-   * Validate user exists
-   */
-  async validateUser(userId: number): Promise<User | null> {
-    return await UserModel.findById(userId);
-  }
 }
 
 export const authService = new AuthService();

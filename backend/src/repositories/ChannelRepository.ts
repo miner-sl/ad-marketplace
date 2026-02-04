@@ -22,7 +22,7 @@ export interface ChannelListFilters {
   max_price?: number;
   ad_format?: string;
   search?: string;
-  ownerTelegramId?: number;
+  ownerId?: number;
   status?: 'active' | 'inactive' | 'moderation';
   limit?: number;
   offset?: number;
@@ -126,6 +126,7 @@ export class ChannelRepository {
    * Returns channels grouped by id with pricing array
    */
   static async listChannelsWithFilters(filters: ChannelListFilters): Promise<any[]> {
+    console.log({filters});
     const {
       min_subscribers,
       max_subscribers,
@@ -133,30 +134,12 @@ export class ChannelRepository {
       max_price,
       ad_format, // TODO support multiple formats selected ad_formats: AdFormat[]
       search,
-      ownerTelegramId,
+      ownerId,
       status,
       limit = 50,
       offset = 0,
     } = filters;
 
-    let pricingConditions = '';
-    const pricingParams: any[] = [];
-    let pricingParamCount = 1;
-
-    // if (ad_format) {
-      pricingConditions += ` AND cp_filter.ad_format = $${pricingParamCount++}`;
-      pricingParams.push('post');
-    // }
-    if (min_price !== undefined) {
-      pricingConditions += ` AND cp_filter.price_ton >= $${pricingParamCount++}`;
-      pricingParams.push(min_price);
-    }
-    if (max_price !== undefined) {
-      pricingConditions += ` AND cp_filter.price_ton <= $${pricingParamCount++}`;
-      pricingParams.push(max_price);
-    }
-
-    console.log({ownerTelegramId});
     // Query to get unique channels with stats
     let query = `
       SELECT DISTINCT c.*, cs.subscribers_count, cs.average_views
@@ -172,8 +155,8 @@ export class ChannelRepository {
     const params: any[] = [];
     let paramCount = 1;
 
-    // Default: only show active channels if status not specified
-    if (!status) {
+    console.log({status, ownerId});
+    if (ownerId === undefined && status === undefined) {
       query += ` AND c.is_active = TRUE`;
     }
 
@@ -195,13 +178,12 @@ export class ChannelRepository {
       paramCount++;
     }
 
-    // Filter by owner's Telegram ID
-    if (ownerTelegramId !== undefined) {
+    // Filter by owner's database ID
+    if (ownerId !== undefined) {
       query += ` AND c.owner_id = $${paramCount++}`;
-      params.push(ownerTelegramId);
+      params.push(ownerId);
     }
 
-    // Filter by status
     if (status) {
       switch (status) {
         case 'active':
@@ -217,21 +199,35 @@ export class ChannelRepository {
       }
     }
 
+    // Build pricing filter conditions with correct parameter numbers
+    const pricingConditions: string[] = [];
+    // if (ad_format) {
+      pricingConditions.push(`cp_filter.ad_format = $${paramCount++}`);
+      params.push('post');
+    // }
+    if (min_price !== undefined) {
+      pricingConditions.push(`cp_filter.price_ton >= $${paramCount++}`);
+      params.push(min_price);
+    }
+    if (max_price !== undefined) {
+      pricingConditions.push(`cp_filter.price_ton <= $${paramCount++}`);
+      params.push(max_price);
+    }
+
     // Add pricing filter condition if any pricing filters exist
-    if (pricingConditions) {
+    if (pricingConditions.length > 0) {
       query += ` AND EXISTS (
         SELECT 1 FROM channel_pricing cp_filter 
         WHERE cp_filter.channel_id = c.id 
         AND cp_filter.is_active = TRUE
-        ${pricingConditions}
+        AND ${pricingConditions.join(' AND ')}
       )`;
-      params.push(...pricingParams);
-      paramCount += pricingParams.length;
     }
 
     query += ` ORDER BY c.created_at DESC LIMIT $${paramCount++} OFFSET $${paramCount++}`;
     params.push(limit, offset);
 
+    console.log({query, params});
     const channelsResult = await db.query(query, params);
     const channels = channelsResult?.rows || [];
 

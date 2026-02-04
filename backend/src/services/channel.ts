@@ -2,6 +2,7 @@ import { ChannelModel, type Channel } from '../models/Channel';
 import { UserModel } from '../models/User';
 import { TelegramService } from './telegram';
 import { topicsService } from './topics';
+import { withTx } from '../utils/transaction';
 import logger from '../utils/logger';
 
 export interface ChannelRegistrationResult {
@@ -16,6 +17,14 @@ export interface ChannelRegistrationResult {
   botUsername?: string;
   error?: 'USER_NOT_FOUND' | 'CHANNEL_ID_REQUIRED' | 'BOT_NOT_ADMIN' | 'CHANNEL_ALREADY_EXISTS' | 'FAILED_TO_CREATE';
   message?: string;
+}
+
+export interface ChannelStatusUpdateResult {
+  success: boolean;
+  channel?: Channel;
+  error?: 'CHANNEL_NOT_FOUND' | 'UNAUTHORIZED' | 'NOT_VERIFIED' | 'NOT_ADMIN' | 'FAILED_TO_UPDATE';
+  message?: string;
+  statusCode?: number;
 }
 
 export class ChannelService {
@@ -140,5 +149,87 @@ export class ChannelService {
    */
   static async getChannelInfo(telegramChannelId: number) {
     return await TelegramService.getChannelInfo(telegramChannelId);
+  }
+
+  /**
+   * Update channel active status (activate/deactivate)
+   * Validates ownership, verification status, and admin permissions
+   */
+  static async updateChannelStatus(
+    channelId: number,
+    userId: number,
+    telegramUserId: number,
+    isActive: boolean
+  ): Promise<ChannelStatusUpdateResult> {
+    try {
+      const channel = await withTx(async (client) => {
+        const channelData = await ChannelModel.findByIdForUpdate(client, channelId);
+
+        if (!channelData) {
+          const error = new Error('Channel not found') as any;
+          error.statusCode = 404;
+          throw error;
+        }
+
+        if (channelData.owner_id !== userId) {
+          const error = new Error('You do not have permission to update this channel') as any;
+          error.statusCode = 403;
+          error.errorCode = 'UNAUTHORIZED';
+          throw error;
+        }
+
+        if (!channelData.is_verified) {
+          const error = new Error('Channel must be verified before it can be activated/deactivated') as any;
+          error.statusCode = 400;
+          error.errorCode = 'NOT_VERIFIED';
+          throw error;
+        }
+
+        const isAdmin = await TelegramService.isUserAdmin(
+          channelData.telegram_channel_id,
+          telegramUserId
+        );
+
+        if (!isAdmin) {
+          const error = new Error('You are no longer an admin of this channel. Please verify your admin status.') as any;
+          error.statusCode = 403;
+          error.errorCode = 'NOT_ADMIN';
+          throw error;
+        }
+
+        return await ChannelModel.updateActiveStatusWithClient(
+          client,
+          channelId,
+          isActive
+        );
+      });
+
+      logger.info('Channel status updated successfully', {
+        channelId,
+        userId,
+        telegramUserId,
+        isActive,
+      });
+
+      return {
+        success: true,
+        channel,
+      };
+    } catch (error: any) {
+      logger.error('Failed to update channel status', {
+        error: error.message,
+        stack: error.stack,
+        channelId,
+        userId,
+        telegramUserId,
+      });
+
+      return {
+        success: false,
+        error: error.errorCode || 'FAILED_TO_UPDATE',
+        message: error.message || 'Failed to update channel status',
+        statusCode: error.statusCode || 500,
+      };
+    }
   }
 }

@@ -41,6 +41,7 @@ export const MyChannelsPage = () => {
                     channel={channel}
                     showAdFormats
                     showTopic
+                    showStatus
                   />
                 ))}
               </Group>

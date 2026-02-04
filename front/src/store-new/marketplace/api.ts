@@ -52,6 +52,17 @@ export const channelsAPI = {
     }
     return data
   },
+
+  updateChannelStatus: async (
+    id: number,
+    is_active: boolean
+  ): Promise<{ id: number; is_active: boolean; message: string }> => {
+    const { data, ok, error } = await MarketplaceService.updateChannelStatus(id, is_active)
+    if (!ok || !data) {
+      throw new Error(error || 'Failed to update channel status')
+    }
+    return data
+  },
 }
 
 export const channelListingsAPI = {

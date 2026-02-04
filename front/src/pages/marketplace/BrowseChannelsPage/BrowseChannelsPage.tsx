@@ -261,6 +261,7 @@ export const BrowseChannelsPage = () => {
                     channel={channel}
                     showAdFormats
                     showTopic
+                    showOwner
                   />
                 ))}
               </Group>

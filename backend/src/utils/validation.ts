@@ -99,3 +99,13 @@ export const listChannelsQuerySchema = z.object({
     z.number().int().nonnegative().default(0)
   ),
 });
+
+export const setChannelPricingSchema = z.object({
+  ad_format: z.enum(['post', 'story', 'forward']),
+  price_ton: z.number().positive(),
+  is_active: z.boolean().optional().default(true),
+});
+
+export const updateChannelStatusSchema = z.object({
+  is_active: z.boolean(),
+});

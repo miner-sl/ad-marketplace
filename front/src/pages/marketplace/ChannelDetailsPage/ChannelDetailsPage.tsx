@@ -17,8 +17,9 @@ import {
   Spinner,
   useToast,
   Button,
+  ListToggler,
 } from '@components'
-import {useChannelQuery, useChannelStatsQuery, useSetChannelPricingMutation} from '@store-new'
+import {useChannelQuery, useChannelStatsQuery, useSetChannelPricingMutation, useUpdateChannelStatusMutation} from '@store-new'
 import {useTelegramUser} from '@hooks'
 import {useAuth} from '@context'
 import {ROUTES_NAME} from '@routes'
@@ -39,7 +40,7 @@ const ChannelHeader = ({ channel, stats }: ChannelHeaderProps) => {
     <>
       <Block align="center">
         <Image
-          size={88}
+          size={112}
           src={null}
           borderRadius={50}
           fallback={channel.title}
@@ -90,6 +91,7 @@ export const ChannelDetailsPage = () => {
   const userId = telegramUser?.id
   const {user} = useAuth()
   const setPricingMutation = useSetChannelPricingMutation()
+  const updateChannelStatusMutation = useUpdateChannelStatusMutation()
   const {copy} = useClipboard()
 
   // Check if current user is the channel owner
@@ -302,6 +304,30 @@ export const ChannelDetailsPage = () => {
     }
   }
 
+  const handleActiveOrDeactivateChannel = async (isEnabled: boolean) => {
+    try {
+      if (updateChannelStatusMutation.isPending) {
+        return;
+      }
+
+      await updateChannelStatusMutation.mutateAsync({
+        id: channelId,
+        is_active: isEnabled,
+      })
+      showToast({
+        type: 'success',
+        message: isEnabled
+          ? 'Channel activated successfully'
+          : 'Channel deactivated successfully',
+      })
+    } catch (error: any) {
+      showToast({
+        type: 'error',
+        message: error?.message || 'Failed to update channel status',
+      })
+    }
+  };
+
   return (
     <Page back>
       <PageLayout>
@@ -379,6 +405,40 @@ export const ChannelDetailsPage = () => {
                 )}
               </Group>
             </Block>
+          </Block>
+        )}
+
+        {isChannelOwner && (
+          <Block margin="top" marginValue={24}>
+            <Group header="CHANNEL STATUS">
+              <ListItem
+                padding="6px 16px"
+                disabled={updateChannelStatusMutation.isPending}
+                text={
+                  <Text type="text" color={channel.is_active ? 'accent' : 'secondary'}>
+                    {channel.is_active ? 'Channel Active' : 'Channel Inactive'}
+                  </Text>
+                }
+                description={
+                  <Text type="caption" color="tertiary">
+                    {channel.is_active
+                      ? 'Channel is visible in the marketplace'
+                      : 'Channel is hidden from the marketplace'}
+                  </Text>
+                }
+                after={
+                  updateChannelStatusMutation.isPending ? (
+                    <Spinner size={16} />
+                  ) : (
+                    <ListToggler
+                      isEnabled={channel.is_active}
+                      onChange={handleActiveOrDeactivateChannel}
+                      disabled={updateChannelStatusMutation.isPending}
+                    />
+                  )
+                }
+              />
+            </Group>
           </Block>
         )}
 

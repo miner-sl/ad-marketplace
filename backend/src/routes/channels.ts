@@ -116,11 +116,12 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
   fastify.post('/:id/pricing', async (request, reply) => {
     try {
       const { id } = request.params as { id: string };
-      const { ad_format, price_ton } = request.body as any;
+      const { ad_format, price_ton, is_active } = request.body as any;
       const pricing = await ChannelModel.setPricing(
         parseInt(id),
         ad_format,
-        parseFloat(price_ton)
+        parseFloat(price_ton),
+        is_active !== undefined ? Boolean(is_active) : true
       );
       return pricing;
     } catch (error: any) {

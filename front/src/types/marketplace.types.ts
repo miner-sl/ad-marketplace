@@ -220,4 +220,5 @@ export interface SetChannelPricingRequest {
   channel_id: number
   ad_format: AdFormat
   price_ton: number
+  is_active?: boolean
 }

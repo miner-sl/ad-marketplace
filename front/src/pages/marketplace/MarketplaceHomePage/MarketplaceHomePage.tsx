@@ -73,24 +73,16 @@ export const MarketplaceHomePage = () => {
   return (
     <Page back={false}>
       <PageLayout>
-      <TelegramMainButton text="Add bot to Channel" onClick={handleAddChat} />
+      <TelegramMainButton text="Add Bot to Channel" onClick={handleAddChat} />
 
       <BlockNew gap={12} className={styles.chatsBlock}>
-        <BlockNew>
-          <BlockNew marginValue={8} row gap={8} justify="between" align="center">
-            <Text type="text" color="secondary">
-              Connect channel owners with advertisers
-            </Text>
-            <span
-              onClick={() => navigate(ROUTES_NAME.PROFILE)}
-              style={{ cursor: 'pointer' }}
-            >
-              <Text type="link" color="accent">
-                Profile
-              </Text>
-            </span>
-          </BlockNew>
-        </BlockNew>
+        {/*<BlockNew>*/}
+        {/*  <BlockNew marginValue={8} row gap={8} justify="between" align="center">*/}
+        {/*    <Text type="text" color="secondary">*/}
+        {/*      Connect channel owners with advertisers*/}
+        {/*    </Text>*/}
+        {/*  </BlockNew>*/}
+        {/*</BlockNew>*/}
 
         <BlockNew gap={4}>
           <BlockNew gap={8} row>
@@ -125,12 +117,6 @@ export const MarketplaceHomePage = () => {
               onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CAMPAIGNS)}
             >
               My Campaigns
-            </Button>
-            <Button
-              type="basic"
-              onClick={() => navigate(ROUTES_NAME.PROFILE)}
-            >
-              Profile
             </Button>
           </BlockNew>
         </BlockNew>

@@ -122,15 +122,20 @@ export class ChannelModel {
     return result.rows[0] || null;
   }
 
-  static async setPricing(channelId: number, format: string, priceTon: number): Promise<ChannelPricing> {
+  static async setPricing(
+    channelId: number,
+    format: string,
+    priceTon: number,
+    isActive: boolean = true
+  ): Promise<ChannelPricing> {
     return await withTx(async (client) => {
       const result = await client.query(
-        `INSERT INTO channel_pricing (channel_id, ad_format, price_ton)
-         VALUES ($1, $2, $3)
+        `INSERT INTO channel_pricing (channel_id, ad_format, price_ton, is_active)
+         VALUES ($1, $2, $3, $4)
          ON CONFLICT (channel_id, ad_format) 
-         DO UPDATE SET price_ton = $3, updated_at = CURRENT_TIMESTAMP
+         DO UPDATE SET price_ton = $3, is_active = $4, updated_at = CURRENT_TIMESTAMP
          RETURNING *`,
-        [channelId, format, priceTon]
+        [channelId, format, priceTon, isActive]
       );
       
       if (result.rows.length === 0) {

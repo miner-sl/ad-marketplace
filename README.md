@@ -5,6 +5,19 @@ A Node.js backend for a Telegram Mini App marketplace connecting channel owners 
 ## Features
 - [X] distributed lock (redis)
 - [X] jwt auth
+- [ ] role [admin moderator, channel owner, ads buyer]
+- [ ] channel verification and advertiser verification
+- [ ] use tg stats for gather stats
+- [ ] recheck every 30 days admin rights user + bot , subs count, 
+- [ ] transactions history
+- [ ] integrate i18n
+- [ ] channel topic, geo/country, language, budget range, format
+- [ ] vectorize channels fields and sort relevance by cosine distance
+- [ ] store images before publish
+- [ ] dashboard (revenue by month, channel page views, in favorites, in favorites, placemnets, earned)
+- [ ] transaction history 
+- [ ] marketplace catalog with basket or fast buy flow (select type, place order, wait moderation)
+- [ ] super admin for moderator channels
 - [ ] Store escrow wallet secret in KMS/HSM/encrypted at database (?)
 - [ ] sick ui
 - [ ] tg notification queue (?)
@@ -270,7 +283,6 @@ See `.env.example` for all required variables:
 - `/deal <id>` - View deal details
 
 ## Deployment
-
 ### Docker Production Deployment
 
 1. **Set up production environment**

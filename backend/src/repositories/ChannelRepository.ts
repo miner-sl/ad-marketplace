@@ -250,13 +250,13 @@ export class ChannelRepository {
        WHERE c.id = $1`,
       [channelId]
     );
-    
+
     if (!result?.rows || result.rows.length === 0) {
       return null;
     }
-    
+
     const channel = result.rows[0];
-    
+
     // Fetch pricing separately
     const pricingResult = await db.query(
       `SELECT 
@@ -269,13 +269,13 @@ export class ChannelRepository {
         created_at,
         updated_at
        FROM channel_pricing 
-       WHERE channel_id = $1 AND is_active = TRUE`,
+       WHERE channel_id = $1`,
       [channelId]
     );
-    
+
     // Add pricing array to channel
     channel.pricing = pricingResult?.rows || [];
-    
+
     return channel;
   }
 }

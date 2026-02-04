@@ -40,7 +40,7 @@ export const ListToggler = ({
       >
         <span
           className={cn(
-            styles.togglerThumb,
+            styles.toggblerThumb,
             isEnabled && styles.togglerThumbEnabled
           )}
         />

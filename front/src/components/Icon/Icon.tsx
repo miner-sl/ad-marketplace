@@ -7,7 +7,7 @@ import type { IconSize, IconTypeName } from './types'
 interface IconProps {
   name: IconTypeName
   size?: IconSize
-  color?: 'danger' | 'tertiary' | 'secondary' | 'accent' | 'primary'
+  color?: 'danger' | 'tertiary' | 'secondary' | 'accent' | 'primary' | 'brown'
   className?: string
 }
 

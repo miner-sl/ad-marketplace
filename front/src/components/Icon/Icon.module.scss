@@ -14,9 +14,7 @@
     g {
       opacity: 1;
     }
-    path {
-      fill: var(--color-accentsRed);
-    }
+    fill: var(--color-accentsRed);
   }
 }
 
@@ -25,9 +23,7 @@
     g {
       opacity: 1;
     }
-    path {
-      fill: var(--color-textIconsTertiary);
-    }
+    fill: var(--color-textIconsTertiary);
   }
 }
 
@@ -36,9 +32,7 @@
     g {
       opacity: 1;
     }
-    path {
-      fill: var(--tg-theme-button-text-color);
-    }
+    fill: var(--tg-theme-button-text-color);
   }
 }
 
@@ -47,9 +41,25 @@
     g {
       opacity: 1;
     }
-    path {
-      fill: var(--color-foreground-primary);
+    fill: var(--color-foreground-primary);
+  }
+}
+
+.color-accent {
+  svg {
+    g {
+      opacity: 1;
     }
+    fill: var(--color-accentsBrandCommunity);
+  }
+}
+
+.color-brown {
+  svg {
+    g {
+      opacity: 1;
+    }
+    fill: var(--palette-brown-light);
   }
 }
 

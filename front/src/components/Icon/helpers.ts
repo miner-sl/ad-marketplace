@@ -24,6 +24,7 @@ import {
   completed,
   sortArrows,
   checkmark,
+  verified,
 } from './icons'
 import type { IconTypeName } from './types'
 
@@ -79,5 +80,7 @@ export const getIcon = (name: IconTypeName) => {
       return sortArrows
     case 'checkmark':
       return checkmark
+    case 'verified':
+      return verified
   }
 }

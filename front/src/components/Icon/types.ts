@@ -30,5 +30,6 @@ export type IconTypeName =
   | 'completed'
   | 'sortArrows'
   | 'checkmark'
+  | 'verified'
 
 export type IconSize = 112 | 100 | 40 | 28 | 24 | 20 | 18 | 16 | 12 | 7

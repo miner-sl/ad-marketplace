@@ -1,25 +1,73 @@
 import {useParams, useNavigate} from 'react-router-dom'
 import {useState, useEffect} from 'react'
 import {
+  Block,
   BlockNew,
   PageLayout,
   Page,
   TelegramBackButton,
   Text,
   TelegramMainButton,
-  ChannelLink,
+  Image,
   ListInput,
-  ListToggler,
-  Button,
+  ListItem,
+  Group,
+  Icon,
+  Spinner,
   useToast,
 } from '@components'
 import {useChannelQuery, useChannelStatsQuery, useSetChannelPricingMutation} from '@store-new'
 import {useTelegramUser} from '@hooks'
 import {useAuth} from '@context'
 import {ROUTES_NAME} from '@routes'
-import type {AdFormat} from '@types'
+import type {AdFormat, Channel, ChannelStats} from '@types'
 import styles from './ChannelDetailsPage.module.scss'
-import {separateNumber} from '@utils'
+import {separateNumber, createMembersCount} from '@utils'
+
+interface ChannelHeaderProps {
+  channel: Channel
+  stats?: ChannelStats
+}
+
+const ChannelHeader = ({ channel, stats }: ChannelHeaderProps) => {
+  const subscribersCount = stats?.subscribers_count || 0
+
+  return (
+    <>
+      <Block align="center">
+        <Image
+          size={88}
+          src={null}
+          borderRadius={50}
+          fallback={channel.title}
+        />
+      </Block>
+      <Block margin="top" marginValue={12} row justify="center" align="center" gap={4}>
+        <Text type="title2" align="center" weight="bold">
+          {channel.title}
+        </Text>
+        {channel.is_verified && (
+          <Icon name="verified" size={20} />
+        )}
+      </Block>
+
+      {subscribersCount > 0 && (
+        <Block margin="top" marginValue={8}>
+          <Text type="caption2" color="tertiary" align="center">
+            {createMembersCount(subscribersCount)}
+          </Text>
+        </Block>
+      )}
+      {channel.description && (
+        <Block margin="top" marginValue={8}>
+          <Text type="text" align="center" color="tertiary">
+            {channel.description}
+          </Text>
+        </Block>
+      )}
+    </>
+  )
+}
 
 const AD_FORMATS: { value: AdFormat; label: string }[] = [
   { value: 'post', label: 'Post' },
@@ -87,10 +135,8 @@ export const ChannelDetailsPage = () => {
 
   const handleEditToggle = () => {
     if (isEditing) {
-      // Exiting edit mode - data is already saved via onBlur and toggle handlers
       setIsEditing(false)
     } else {
-      // Entering edit mode - initialize with current values
       setIsEditing(true)
     }
   }
@@ -121,8 +167,10 @@ export const ChannelDetailsPage = () => {
     navigate(ROUTES_NAME.MARKETPLACE_REQUEST_POST.replace(':id', id || ''))
   }
 
+
   const handlePriceChange = (format: AdFormat, value: string) => {
     // Allow empty string or valid number
+    // Remove any trailing zeros after decimal point for better UX while typing
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
       setEditingPrices((prev) => ({ ...prev, [format]: value }))
     }
@@ -186,6 +234,12 @@ export const ChannelDetailsPage = () => {
     const priceValue = editingPrices[format].trim()
     const currentPricing = channel.pricing?.find((p) => p.ad_format === format)
 
+    // Format the value to 2 decimal places
+    if (priceValue && !isNaN(parseFloat(priceValue))) {
+      const formattedValue = parseFloat(priceValue).toFixed(2)
+      setEditingPrices((prev) => ({ ...prev, [format]: formattedValue }))
+    }
+
     // Only save if price changed and is valid
     if (
       priceValue &&
@@ -214,138 +268,207 @@ export const ChannelDetailsPage = () => {
     <Page back>
       <PageLayout>
         <TelegramBackButton/>
-        <BlockNew gap={4} className={styles.container}>
-          <BlockNew padding="0 8px">
-            <BlockNew gap={4}>
-              <ChannelLink channel={channel} showLabel={false} textType="title2" weight="bold" />
-              {channel.is_verified && (
-                <Text type="caption" color="accent">
-                  ✓ Verified Channel
-                </Text>
-              )}
-            </BlockNew>
-          </BlockNew>
 
-          {channel.description && (
-            <BlockNew padding="0 8px">
-              <Text type="text" color="secondary">
-                {channel.description}
-              </Text>
-            </BlockNew>
-          )}
+        {/* Channel Header */}
+        <ChannelHeader channel={channel} stats={displayStats} />
 
-          {displayStats && (
-            <BlockNew gap={2} padding="0 8px">
-              <BlockNew gap={2}>
-                <Text type="title2" weight="bold">
-                  Statistics
-                </Text>
+        {/* Statistics Section */}
+        {displayStats && (
+          <Block margin="bottom" marginValue={24}>
+            <Block paddingValue={16}>
+              <Group header="STATISTICS">
                 {displayStats.subscribers_count && (
-                  <Text type="text">
-                    👥 {separateNumber(displayStats.subscribers_count)} subscribers
-                  </Text>
+                  <ListItem
+                    padding="6px 16px"
+                    text={
+                      <Text type="text">
+                        👥 {separateNumber(displayStats.subscribers_count)} subscribers
+                      </Text>
+                    }
+                  />
                 )}
                 {displayStats.average_views && (
-                  <Text type="text">
-                    👁️ {separateNumber(displayStats.average_views)} average views
-                  </Text>
+                  <ListItem
+                    padding="6px 16px"
+                    text={
+                      <Text type="text">
+                        👁️ {separateNumber(displayStats.average_views)} average views
+                      </Text>
+                    }
+                  />
                 )}
                 {displayStats.average_reach && (
-                  <Text type="text">
-                    📊 {separateNumber(displayStats.average_reach)} average reach
-                  </Text>
+                  <ListItem
+                    padding="6px 16px"
+                    text={
+                      <Text type="text">
+                        📊 {separateNumber(displayStats.average_reach)} average reach
+                      </Text>
+                    }
+                  />
                 )}
                 {displayStats.premium_subscribers_count && (
-                  <Text type="text" color="accent">
-                    ⭐ {separateNumber(displayStats.premium_subscribers_count)}{' '}
-                    premium subscribers
-                  </Text>
-                )}
-              </BlockNew>
-            </BlockNew>
-          )}
-
-          <BlockNew gap={2} padding="0 8px">
-            <BlockNew row gap={8} justify="between" align="center">
-              <Text type="title2" weight="bold">
-                Pricing
-              </Text>
-              {isChannelOwner && (
-                <Button
-                  type={isEditing ? 'secondary' : 'basic'}
-                  onClick={handleEditToggle}
-                >
-                  {isEditing ? 'Done' : 'Edit'}
-                </Button>
-              )}
-            </BlockNew>
-            {AD_FORMATS.map((format) => {
-              const pricing = channel.pricing?.find((p) => p.ad_format === format.value)
-              const isEnabled = isChannelOwner && isEditing
-                ? priceEnabled[format.value]
-                : pricing?.is_active ?? false
-
-              // For non-owners, only show if active
-              // For owners, show all formats (they can enable/disable)
-              if (!isChannelOwner && !isEnabled) {
-                return null
-              }
-
-              return (
-                <BlockNew key={format.value} gap={8} row align="center" className={styles.pricingRow}>
-                  <BlockNew row gap={8} align="center" style={{ flex: 1 }}>
-                    <Text type="text" weight="medium" style={{ minWidth: '100px' }}>
-                      {format.label}
-                    </Text>
-                    {isChannelOwner && isEditing ? (
-                      <>
-                        <ListInput
-                          type="number"
-                          inputMode="decimal"
-                          step="0.01"
-                          min="0"
-                          placeholder="0.00"
-                          value={editingPrices[format.value]}
-                          onChange={(value) => handlePriceChange(format.value, value)}
-                          onBlur={() => handlePriceBlur(format.value)}
-                          disabled={setPricingMutation.isPending}
-                          className={styles.priceInput}
-                        />
-                        <Text type="text" color="secondary">
-                          TON
-                        </Text>
-                      </>
-                    ) : (
-                      <Text type="text" color={isEnabled ? 'accent' : 'secondary'}>
-                        {pricing?.price_ton || '0.00'} TON
+                  <ListItem
+                    padding="6px 16px"
+                    text={
+                      <Text type="text" color="accent">
+                        ⭐ {separateNumber(displayStats.premium_subscribers_count)} premium subscribers
                       </Text>
-                    )}
-                  </BlockNew>
-                  {isChannelOwner && (
-                    <ListToggler
-                      isEnabled={isEnabled}
-                      onChange={() => handleToggleEnabled(format.value)}
-                      disabled={setPricingMutation.isPending}
-                    />
-                  )}
-                </BlockNew>
-              )
-            })}
-            {(!isChannelOwner || !isEditing) && (!visiblePricing || visiblePricing.length === 0) && (
-              <Text type="text" color="secondary">
-                No pricing available
-              </Text>
-            )}
-          </BlockNew>
+                    }
+                  />
+                )}
+              </Group>
+            </Block>
+          </Block>
+        )}
 
-          {postPricing && userId && (
-            <TelegramMainButton
-              text="Request Post"
-              onClick={handleRequestPostClick}
-              isVisible={true}
-            />
-          )}
-        </BlockNew>
+        {/* Configuration Section */}
+        <Block margin="top" marginValue={24}>
+          <Block margin="bottom" marginValue={44}>
+            <Group header="CONFIGURATION">
+              {AD_FORMATS.map((format) => {
+                const pricing = channel.pricing?.find((p) => p.ad_format === format.value)
+                const isEnabled = isChannelOwner && isEditing
+                  ? priceEnabled[format.value]
+                  : pricing?.is_active ?? false
+
+                // For non-owners, only show if active
+                if (!isChannelOwner && !isEnabled) {
+                  return null
+                }
+
+                return (
+                  <ListItem
+                    key={format.value}
+                    padding="6px 16px"
+                    disabled={setPricingMutation.isPending}
+                    text={
+                      <BlockNew row align="center" justify="between" gap={8} className={styles.priceTextContainer}>
+                        {isChannelOwner && isEditing ? (
+                          <>
+                            <div className={styles.priceLabel}>
+                              <Text type="text" weight="medium">
+                                {format.label}
+                              </Text>
+                            </div>
+                            <ListInput
+                              type="number"
+                              inputMode="decimal"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              value={
+                                editingPrices[format.value]
+                                  ? (() => {
+                                      const val = editingPrices[format.value]
+                                      // If it's a complete number (doesn't end with '.'), format to 2 decimals
+                                      if (val && !val.endsWith('.') && !isNaN(parseFloat(val))) {
+                                        return parseFloat(val).toFixed(2)
+                                      }
+                                      return val
+                                    })()
+                                  : ''
+                              }
+                              onChange={(value) => handlePriceChange(format.value, value)}
+                              onBlur={() => handlePriceBlur(format.value)}
+                              disabled={setPricingMutation.isPending}
+                              className={styles.priceInput}
+                            />
+                            <Text type="text" color="secondary">
+                              TON
+                            </Text>
+                          </>
+                        ) : (
+                          <>
+                            <div className={styles.priceLabel}>
+                              <Text type="text" weight="medium">
+                                {format.label}
+                              </Text>
+                            </div>
+                            <Text type="text" color={isEnabled ? 'accent' : 'secondary'}>
+                              {pricing?.price_ton?.toFixed?.(2) || '0.00'} TON
+                            </Text>
+                          </>
+                        )}
+                      </BlockNew>
+                    }
+                    after={
+                      <>
+                        {setPricingMutation.isPending && <Spinner size={16} />}
+                      </>
+                    }
+                    before={
+                      <div
+                        onClick={(e) => {
+                          if (isChannelOwner && !setPricingMutation.isPending) {
+                            e.stopPropagation()
+                            handleToggleEnabled(format.value)
+                          }
+                        }}
+                        style={{
+                          cursor: isChannelOwner && !setPricingMutation.isPending ? 'pointer' : 'default',
+                          opacity: setPricingMutation.isPending ? 0.5 : 1,
+                        }}
+                      >
+                        <Icon
+                          name={isEnabled ? 'eye' : 'eyeCrossed'}
+                          size={28}
+                          color={isEnabled ? 'tertiary' : 'primary'}
+                        />
+                      </div>
+                    }
+                  />
+                )
+              })}
+              {isChannelOwner && (
+                <ListItem
+                  padding="6px 16px"
+                  text={
+                    <Text type="text">
+                      {isEditing ? 'Done Editing' : 'Edit Pricing'}
+                    </Text>
+                  }
+                  before={
+                    <Icon
+                      name={isEditing ? 'checkmark' : 'plus'}
+                      size={28}
+                      color="accent"
+                    />
+                  }
+                  onClick={handleEditToggle}
+                />
+              )}
+              {(!isChannelOwner || !isEditing) && (!visiblePricing || visiblePricing.length === 0) && (
+                <ListItem
+                  padding="6px 16px"
+                  text={
+                    <Text type="text" color="secondary">
+                      No pricing available
+                    </Text>
+                  }
+                />
+              )}
+            </Group>
+          </Block>
+        </Block>
+
+        {/* Footer */}
+        <Block margin="top" marginValue="auto">
+          <Text type="caption" align="center" color="tertiary">
+            To request a post from {channel.title || 'this channel'},
+            <br />
+            click the button below
+          </Text>
+        </Block>
+
+        {/* Request Post Button */}
+        {postPricing && userId && (
+          <TelegramMainButton
+            text="Request Post"
+            onClick={handleRequestPostClick}
+            isVisible={true}
+          />
+        )}
       </PageLayout>
     </Page>
   )

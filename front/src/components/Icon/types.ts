@@ -10,14 +10,12 @@ export type IconTypeName =
   | 'gatewayBot'
   | 'doubleChevron'
   | 'share'
-  | 'trash'
   | 'check'
   | 'cross'
   | 'chevron'
   | 'eyeCrossed'
   | 'eye'
   | 'connectWallet'
-  | 'toncoin'
   | 'premium'
   | 'whitelist'
   | 'externalSource'
@@ -31,5 +29,6 @@ export type IconTypeName =
   | 'sortArrows'
   | 'checkmark'
   | 'verified'
+  | 'searchGlass'
 
 export type IconSize = 112 | 100 | 40 | 28 | 24 | 20 | 18 | 16 | 12 | 7

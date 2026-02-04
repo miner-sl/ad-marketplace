@@ -1,3 +1,4 @@
+export * from './addBotToChannelLink'
 export * from './checkStartAppParams'
 export * from './collapseAddress'
 export * from './goTo'

@@ -1,5 +1,6 @@
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import cn from 'classnames'
 import {
   BlockNew,
   PageLayout,
@@ -12,12 +13,24 @@ import {
   GroupItem,
   Image,
   Icon,
+  Block,
+  Dropdown,
+  AdFormatBadge,
 } from '@components'
-import { useChannelsQuery } from '@store-new'
+import { useChannelsQuery, type EnhancedChannel } from '@store-new'
 import { ROUTES_NAME } from '@routes'
 import {pluralize, hapticFeedback} from '@utils'
+import {useDebounce} from '@hooks'
 import type { ChannelFilters, AdFormat } from '@types'
+
 import styles from './BrowseChannelsPage.module.scss'
+
+const AD_FORMAT_OPTIONS: Array<AdFormat | ''> = ['', 'post', 'forward', 'story']
+
+const formatAdFormatLabel = (format: AdFormat | ''): string => {
+  if (format === '') return 'All formats'
+  return format.charAt(0).toUpperCase() + format.slice(1)
+}
 
 export const BrowseChannelsPage = () => {
   const navigate = useNavigate()
@@ -25,6 +38,25 @@ export const BrowseChannelsPage = () => {
     limit: 50,
   })
   const [showFilters, setShowFilters] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
+  const debouncedSearch = useDebounce(searchInput, 500)
+  const [isFormatDropdownOpen, setIsFormatDropdownOpen] = useState(false)
+  const formatButtonRef = useRef<HTMLDivElement>(null)
+
+  // Update filters when debounced search value changes
+  useEffect(() => {
+    if (debouncedSearch === '') {
+      setFilters((prev) => {
+        const { search: _, ...rest } = prev
+        return rest
+      })
+    } else {
+      setFilters((prev) => ({
+        ...prev,
+        search: debouncedSearch,
+      }))
+    }
+  }, [debouncedSearch])
 
   const { data: channels, isLoading: channelsLoading } = useChannelsQuery(filters)
 
@@ -34,6 +66,14 @@ export const BrowseChannelsPage = () => {
         const { [key]: _, ...rest } = prev
         return rest
       })
+      return
+    }
+
+    if (key === 'search') {
+      setFilters((prev) => ({
+        ...prev,
+        [key]: value,
+      }))
       return
     }
     const numValue = Number(value)
@@ -52,7 +92,17 @@ export const BrowseChannelsPage = () => {
     }))
   }
 
+  const handleToggleFormatDropdown = (value?: boolean) => {
+    setIsFormatDropdownOpen(value !== undefined ? value : !isFormatDropdownOpen)
+  }
+
+  const formatDropdownOptions = AD_FORMAT_OPTIONS.map((format) => ({
+    label: formatAdFormatLabel(format),
+    value: format,
+  }))
+
   const resetFilters = () => {
+    setSearchInput('')
     setFilters({ limit: 50 })
   }
 
@@ -67,6 +117,7 @@ export const BrowseChannelsPage = () => {
                 Browse Channels
               </Text>
               <Button
+                size="small"
                 type="secondary"
                 onClick={() => setShowFilters(!showFilters)}
               >
@@ -75,101 +126,123 @@ export const BrowseChannelsPage = () => {
             </BlockNew>
           </BlockNew>
 
+          <Group>
+            <Block>
+              <ListInput
+                before={<Icon name="searchGlass" size={16} />}
+                showClearButton
+                textColor="secondary"
+                type="text"
+                placeholder="Search by channel name or username..."
+                value={searchInput}
+                onChange={(value) => setSearchInput(value)}
+              />
+            </Block>
+          </Group>
+
           {showFilters && (
             <BlockNew gap={12} padding="0 16px" className={styles.filters}>
               <BlockNew gap={8}>
                 <Text type="caption" color="secondary">
                   Subscribers
                 </Text>
-                <BlockNew row gap={8}>
-                  <ListInput
-                    type="number"
-                    placeholder="Min"
-                    value={filters.min_subscribers?.toString() || ''}
-                    onChange={(value) => handleFilterChange('min_subscribers', value)}
-                    inputMode="numeric"
-                  />
-                  <ListInput
-                    type="number"
-                    placeholder="Max"
-                    value={filters.max_subscribers?.toString() || ''}
-                    onChange={(value) => handleFilterChange('max_subscribers', value)}
-                    inputMode="numeric"
-                  />
-                </BlockNew>
+                <Group>
+                  <BlockNew row gap={8}>
+                    <ListInput
+                      type="number"
+                      placeholder="Min"
+                      value={filters.min_subscribers?.toString() || ''}
+                      onChange={(value) => handleFilterChange('min_subscribers', value)}
+                      inputMode="numeric"
+                    />
+                    <ListInput
+                      type="number"
+                      placeholder="Max"
+                      value={filters.max_subscribers?.toString() || ''}
+                      onChange={(value) => handleFilterChange('max_subscribers', value)}
+                      inputMode="numeric"
+                    />
+                  </BlockNew>
+                </Group>
               </BlockNew>
 
               <BlockNew gap={8}>
                 <Text type="caption" color="secondary">
                   Price (TON)
                 </Text>
-                <BlockNew row gap={8}>
-                  <ListInput
-                    type="number"
-                    placeholder="Min"
-                    value={filters.min_price?.toString() || ''}
-                    onChange={(value) => handleFilterChange('min_price', value)}
-                    inputMode="decimal"
-                    step="0.01"
-                    min="0"
-                  />
-                  <ListInput
-                    type="number"
-                    placeholder="Max"
-                    value={filters.max_price?.toString() || ''}
-                    onChange={(value) => handleFilterChange('max_price', value)}
-                    inputMode="decimal"
-                    step="0.01"
-                    min="0"
-                  />
-                </BlockNew>
+                <Group>
+                  <BlockNew row gap={8}>
+                    <ListInput
+                      type="number"
+                      placeholder="Min"
+                      value={filters.min_price?.toString() || ''}
+                      onChange={(value) => handleFilterChange('min_price', value)}
+                      inputMode="decimal"
+                      step="0.01"
+                      min="0"
+                    />
+                    <ListInput
+                      type="number"
+                      placeholder="Max"
+                      value={filters.max_price?.toString() || ''}
+                      onChange={(value) => handleFilterChange('max_price', value)}
+                      inputMode="decimal"
+                      step="0.01"
+                      min="0"
+                    />
+                  </BlockNew>
+                </Group>
               </BlockNew>
 
               <BlockNew gap={8}>
                 <Text type="caption" color="secondary">
                   Average Views
                 </Text>
-                <ListInput
-                  type="number"
-                  placeholder="Minimum views"
-                  value={filters.min_views?.toString() || ''}
-                  onChange={(value) => handleFilterChange('min_views', value)}
-                  inputMode="numeric"
-                />
+                <Group>
+                  <ListInput
+                    type="number"
+                    placeholder="Minimum views"
+                    value={filters.min_views?.toString() || ''}
+                    onChange={(value) => handleFilterChange('min_views', value)}
+                    inputMode="numeric"
+                  />
+                </Group>
               </BlockNew>
 
-              <BlockNew gap={8}>
+              {/* <BlockNew gap={8}>
                 <Text type="caption" color="secondary">
                   Ad Format
                 </Text>
-                <select
-                  value={filters.ad_format || ''}
-                  onChange={(e) => handleFormatChange(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    borderRadius: '12px',
-                    border: '1px solid var(--color-backgroundTertiary)',
-                    backgroundColor: 'var(--color-background)',
-                    color: 'var(--color-textPrimary)',
-                    fontSize: '16px',
-                  }}
+                <div
+                  className={cn(styles.orderByContainer)}
+                  onClick={() => handleToggleFormatDropdown()}
+                  ref={formatButtonRef}
                 >
-                  <option value="">All formats</option>
-                  <option value="post">Post</option>
-                  <option value="forward">Forward</option>
-                  <option value="story">Story</option>
-                </select>
-              </BlockNew>
+                  <Icon name="sortArrows" size={18} color="tertiary" />
+                  <Dropdown
+                  active={isFormatDropdownOpen}
+                  options={formatDropdownOptions}
+                  selectedValue={filters.ad_format || ''}
+                  onSelect={(value: string) => {
+                    handleFormatChange(value)
+                    handleToggleFormatDropdown(false)
+                  }}
+                  onClose={() => handleToggleFormatDropdown(false)}
+                  triggerRef={formatButtonRef as React.RefObject<HTMLElement>}
+                />
+                </div>
+              </BlockNew> */}
 
               <BlockNew row gap={8}>
                 <Button
+                  size="small"
                   type="secondary"
                   onClick={resetFilters}
                 >
                   Reset
                 </Button>
                 <Button
+                  size="small"
                   type="primary"
                   onClick={() => setShowFilters(false)}
                 >
@@ -186,11 +259,9 @@ export const BrowseChannelsPage = () => {
           ) : channels && channels.length > 0 ? (
             <BlockNew id="channels-container">
               <Group>
-                {channels.map((channel) => {
-                  const channelName = channel.title || `@${channel.username || 'channel'}`
-                  const subscribersCount = channel.stats?.subscribers_count || 0
-                  const postPricing = channel.pricing?.find((p) => p.ad_format === 'post' && p.is_active)
-                  
+                {channels.map((channel: EnhancedChannel) => {
+                  const { activeAdFormats, topic, channelName, subscribersCount, postPricing } = channel
+
                   return (
                     <GroupItem
                       key={channel.id}
@@ -201,6 +272,20 @@ export const BrowseChannelsPage = () => {
                           </Text>
                           {channel.is_verified && (
                             <Icon name="verified" size={16} />
+                          )}
+                          {activeAdFormats.length > 0 && (
+                            <BlockNew row gap={4} align="center">
+                              {activeAdFormats.map((format) => (
+                                <AdFormatBadge key={format} format={format} />
+                              ))}
+                            </BlockNew>
+                          )}
+                          {topic && (
+                            <div style={{ padding: '2px 8px', borderRadius: '6px', background: 'var(--color-background-tertiary)' }}>
+                              <Text type="caption" color="secondary">
+                                {topic.name}
+                              </Text>
+                            </div>
                           )}
                         </BlockNew>
                       }

@@ -52,12 +52,12 @@ export const OnboardingPage = () => {
         showToast({ message: 'Registration failed', type: 'error' });
         return;
       }
-      
+
       // Store Telegram user ID after successful registration
       if (telegramUser.id) {
         setStoredTelegramUserId(telegramUser.id)
       }
-      
+
       queryClient.setQueryData(TANSTACK_KEYS.USER_ME(telegramUser.id), result);
       navigate(ROUTES_NAME.MARKETPLACE_HOME, { replace: true });
     } catch (error) {
@@ -72,7 +72,7 @@ export const OnboardingPage = () => {
         <BlockNew gap={24} className={styles.container}>
           <BlockNew padding="0 16px" gap={8}>
             <Text type="hero" weight="bold" align="center">
-              Welcome to Ad Marketplace
+              Welcome to Ads Marketplace
             </Text>
             <Text type="text" color="secondary" align="center">
               Choose your role to get started

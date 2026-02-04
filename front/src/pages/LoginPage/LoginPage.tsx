@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+
 import {
   BlockNew,
   PageLayout,
@@ -7,13 +8,15 @@ import {
   Text,
   Spinner,
   useToast,
-} from '@components'
-import { useAuth } from '@context'
-import config from '@config'
-import type { TelegramWidgetUser } from '@types'
-import styles from './LoginPage.module.scss'
+} from '@components';
+import { useAuth } from '@context';
+import config from '@config';
+import type { TelegramWidgetUser } from '@types';
 
-const BOT_USERNAME: string = config.botName || ''
+import styles from './LoginPage.module.scss';
+
+const BOT_USERNAME: string = config.botName;
+
 const isLocalhost =
   typeof window !== 'undefined' &&
   (window.location.hostname === 'localhost' ||
@@ -97,15 +100,14 @@ export function LoginPage() {
     }
   }, [isTelegramMiniApp, handleTelegramAuth, showToast])
 
-  // In Telegram Mini App, show loading while auto-auth happens
   if (isTelegramMiniApp) {
     return (
       <Page guard={false}>
         <PageLayout center>
-          <BlockNew gap={24} className={styles.container} justify='center'>
+          <BlockNew gap={24} className={styles.container} align='center'>
             <BlockNew gap={8}>
               <Text type="hero" weight="bold" align="center">
-                Ad Marketplace
+                Ads Marketplace
               </Text>
               <Text type="text" color="secondary" align="center">
                 Authenticating...
@@ -124,7 +126,7 @@ export function LoginPage() {
         <BlockNew gap={24} className={styles.container}>
           <BlockNew gap={8}>
             <Text type="hero" weight="bold" align="center">
-              Ad Marketplace
+              Ads Marketplace
             </Text>
             <Text type="text" color="secondary" align="center">
               Connect your Telegram account to get started

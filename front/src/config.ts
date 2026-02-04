@@ -42,7 +42,7 @@ const devConfigBase: BaseConfig = {
   apiHost: 'http://192.168.64.1:3000',
   // apiHost: 'http://localhost:3000',
   botName: 'NonNano_Bot',
-  appName: 'open',
+  appName: 'Open',
   tonConnectManifestUrl: 'https://cdn.joincommunity.xyz/gateway/manifest.json',
   accessToken: import.meta.env.VITE_ACCESS_TOKEN,
 }
@@ -50,8 +50,8 @@ const devConfigBase: BaseConfig = {
 const prodConfigBase: BaseConfig = {
   isProd: true,
   apiHost: 'https://api.access.tools.tg',
-  botName: 'access_app_bot',
-  appName: 'open',
+  botName: import.meta.env.VITE_BOT_USERNAME || 'NonNano_Bot',
+  appName: 'Open',
   tonConnectManifestUrl: 'https://cdn.joincommunity.xyz/gateway/manifest.json',
 }
 

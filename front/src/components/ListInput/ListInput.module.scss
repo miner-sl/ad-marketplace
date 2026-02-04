@@ -2,6 +2,16 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  padding: 10px 16px;
+  position: relative;
+  height: 40px;
+}
+
+.before {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-right: 4px;
 }
 
 .listInput {
@@ -14,6 +24,7 @@
   border: none;
   outline: none;
   box-sizing: border-box;
+  flex: 1;
 }
 
 .listInput-secondary {
@@ -26,4 +37,46 @@
 
 .listInput-accent {
   color: var(--color-textIconsAccent);
+}
+
+.clearButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  outline: none;
+  stroke: none;
+  border: none;
+
+  &:hover {
+    opacity: 1;
+    outline: none;
+    border: none;
+    stroke: none;
+  }
+
+  &:active {
+    opacity: 0.8;
+    outline: none;
+    border: none;
+    stroke: none;
+  }
+
+  &:focus {
+    outline: none;
+    border: none;
+    stroke: none;
+  }
+
+  &:focus-visible {
+    outline: none;
+    border: none;
+    stroke: none;
+  }
 }

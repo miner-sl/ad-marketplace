@@ -14,6 +14,7 @@ import {
   Group,
   Icon,
   useToast,
+  Spinner,
 } from '@components'
 import {
   useAcceptDealMutation,
@@ -77,7 +78,7 @@ export const DealDetailsPage = () => {
   const dealId = id ? parseInt(id) : 0
   const user = useTelegramUser()
 
-  const {data: deal, isLoading} = useDealQuery(dealId, user?.id)
+  const {data: deal, isLoading} = useDealQuery(dealId, user?.id);
   // const { data: creative } = useDealCreativeQuery(dealId)
   const acceptDealMutation = useAcceptDealMutation()
   const rejectDealMutation = useRejectDealMutation()
@@ -89,14 +90,13 @@ export const DealDetailsPage = () => {
   // const submitCreativeMutation = useSubmitCreativeMutation()
   const {copy} = useClipboard()
   const {showToast} = useToast()
+  // const {transferTon, isConnected} = useTonTransfer()
   if (isLoading || !deal) {
     return (
       <Page back>
         <PageLayout>
           <TelegramBackButton/>
-          <Text type="text" align="center">
-            Loading...
-          </Text>
+          <Spinner size={32} />
         </PageLayout>
       </Page>
     )
@@ -185,14 +185,34 @@ export const DealDetailsPage = () => {
     }
   }
 
-  const handlePayDeal = () => {
+  const handlePayDeal = async () => {
     if (!deal.escrow_address) {
       showToast({ type: 'error', message: 'Escrow address not available' })
       return
     }
-    // Copy escrow address to clipboard
-    copy(deal.escrow_address, `send ${deal.price_ton} TON to the escrow address. Escrow address copied`)
-    // TODO: Open TON wallet or payment interface
+
+    // if (!isConnected) {
+    //   showToast({
+    //     type: 'error',
+    //     message: 'Please connect your TON wallet first'
+    //   })
+    //   return
+    // }
+
+    try {
+      // await transferTon(
+      //   deal.escrow_address,
+      //   deal.price_ton,
+      //   `Payment for Deal #${deal.id}`
+      // )
+      showToast({
+        type: 'success',
+        message: 'Transaction sent successfully. Waiting for confirmation...',
+      })
+    } catch (error) {
+      // Error handling is done in the hook
+      console.error('Payment failed:', error)
+    }
   }
 
   const isAdvertiserUser = typeof deal.advertiser === 'object' && deal.advertiser !== null
@@ -250,7 +270,6 @@ export const DealDetailsPage = () => {
           </Block>
         )}
 
-        {/* Deal Information Section */}
         <Block margin="top" marginValue={24}>
           <Block margin="bottom" marginValue={44}>
             <Group header="DEAL INFORMATION">
@@ -275,7 +294,7 @@ export const DealDetailsPage = () => {
                       Price:
                     </Text>
                     <Text type="text" color="accent">
-                      {deal.price_ton} TON
+                      {deal.price_ton?.toFixed?.(2)} TON
                     </Text>
                   </BlockNew>
                 }

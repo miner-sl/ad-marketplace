@@ -3,6 +3,7 @@ import React from 'react'
 import type { ChangeEvent } from 'react'
 
 import styles from './ListInput.module.scss'
+import { Icon } from '../Icon'
 
 export interface ListInputProps {
   textColor?: 'primary' | 'secondary' | 'tertiary'
@@ -34,6 +35,8 @@ export interface ListInputProps {
     | 'email'
     | 'url'
   after?: React.ReactNode
+  before?: React.ReactNode
+  showClearButton?: boolean
 }
 
 export const ListInput: React.FC<ListInputProps> = ({
@@ -57,6 +60,8 @@ export const ListInput: React.FC<ListInputProps> = ({
   textColor = 'primary',
   inputMode,
   after,
+  before,
+  showClearButton = false,
   onBlur,
 }) => {
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -65,8 +70,17 @@ export const ListInput: React.FC<ListInputProps> = ({
     }
   }
 
+  const handleClear = () => {
+    if (onChange && !disabled) {
+      onChange('')
+    }
+  }
+
+  const hasValue = value !== undefined && value !== null && value !== ''
+
   return (
     <div className={styles.listInputContainer}>
+      {before && <div className={styles.before}>{before}</div>}
       <input
         className={cn(
           styles.listInput,
@@ -92,7 +106,17 @@ export const ListInput: React.FC<ListInputProps> = ({
         max={max}
         inputMode={inputMode}
       />
-      <div>{after}</div>
+      {showClearButton && hasValue && !disabled && (
+        <button
+          type="button"
+          onClick={handleClear}
+          className={styles.clearButton}
+          aria-label="Clear input"
+        >
+          <Icon name="cross" size={16} color="tertiary" />
+        </button>
+      )}
+      {after && <div>{after}</div>}
     </div>
   )
 }

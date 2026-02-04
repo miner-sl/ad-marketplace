@@ -20,6 +20,7 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
         min_price,
         max_price,
         ad_format,
+        search,
         limit = 50,
         offset = 0,
       } = request.query as any;
@@ -38,6 +39,7 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
           ? parseFloat(max_price as string) 
           : undefined,
         ad_format: ad_format as string | undefined,
+        search: search as string | undefined,
         limit: parseInt(limit as string),
         offset: parseInt(offset as string),
       };

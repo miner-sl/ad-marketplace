@@ -13,7 +13,10 @@ import type {
   CreateDealRequest,
   SubmitCreativeRequest,
   SetChannelPricingRequest,
+  AdFormat,
+  ChannelPricing,
 } from '@types'
+import { PREDEFINED_TOPICS } from '../../common/constants/topics'
 
 import {
   channelsAPI,
@@ -22,16 +25,47 @@ import {
   dealsAPI,
 } from './api'
 
+export interface EnhancedChannel extends Omit<Channel, 'topic'> {
+  activeAdFormats: AdFormat[]
+  topic: { id: number; name: string } | undefined
+  channelName: string
+  subscribersCount: number
+  postPricing: ChannelPricing | undefined
+}
+
 // Channels
 export const useChannelsQuery = (filters?: ChannelFilters) => {
   console.log('useChannelsQuery hook called with filters:', filters)
-  return useQuery<Channel[]>({
+  return useQuery<Channel[], Error, EnhancedChannel[]>({
     queryKey: [...TANSTACK_KEYS.CHANNELS, filters],
     queryFn: async () => {
       console.log('useChannelsQuery queryFn executing with filters:', filters)
       const result = await channelsAPI.getChannels(filters)
       console.log('useChannelsQuery queryFn result:', result)
       return result
+    },
+    select: (channels: Channel[]): EnhancedChannel[] => {
+      return channels.map((channel) => {
+        const activePricing = channel.pricing?.filter((p) => p.is_active) || []
+        const activeAdFormats = activePricing.map((p) => p.ad_format)
+        const topic =
+          channel.topic ||
+          (channel.topic_id
+            ? PREDEFINED_TOPICS.find((t) => t.id === channel.topic_id) || undefined
+            : undefined)
+        const channelName = channel.title || `@${channel.username || 'channel'}`
+        const subscribersCount = channel.stats?.subscribers_count || 0
+        const postPricing = channel.pricing?.find((p) => p.ad_format === 'post' && p.is_active)
+
+        return {
+          ...channel,
+          activeAdFormats,
+          topic,
+          channelName,
+          subscribersCount,
+          postPricing,
+        } as EnhancedChannel
+      })
     },
     gcTime: TANSTACK_GC_TIME,
     staleTime: TANSTACK_TTL.CHANNELS || 60000, // 1 minute default

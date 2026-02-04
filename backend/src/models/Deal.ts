@@ -103,13 +103,18 @@ export class DealModel {
         c.username as c_username,
         c.title as c_title,
         c.description as c_description,
+        c.topic_id as c_topic_id,
         c.bot_admin_id as c_bot_admin_id,
         c.is_verified as c_is_verified,
         c.is_active as c_is_active,
         c.created_at as c_created_at,
-        c.updated_at as c_updated_at
+        c.updated_at as c_updated_at,
+        t.id as t_id,
+        t.name as t_name,
+        t.description as t_description,
       FROM deals d
       LEFT JOIN channels c ON d.channel_id = c.id
+      LEFT JOIN topics t ON c.topic_id = t.id
       WHERE d.id = $1`,
       [id]
     );
@@ -120,14 +125,18 @@ export class DealModel {
     
     const row = result.rows[0];
     
-    // Extract deal fields (all columns that don't start with 'c_')
+    // Extract deal fields (all columns that don't start with 'c_' or 't_')
     const deal: any = {};
     const channel: any = {};
+    const topic: any = {};
     
     for (const key in row) {
       if (key.startsWith('c_')) {
         const channelKey = key.replace('c_', '');
         channel[channelKey] = row[key];
+      } else if (key.startsWith('t_')) {
+        const topicKey = key.replace('t_', '');
+        topic[topicKey] = row[key];
       } else {
         deal[key] = row[key];
       }
@@ -135,6 +144,10 @@ export class DealModel {
     
     // Only add channel if it has an id (meaning the join found a channel)
     if (channel.id) {
+      // Add topic to channel if topic exists
+      if (topic.id) {
+        channel.topic = topic;
+      }
       deal.channel = channel;
     }
     

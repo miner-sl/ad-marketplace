@@ -3,7 +3,21 @@
 }
 
 .filters {
-  background: var(--color-backgroundSecondary);
   border-radius: 12px;
   padding: 16px;
+}
+
+.orderByContainer {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--color-backgroundPrimary);
+  transition: background 0.2s;
+  position: relative;
+}
+
+.orderByContainer:hover {
+  background: var(--color-backgroundTertiary);
 }

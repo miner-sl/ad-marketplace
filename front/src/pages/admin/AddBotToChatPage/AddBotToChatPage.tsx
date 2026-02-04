@@ -1,3 +1,5 @@
+import { useCallback, useEffect, useState } from 'react'
+
 import sandwatchLottie from '@assets/sandwatch.json'
 import {
   Block,
@@ -12,14 +14,12 @@ import {
 } from '@components'
 import { useAppNavigation, useInterval } from '@hooks'
 import { ROUTES_NAME } from '@routes'
-import { useCallback, useEffect, useState } from 'react'
 import config from '@config'
 // import { AdminChat, useChatActions } from '@store'
 
 // import { findNewChat } from './helpers'
 import type {AdminChat} from "@types";
-import {openTelegramLink} from "@tma.js/sdk-react";
-
+import {addBotToChannelLink} from "@utils";
 
 export const AddBotToChatPage = () => {
   const { appNavigate } = useAppNavigation()
@@ -40,11 +40,7 @@ export const AddBotToChatPage = () => {
   }, [appNavigate])
 
   const addGatewayBot = useCallback(() => {
-    let link = `${config.botLink}?startgroup=&admin=restrict_members+invite_users`;
-    console.log(link, window.Telegram);
-    // debugger;
-    openTelegramLink(link);
-    // setIsCheckingNewChat(true)
+    addBotToChannelLink(config.botName)
   }, [])
   //
   // const fetchAdminUserChats = async () => {
@@ -148,7 +144,7 @@ export const AddBotToChatPage = () => {
       (isCheckingChatPermissions && 'Checking Bot Permissions')
     Component = (
       <>
-        {/*<StickerPlayer lottie={sandwatchLottie} />*/}
+        <StickerPlayer lottie={sandwatchLottie} />
         <Block margin="top" marginValue={16}>
           <Text type="title" align="center" weight="bold">
             {title}
@@ -167,13 +163,12 @@ export const AddBotToChatPage = () => {
         <Icon name="gatewayBot" size={112} />
         <Block margin="top" marginValue={16}>
           <Text type="title" align="center" weight="bold">
-            Add Access Bot to The Group or Channel
+            Add Ads Bot to The Channel
           </Text>
         </Block>
         <Block margin="top" marginValue={12}>
           <Text align="center" type="text">
-            Access bot require admin access to control who can join the group or
-            channel. Telegram bots can’t read messages inside the group chat.
+            Access bot require admin access to post messages in the channel
           </Text>
         </Block>
       </>
@@ -196,7 +191,7 @@ export const AddBotToChatPage = () => {
           text={
             isCheckingNewChat || isCheckingChatPermissions
               ? 'Cancel'
-              : 'Add bot to Channel'
+              : 'Add Bot To Channel'
           }
           onClick={handleClick}
         />

@@ -51,6 +51,8 @@ export interface Channel {
   bot_admin_id?: number
   is_verified: boolean
   is_active: boolean
+  topic_id?: number
+  topic?: { id: number; name: string }
   created_at: string
   updated_at: string
   stats?: ChannelStats
@@ -147,6 +149,7 @@ export interface Creative {
 }
 
 export interface ChannelFilters {
+  search?: string
   min_subscribers?: number
   max_subscribers?: number
   min_price?: number

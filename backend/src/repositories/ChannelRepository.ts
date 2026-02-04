@@ -21,6 +21,7 @@ export interface ChannelListFilters {
   min_price?: number;
   max_price?: number;
   ad_format?: string;
+  search?: string;
   limit?: number;
   offset?: number;
 }
@@ -129,6 +130,7 @@ export class ChannelRepository {
       min_price,
       max_price,
       ad_format,
+      search,
       limit = 50,
       offset = 0,
     } = filters;
@@ -172,6 +174,15 @@ export class ChannelRepository {
     if (max_subscribers !== undefined) {
       query += ` AND cs.subscribers_count <= $${paramCount++}`;
       params.push(max_subscribers);
+    }
+    
+    if (search && search.trim() !== '') {
+      query += ` AND (
+        c.title ILIKE $${paramCount} OR 
+        c.username ILIKE $${paramCount}
+      )`;
+      params.push(`%${search.trim()}%`);
+      paramCount++;
     }
 
     // Add pricing filter condition if any pricing filters exist

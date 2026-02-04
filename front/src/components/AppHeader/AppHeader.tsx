@@ -39,7 +39,7 @@ export function AppHeader() {
           className={styles.logo}
         >
           <Text type="caption2" weight="bold">
-            Ad Marketplace
+            Ads Marketplace
           </Text>
         </span>
       </BlockNew>

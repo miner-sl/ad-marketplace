@@ -16,6 +16,7 @@ interface ButtonProps {
     | 'link'
     | 'primary-gradient'
     | 'accent'
+  size?: 'small' | 'medium'
 }
 
 export const Button = ({
@@ -24,6 +25,7 @@ export const Button = ({
   disabled,
   prefix,
   type = 'basic',
+  size = 'medium',
 }: ButtonProps) => {
   return (
     <div
@@ -31,7 +33,8 @@ export const Button = ({
         styles.root,
         styles[`type-${type}`],
         disabled && styles.disabled,
-        !disabled && styles.ripple
+        !disabled && styles.ripple,
+        size && styles[`size-${size}`]
       )}
       onClick={() => {
         if (!disabled && onClick) {

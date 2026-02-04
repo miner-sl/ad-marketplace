@@ -6,6 +6,7 @@ import {
   TelegramBackButton,
   TelegramMainButton,
   Text,
+  Spinner,
 } from '@components'
 import { useCampaignsQuery } from '@store-new'
 import { ROUTES_NAME } from '@routes'
@@ -36,9 +37,7 @@ export const MyCampaignsPage = () => {
           </BlockNew>
 
           {isLoading ? (
-            <Text type="text" color="secondary" align="center">
-              Loading...
-            </Text>
+            <Spinner size={32} />
           ) : myCampaigns.length > 0 ? (
             <BlockNew gap={8}>
               {myCampaigns.map((campaign) => (

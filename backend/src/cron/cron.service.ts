@@ -47,7 +47,7 @@ async function gracefulShutdown(signal: string) {
   logger.info(`Received ${signal}, starting graceful shutdown...`);
 
   try {
-    CronJobs.stopAll();
+    CronJobsSchedulerService.stopAll();
     logger.info('Cron jobs stopped');
   } catch (error: any) {
     logger.error('Error stopping cron jobs', { error: error.message });

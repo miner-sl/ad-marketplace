@@ -12,7 +12,7 @@ import { isPrimaryWorker } from '../utils/cluster.util';
 export class TonEscrowPaymentPollingService {
   private readonly logger = logger;
   private isProcessing = false;
-  private readonly batchSize = 100;
+  private readonly batchSize = 30;
   private job: cron.ScheduledTask | null = null;
 
   /**

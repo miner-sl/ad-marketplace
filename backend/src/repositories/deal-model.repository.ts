@@ -69,7 +69,7 @@ export class DealModel {
         c.updated_at as c_updated_at,
         t.id as t_id,
         t.name as t_name,
-        t.description as t_description,
+        t.description as t_description
       FROM deals d
       LEFT JOIN channels c ON d.channel_id = c.id
       LEFT JOIN topics t ON c.topic_id = t.id

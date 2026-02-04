@@ -1,15 +1,7 @@
-import jwt, {SignOptions} from 'jsonwebtoken';
 import { UserModel } from '../repositories/user.repository';
 import { User } from '../models/user.types';
 import {TelegramUser, WebAppInitData } from './telegram-auth.service';
-import env from '../utils/env';
-import logger from '../utils/logger';
-
-export interface JwtPayload {
-  sub: string; // User ID
-  username: string;
-  telegramId?: number;
-}
+import { createAccessToken, validateToken, JwtPayload } from '../utils/jwt';
 
 export interface AuthResponse {
   user: {
@@ -35,19 +27,9 @@ export class AuthService {
     let user = await UserModel.findByTelegramId(telegramUser.id);
 
     if (!user) {
-      // Generate username if not provided
-      const username = telegramUser.username && telegramUser.username !== ''
-        ? telegramUser.username
-        : `tg_${telegramUser.id}`;
-
-      // Check if username already exists (by querying database)
-      // For now, we'll use a simple approach - if username is provided and not empty, use it
-      // Otherwise, use tg_<telegram_id> format which should be unique
-      const finalUsername = username;
-
       user = await UserModel.create({
         telegram_id: telegramUser.id,
-        username: finalUsername,
+        username: this.prepareTelegramUsername(telegramUser),
         first_name: telegramUser.first_name,
         last_name: telegramUser.last_name,
         photo_url: telegramUser.photo_url,
@@ -73,15 +55,11 @@ export class AuthService {
       user = updatedUser;
     }
 
-    const payload: JwtPayload = {
-      sub: user.id.toString(),
-      username: user.username || `tg_${user.telegram_id}`,
-      telegramId: user.telegram_id,
-    };
-
-    const accessToken = jwt.sign(payload, env.JWT_SECRET, {
-      expiresIn: env.JWT_EXPIRES_IN ||'7D',
-    } as SignOptions);
+    const accessToken = createAccessToken(
+      user.id,
+      user.username,
+      user.telegram_id
+    );
 
     return {
       user: {
@@ -127,13 +105,7 @@ export class AuthService {
    * Validate JWT token
    */
   async validateToken(token: string): Promise<JwtPayload> {
-    try {
-      const payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
-      return payload;
-    } catch (error: any) {
-      logger.warn('Invalid JWT token', { error: error.message });
-      throw new Error('Invalid token');
-    }
+    return validateToken(token);
   }
 
   /**
@@ -141,6 +113,20 @@ export class AuthService {
    */
   async getUser(userId: number): Promise<User | null> {
     return await UserModel.findById(userId);
+  }
+
+
+  private prepareTelegramUsername(telegramUser: TelegramUser): string {
+    // Generate username if not provided
+    const username = telegramUser.username && telegramUser.username !== ''
+      ? telegramUser.username
+      : `tg_${telegramUser.id}`;
+
+    // Check if username already exists (by querying database)
+    // For now, we'll use a simple approach - if username is provided and not empty, use it
+    // Otherwise, use tg_<telegram_id> format which should be unique
+    const finalUsername = username;
+    return finalUsername;
   }
 
 }

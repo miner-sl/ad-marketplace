@@ -2,7 +2,7 @@ import {type ReactNode, useCallback, useEffect, useState} from 'react'
 import {retrieveLaunchParams, retrieveRawInitData} from '@tma.js/sdk-react'
 
 import { MarketplaceService } from '@services'
-import { clearToken, setToken } from '@utils'
+import { clearToken, setToken, setStoredTelegramUserId, getStoredTelegramUserId, clearStoredTelegramUserId } from '@utils'
 import { useToast } from '@components'
 import { AuthContext, type AuthContextType } from './AuthContext'
 import type { TelegramWidgetUser, User } from '@types'
@@ -26,11 +26,63 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isTelegramMiniApp] = useState(() => checkIsTelegramMiniApp());
   const { showToast } = useToast();
 
+  const checkTelegramUserIdMatch = useCallback(() => {
+    if (!checkIsTelegramMiniApp()) {
+      return true // Not a Telegram MiniApp, skip check
+    }
+
+    try {
+      const launchParams = retrieveLaunchParams()
+      const currentTelegramUserId = launchParams?.tgWebAppData?.user?.id
+      const storedTelegramUserId = getStoredTelegramUserId()
+
+      // If we have a stored user ID and it doesn't match current, reset
+      if (storedTelegramUserId !== null && currentTelegramUserId && storedTelegramUserId !== currentTelegramUserId) {
+        console.warn('Telegram user ID mismatch detected. Resetting user data.')
+        clearToken()
+        clearStoredTelegramUserId()
+        setUser(null)
+        return false
+      }
+
+      return true
+    } catch (error) {
+      console.error('Failed to check Telegram user ID:', error)
+      return true // Continue on error
+    }
+  }, [])
+
   const checkAuth = useCallback(async () => {
+    // First check if Telegram user ID matches stored one
+    if (!checkTelegramUserIdMatch()) {
+      setLoading(false)
+      return
+    }
+
     try {
       // Try to get current user with token
       const userData = await MarketplaceService.getMe();
       if (userData) {
+        // Verify Telegram user ID matches
+        const launchParams = retrieveLaunchParams()
+        const currentTelegramUserId = launchParams?.tgWebAppData?.user?.id
+        const userTelegramId = userData.telegram_id || userData.telegramId
+
+        if (currentTelegramUserId && userTelegramId && currentTelegramUserId !== userTelegramId) {
+          // User ID mismatch, reset
+          console.warn('Stored user Telegram ID does not match current. Resetting.')
+          clearToken()
+          clearStoredTelegramUserId()
+          setUser(null)
+          setLoading(false)
+          return
+        }
+
+        // Store the Telegram user ID
+        if (currentTelegramUserId) {
+          setStoredTelegramUserId(currentTelegramUserId)
+        }
+
         setUser(userData);
         setLoading(false);
         return;
@@ -43,9 +95,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         const initDataRaw = retrieveRawInitData()
         if (initDataRaw && initDataRaw !== '') {
+          const launchParams = retrieveLaunchParams()
+          const currentTelegramUserId = launchParams?.tgWebAppData?.user?.id
+
           const response = await MarketplaceService.loginWithTelegramMiniApp(initDataRaw)
           setToken(response.accessToken)
           setUser(response.user)
+
+          // Store Telegram user ID
+          if (currentTelegramUserId) {
+            setStoredTelegramUserId(currentTelegramUserId)
+          }
           // if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
           //   window.Telegram.WebApp.expand()
           //   window.Telegram.WebApp.ready()
@@ -57,7 +117,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     setLoading(false)
-  }, [isTelegramMiniApp])
+  }, [isTelegramMiniApp, checkTelegramUserIdMatch])
 
   useEffect(() => {
     void checkAuth()
@@ -69,6 +129,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const response = await MarketplaceService.loginWithTelegramWidget(telegramUser)
         setToken(response.accessToken)
         setUser(response.user)
+
+        // Store Telegram user ID if available
+        if (telegramUser.id) {
+          setStoredTelegramUserId(telegramUser.id)
+        }
+
         const displayName = response.user.first_name ?? response.user.firstName ?? response.user.username ?? 'User'
         showToast({ type: 'success', message: `Welcome, ${displayName}!` })
       } catch (error) {
@@ -86,9 +152,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const loginWithTelegramMiniApp = useCallback(
     async (initData: string) => {
       try {
+        const launchParams = retrieveLaunchParams()
+        const currentTelegramUserId = launchParams?.tgWebAppData?.user?.id
+
         const response = await MarketplaceService.loginWithTelegramMiniApp(initData)
         setToken(response.accessToken)
         setUser(response.user)
+
+        // Store Telegram user ID
+        if (currentTelegramUserId) {
+          setStoredTelegramUserId(currentTelegramUserId)
+        }
+
         const displayName = response.user.first_name ?? response.user.firstName ?? response.user.username ?? 'User'
         showToast({ type: 'success', message: `Welcome, ${displayName}!` })
       } catch (error) {
@@ -110,6 +185,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error('Logout failed:', error)
     } finally {
       clearToken()
+      clearStoredTelegramUserId()
       setUser(null)
     }
   }, [])

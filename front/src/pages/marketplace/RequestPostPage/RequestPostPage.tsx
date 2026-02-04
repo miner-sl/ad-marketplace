@@ -1,6 +1,7 @@
 import {useParams, useNavigate} from 'react-router-dom'
 import {useState} from 'react'
 import {
+  Block,
   BlockNew,
   PageLayout,
   Page,
@@ -9,6 +10,8 @@ import {
   TelegramMainButton,
   ChannelLink,
   useToast,
+  List,
+  ListItem,
 } from '@components'
 import {useChannelQuery, useCreateDealMutation} from '@store-new'
 import {useTelegramUser} from '@hooks'
@@ -87,64 +90,55 @@ export const RequestPostPage = () => {
     <Page back>
       <PageLayout>
         <TelegramBackButton/>
-        <BlockNew gap={16} className={styles.container}>
-          <BlockNew padding="0 16px">
-            <Text type="title" weight="bold">
-              Request Post
-            </Text>
-            <ChannelLink channel={channel} showLabel={false} />
-          </BlockNew>
+        <BlockNew padding="0 16px">
+          <Text type="title" weight="bold">
+            Request Post
+          </Text>
+          <ChannelLink channel={channel} showLabel={false} />
+        </BlockNew>
 
-          <BlockNew gap={12} padding="0 16px">
-            <BlockNew gap={4}>
-              <Text type="text" weight="medium">
-                Publish Date
-              </Text>
-              <input
-                type="datetime-local"
-                value={publishDate}
-                onChange={(e) => setPublishDate(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--color-border)',
-                  backgroundColor: 'var(--color-background-secondary)',
-                  color: 'var(--color-text-primary)',
-                  fontSize: '16px',
-                }}
-              />
-            </BlockNew>
-            <BlockNew gap={4}>
-              <BlockNew row gap={4} align="center">
-                <Text type="text" weight="medium">
-                  Message Text
-                </Text>
-                <Text type="caption" color="danger">
-                  *
-                </Text>
-              </BlockNew>
+        <Block margin="top" marginValue={24}>
+          <List>
+            <ListItem
+              text="Publish Date"
+              after={
+                <input
+                  type="datetime-local"
+                  value={publishDate}
+                  onChange={(e) => setPublishDate(e.target.value)}
+                  className={styles.dateInput}
+                />
+              }
+            />
+          </List>
+        </Block>
+
+        <Block margin="top" marginValue={24}>
+          <List>
+            <ListItem
+              text={
+                <Block row gap={4} align="center">
+                  <Text type="text">Message Text</Text>
+                  <Text type="caption" color="danger">
+                    *
+                  </Text>
+                </Block>
+              }
+            >
               <textarea
                 value={messageText}
                 onChange={(e) => setMessageText(e.target.value)}
                 placeholder="Enter your post message or brief..."
                 rows={8}
                 required
+                className={styles.textarea}
                 style={{
-                  width: '100%',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  border: messageText.trim() === '' ? '1px solid var(--color-danger)' : '1px solid var(--color-border)',
-                  backgroundColor: 'var(--color-background-secondary)',
-                  color: 'var(--color-text-primary)',
-                  fontSize: '16px',
-                  fontFamily: 'inherit',
-                  resize: 'vertical',
+                  borderColor: messageText.trim() === '' ? 'var(--color-danger)' : undefined,
                 }}
               />
-            </BlockNew>
-          </BlockNew>
-        </BlockNew>
+            </ListItem>
+          </List>
+        </Block>
       </PageLayout>
 
       <TelegramMainButton

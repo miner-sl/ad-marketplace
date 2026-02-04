@@ -13,7 +13,7 @@ import {
 import { useTelegramUser } from '@hooks';
 import { useRegisterUserMutation } from '@store-new';
 import { ROUTES_NAME } from '@routes';
-import { TANSTACK_KEYS } from '@utils';
+import { TANSTACK_KEYS, setStoredTelegramUserId } from '@utils';
 import type { UserRole } from '@types';
 
 import styles from './OnboardingPage.module.scss'
@@ -48,10 +48,16 @@ export const OnboardingPage = () => {
         roles: selectedRoles,
       })
 
-      if (!result.registered === true) {
+      if (result.registered !== true) {
         showToast({ message: 'Registration failed', type: 'error' });
         return;
       }
+      
+      // Store Telegram user ID after successful registration
+      if (telegramUser.id) {
+        setStoredTelegramUserId(telegramUser.id)
+      }
+      
       queryClient.setQueryData(TANSTACK_KEYS.USER_ME(telegramUser.id), result);
       navigate(ROUTES_NAME.MARKETPLACE_HOME, { replace: true });
     } catch (error) {

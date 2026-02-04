@@ -84,6 +84,14 @@ export class CampaignRepository {
     return result.rows[0] || null;
   }
 
+  static async findByAdvertiser(advertiserId: number): Promise<Campaign[]> {
+    const result = await db.query(
+      'SELECT * FROM campaigns WHERE advertiser_id = $1 ORDER BY created_at DESC',
+      [advertiserId]
+    );
+    return result.rows || [];
+  }
+
   /**
    * Create a new campaign
    */
@@ -116,7 +124,7 @@ export class CampaignRepository {
   /**
    * Update campaign
    */
-  static async update(campaignId: number, data: CampaignUpdateData): Promise<Campaign> {
+  static async update(id: number, data: CampaignUpdateData): Promise<Campaign> {
     const updates: string[] = [];
     const params: any[] = [];
     let paramCount = 1;
@@ -147,24 +155,23 @@ export class CampaignRepository {
     }
 
     if (updates.length === 0) {
-      // No updates provided, return existing campaign
-      const existing = await this.findById(campaignId);
+      const existing = await this.findById(id);
       if (!existing) {
-        throw new Error(`Campaign #${campaignId} not found`);
+        throw new Error(`Campaign #${id} not found`);
       }
       return existing;
     }
 
     updates.push(`updated_at = CURRENT_TIMESTAMP`);
-    params.push(campaignId);
+    params.push(id);
 
     const query = `UPDATE campaigns SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
     const result = await db.query(query, params);
-    
+
     if (!result?.rows || result.rows.length === 0) {
-      throw new Error(`Campaign #${campaignId} not found`);
+      throw new Error(`Campaign #${id} not found`);
     }
-    
+
     return result.rows[0];
   }
 }

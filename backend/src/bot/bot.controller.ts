@@ -4,7 +4,6 @@ import { DealFlowService } from '../services/deal-flow.service';
 import { DealModel } from '../repositories/deal-model.repository';
 import { ChannelModel } from '../repositories/channel-model.repository';
 import { ChannelService } from '../services/channel.service';
-import { CampaignModel } from '../repositories/campaign-model.repository';
 import { TelegramService } from '../services/telegram.service';
 import { CreativeService } from '../services/creative.service';
 import { TONService } from '../services/ton.service';
@@ -13,6 +12,7 @@ import { ChannelRepository } from '../repositories/channel.repository';
 import { DealRepository } from '../repositories/deal.repository';
 import { CreativeRepository } from '../repositories/creative.repository';
 import logger from '../utils/logger';
+import {CampaignRepository} from "../repositories/campaign.repository";
 
 export class BotController {
   /**
@@ -166,7 +166,7 @@ export class BotController {
       return ctx.reply('Please use /start first');
     }
 
-    const campaigns = await CampaignModel.findByAdvertiser(user.id);
+    const campaigns = await CampaignRepository.findByAdvertiser(user.id);
     if (campaigns.length === 0) {
       return ctx.reply('You have no campaigns yet.');
     }
@@ -1393,7 +1393,7 @@ export class BotController {
       return ctx.reply('Please use /start first');
     }
 
-    const campaign = await CampaignModel.findById(campaignId);
+    const campaign = await CampaignRepository.findById(campaignId);
     if (!campaign) {
       return ctx.reply('Campaign not found');
     }
@@ -1402,7 +1402,7 @@ export class BotController {
       return ctx.reply('You are not authorized to pause this campaign');
     }
 
-    await CampaignModel.update(campaignId, { status: 'closed' });
+    await CampaignRepository.update(campaignId, { status: 'closed' });
     await ctx.reply('⏸️ Campaign paused.');
   }
 
@@ -1415,7 +1415,7 @@ export class BotController {
       return ctx.reply('Please use /start first');
     }
 
-    const campaign = await CampaignModel.findById(campaignId);
+    const campaign = await CampaignRepository.findById(campaignId);
     if (!campaign) {
       return ctx.reply('Campaign not found');
     }
@@ -1424,7 +1424,7 @@ export class BotController {
       return ctx.reply('You are not authorized to close this campaign');
     }
 
-    await CampaignModel.update(campaignId, { status: 'closed' });
+    await CampaignRepository.update(campaignId, { status: 'closed' });
     await ctx.reply('🔒 Campaign closed.');
   }
 
@@ -1437,7 +1437,7 @@ export class BotController {
       return ctx.reply('Please use /start first');
     }
 
-    const campaign = await CampaignModel.findById(campaignId);
+    const campaign = await CampaignRepository.findById(campaignId);
     if (!campaign) {
       return ctx.reply('Campaign not found');
     }
@@ -1446,7 +1446,7 @@ export class BotController {
       return ctx.reply('You are not authorized to reactivate this campaign');
     }
 
-    await CampaignModel.update(campaignId, { status: 'active' });
+    await CampaignRepository.update(campaignId, { status: 'active' });
     await ctx.reply('▶️ Campaign reactivated.');
   }
 

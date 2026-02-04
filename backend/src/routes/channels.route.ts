@@ -23,11 +23,7 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
     preHandler: [authMiddleware, validateBody(updateChannelStatusSchema)],
   }, ChannelsController.updateChannelStatus);
 
-  fastify.post('/:id/refresh-stats', ChannelsController.refreshChannelStats);
-
   fastify.get('/topics', ChannelsController.getAllTopics);
-
-  fastify.get('/topics/:id', ChannelsController.getTopicById);
 };
 
 export default channelsRouter;

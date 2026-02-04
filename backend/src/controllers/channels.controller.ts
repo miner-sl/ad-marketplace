@@ -225,49 +225,12 @@ export class ChannelsController {
     }
   }
 
-  static async refreshChannelStats(request: FastifyRequest, reply: FastifyReply) {
-    try {
-      const { id } = request.params as { id: string };
-      const channel = await ChannelRepository.findById(parseInt(id));
-      if (!channel || !channel.telegram_channel_id) {
-        return reply.code(404).send({ error: 'Channel not found' });
-      }
-
-      const stats = await TelegramService.fetchChannelStats(channel.telegram_channel_id);
-      const savedStats = await ChannelModel.saveStats(parseInt(id), stats);
-      return savedStats;
-    } catch (error: any) {
-      logger.error('Channel stats refresh endpoint error', {
-        error: error.message,
-        stack: error.stack,
-        channelId: (request.params as { id: string }).id,
-      });
-      reply.code(500).send({ error: error.message });
-    }
-  }
-
   static async getAllTopics(request: FastifyRequest, reply: FastifyReply) {
     try {
       const topics = topicsService.getAllTopics();
       return topics;
     } catch (error: any) {
       logger.error('Failed to get topics', { error: error.message });
-      reply.code(500).send({ error: error.message });
-    }
-  }
-
-  static async getTopicById(request: FastifyRequest, reply: FastifyReply) {
-    try {
-      const { id } = request.params as { id: string };
-      const topic = topicsService.getTopicById(parseInt(id));
-
-      if (!topic) {
-        return reply.code(404).send({ error: 'Topic not found' });
-      }
-
-      return topic;
-    } catch (error: any) {
-      logger.error('Failed to get topic', { error: error.message, topicId: (request.params as { id: string }).id });
       reply.code(500).send({ error: error.message });
     }
   }

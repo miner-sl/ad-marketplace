@@ -76,18 +76,18 @@ export class DealModel {
       WHERE d.id = $1`,
       [id]
     );
-    
+
     if (!result.rows || result.rows.length === 0) {
       return null;
     }
-    
+
     const row = result.rows[0];
-    
+
     // Extract deal fields (all columns that don't start with 'c_' or 't_')
     const deal: any = {};
     const channel: any = {};
     const topic: any = {};
-    
+
     for (const key in row) {
       if (key.startsWith('c_')) {
         const channelKey = key.replace('c_', '');
@@ -99,7 +99,7 @@ export class DealModel {
         deal[key] = row[key];
       }
     }
-    
+
     // Only add channel if it has an id (meaning the join found a channel)
     if (channel.id) {
       // Add topic to channel if topic exists
@@ -108,7 +108,7 @@ export class DealModel {
       }
       deal.channel = channel;
     }
-    
+
     return deal;
   }
 
@@ -116,14 +116,14 @@ export class DealModel {
     let query = `SELECT * FROM deals 
        WHERE (channel_owner_id = $1 OR advertiser_id = $1)`;
     const params: any[] = [userId];
-    
+
     if (status) {
       query += ` AND status = $2`;
       params.push(status);
     }
-    
+
     query += ` ORDER BY created_at DESC`;
-    
+
     const result = await db.query(query, params);
     return result.rows;
   }
@@ -134,7 +134,7 @@ export class DealModel {
         `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
         [id]
       );
-  
+
       if (row.rows.length === 0) {
         throw new Error(`Deal #${id} not found`);
       }
@@ -144,11 +144,11 @@ export class DealModel {
          RETURNING *`,
         [status, id]
       );
-      
+
       if (result.rows.length === 0) {
         throw new Error(`Deal #${id} not found`);
       }
-      
+
       return result.rows[0];
     });
   }
@@ -166,7 +166,7 @@ export class DealModel {
       }
 
       const deal = dealCheck.rows[0];
-      
+
       // Idempotency check: if payment already confirmed, return existing deal
       if (deal.payment_tx_hash && deal.status !== 'payment_pending') {
         const logger = (await import('../utils/logger')).default;
@@ -177,7 +177,7 @@ export class DealModel {
         });
         return deal;
       }
-      
+
       // Check status atomically
       if (deal.status !== 'payment_pending') {
         throw new Error(`Cannot confirm payment in status: ${deal.status}`);
@@ -191,7 +191,7 @@ export class DealModel {
          RETURNING *`,
         [txHash, id]
       );
-      
+
       if (result.rows.length === 0) {
         // Payment was confirmed by another process - re-query to get current state
         const recheck = await client.query(
@@ -208,7 +208,7 @@ export class DealModel {
         }
         throw new Error(`Deal #${id} status changed during payment confirmation`);
       }
-      
+
       return result.rows[0];
     });
   }
@@ -226,7 +226,7 @@ export class DealModel {
       }
 
       const deal = dealCheck.rows[0];
-      
+
       // Check status atomically
       if (deal.status !== 'paid' && deal.status !== 'scheduled') {
         throw new Error(`Cannot schedule post in status: ${deal.status}`);
@@ -234,7 +234,7 @@ export class DealModel {
 
       // Ensure date is in UTC (convert to ISO string and back to ensure UTC)
       const utcDate = new Date(postTime.toISOString());
-      
+
       // Atomic update with status check
       const result = await client.query(
         `UPDATE deals 
@@ -266,7 +266,7 @@ export class DealModel {
 
       // Ensure date is in UTC (convert to ISO string and back to ensure UTC)
       const utcDate = new Date(verificationUntil.toISOString());
-      
+
       const result = await client.query(
         `UPDATE deals 
          SET status = 'posted', actual_post_time = CURRENT_TIMESTAMP, 
@@ -275,11 +275,11 @@ export class DealModel {
          RETURNING *`,
         [messageId, utcDate, id]
       );
-      
+
       if (result.rows.length === 0) {
         throw new Error(`Failed to record post for Deal #${id}`);
       }
-      
+
       return result.rows[0];
     });
   }
@@ -293,11 +293,11 @@ export class DealModel {
          RETURNING *`,
         [id]
       );
-      
+
       if (result.rows.length === 0) {
         throw new Error(`Deal #${id} not found or not in 'posted' status`);
       }
-      
+
       return result.rows[0];
     });
   }
@@ -311,18 +311,17 @@ export class DealModel {
          RETURNING *`,
         [id]
       );
-      
+
       if (result.rows.length === 0) {
         throw new Error(`Deal #${id} not found or not in valid status for completion`);
       }
-      
+
       return result.rows[0];
     });
   }
 
   static async cancel(id: number, reason?: string): Promise<Deal> {
     return await withTx(async (client) => {
-      // Lock deal row
       const dealCheck = await client.query(
         `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
         [id]
@@ -333,7 +332,7 @@ export class DealModel {
       }
 
       const deal = dealCheck.rows[0];
-      
+
       // Only allow cancellation in certain statuses
       const cancellableStatuses = ['pending', 'negotiating', 'payment_pending'];
       if (!cancellableStatuses.includes(deal.status)) {
@@ -347,11 +346,11 @@ export class DealModel {
          RETURNING *`,
         [id]
       );
-      
+
       if (result.rows.length === 0) {
         throw new Error(`Deal #${id} status changed during cancellation`);
       }
-      
+
       return result.rows[0];
     });
   }

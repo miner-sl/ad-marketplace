@@ -123,7 +123,6 @@ export class DealsController {
         return reply.code(400).send({ error: 'pricing_id is required' });
       }
 
-      // Fetch pricing details and derive other fields
       const pricing = await ChannelModel.getPricingById(pricing_id);
       if (!pricing) {
         return reply.code(404).send({ error: 'Pricing not found' });

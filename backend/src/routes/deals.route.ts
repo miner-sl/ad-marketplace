@@ -1,5 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { validateBody, validateQuery } from '../middleware/validation';
+import { authMiddleware } from '../middleware/auth';
 import { createDealSchema, confirmPaymentSchema, submitCreativeSchema, listDealsQuerySchema, dealRequestsQuerySchema } from '../utils/validation';
 import { DealsController } from '../controllers/deals.controller';
 
@@ -9,32 +10,40 @@ const dealsRouter: FastifyPluginAsync = async (fastify) => {
   }, DealsController.listDeals);
 
   fastify.get('/requests', {
-    preHandler: [validateQuery(dealRequestsQuerySchema)],
+    preHandler: [authMiddleware, validateQuery(dealRequestsQuerySchema)],
   }, DealsController.getDealRequests);
 
-  fastify.get('/:id', DealsController.getDealById);
+  fastify.get('/:id', {
+    preHandler: [authMiddleware],
+  }, DealsController.getDealById);
 
   fastify.post('/', {
-    preHandler: [validateBody(createDealSchema)],
+    preHandler: [authMiddleware, validateBody(createDealSchema)],
   }, DealsController.createDeal);
 
-  fastify.post('/:id/accept', DealsController.acceptDeal);
+  fastify.post('/:id/accept', {
+    preHandler: [authMiddleware],
+  }, DealsController.acceptDeal);
 
   fastify.post('/:id/payment', {
-    preHandler: [validateBody(confirmPaymentSchema)],
+    preHandler: [authMiddleware, validateBody(confirmPaymentSchema)],
   }, DealsController.confirmPayment);
 
   fastify.post('/:id/creative', {
-    preHandler: [validateBody(submitCreativeSchema)],
+    preHandler: [authMiddleware, validateBody(submitCreativeSchema)],
   }, DealsController.submitCreative);
 
-  fastify.post('/:id/creative/approve', DealsController.approveCreative);
+  fastify.post('/:id/creative/approve', {
+    preHandler: [authMiddleware],
+  }, DealsController.approveCreative);
 
-  fastify.post('/:id/creative/revision', DealsController.requestRevision);
+  fastify.post('/:id/creative/revision', {
+    preHandler: [authMiddleware],
+  }, DealsController.requestRevision);
 
-  fastify.post('/:id/schedule', DealsController.schedulePost);
-
-  fastify.post('/:id/cancel', DealsController.cancelDeal);
+  fastify.post('/:id/cancel', {
+    preHandler: [authMiddleware],
+  }, DealsController.cancelDeal);
 };
 
 export default dealsRouter;

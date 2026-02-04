@@ -102,7 +102,7 @@ export function LoginPage() {
     return (
       <Page guard={false}>
         <PageLayout center>
-          <BlockNew gap={24} className={styles.container}>
+          <BlockNew gap={24} className={styles.container} justify='center'>
             <BlockNew gap={8}>
               <Text type="hero" weight="bold" align="center">
                 Ad Marketplace

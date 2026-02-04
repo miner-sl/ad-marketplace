@@ -308,6 +308,7 @@ export const ChannelDetailsPage = () => {
         <TelegramBackButton/>
 
         <ChannelHeader channel={channel} stats={displayStats} />
+
         <Block
           margin="top"
           marginValue={24}
@@ -331,6 +332,7 @@ export const ChannelDetailsPage = () => {
             </Button>
           </div>
         </Block>
+
         {displayStats && (
           <Block margin="bottom" marginValue={24}>
             <Block paddingValue={16}>
@@ -389,7 +391,6 @@ export const ChannelDetailsPage = () => {
                   ? priceEnabled[format.value]
                   : pricing?.is_active ?? false
 
-                // For non-owners, only show if active
                 if (!isChannelOwner && !isEnabled) {
                   return null
                 }
@@ -508,7 +509,6 @@ export const ChannelDetailsPage = () => {
             </Group>
           </Block>
         </Block>
-
 
 
         <Block margin="top" marginValue="auto">

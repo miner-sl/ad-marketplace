@@ -73,7 +73,7 @@ export const MarketplaceHomePage = () => {
             const channelName = channel.title || `@${channel.username || 'channel'}`
             const subscribersCount = channel.stats?.subscribers_count || 0
             const postPricing = channel.pricing?.find((p) => p.ad_format === 'post' && p.is_active)
-            
+
             return (
               <GroupItem
                 key={channel.id}
@@ -214,8 +214,8 @@ export const MarketplaceHomePage = () => {
             <div
                 className={styles.contentSlider}
                 style={{
-                  transform: `translateX(-${activeTabIndex * 50}%)`,
-                  width: `${contentSlides.length * 100}%`,
+                  // transform: `translateX(-${activeTabIndex * 50}%)`,
+                  // width: `${contentSlides.length * 100}%`,
                 }}
             >
               {contentSlides.map((slide, index) => (

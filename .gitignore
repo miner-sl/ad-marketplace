@@ -1,5 +1,7 @@
 node_modules/
 dist/
+frontend/
+frontend.zip
 backend/.env
 *.log
 .DS_Store

@@ -18,7 +18,7 @@ import { withTx } from '../utils/transaction';
 import { distributedLock } from '../utils/lock';
 import { isPrimaryWorker } from '../utils/cluster.util';
 
-export class CronJobs {
+export class CronJobsSchedulerService {
   private static jobs: cron.ScheduledTask[] = [];
 
   /**

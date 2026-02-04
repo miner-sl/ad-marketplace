@@ -2,7 +2,7 @@ import cluster from 'cluster';
 import os from 'os';
 
 import bot from './bot';
-import { CronJobs } from './cron/jobs';
+import { CronJobsSchedulerService } from './cron/jobs-scheduler.service';
 import logger from './utils/logger';
 import env from './utils/env';
 import db from './db/connection';
@@ -24,7 +24,7 @@ function runTgBot() {
   }
 
   const workerId = cluster.worker?.id || 0;
-  
+
   if (isProd && env.TELEGRAM_WEBHOOK_URL) {
     // In production with webhooks, only worker 0 sets the webhook URL
     // All workers can handle webhook requests
@@ -81,7 +81,7 @@ async function bootstrap(): Promise<void> {
 
     if (!isProd) {
       try {
-        CronJobs.startAll();
+        CronJobsSchedulerService.startAll();
         logger.info('Cron jobs started');
       } catch (error: any) {
         logger.error('Failed to start cron jobs', { error: error.message });

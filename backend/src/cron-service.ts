@@ -3,7 +3,7 @@
  * This service runs independently from the main API server
  */
 import * as dotenv from 'dotenv';
-import { CronJobs } from './cron/jobs';
+import { CronJobsSchedulerService } from './cron/jobs-scheduler.service';
 import logger from './utils/logger';
 import env from './utils/env';
 import db from './db/connection';
@@ -24,7 +24,7 @@ async function startCronService() {
 
     logger.info('Telegram bot initialized for notifications');
 
-    CronJobs.startAll();
+    CronJobsSchedulerService.startAll();
     logger.info('Cron service started successfully');
 
     logger.info('Cron service is running. Press Ctrl+C to stop.');

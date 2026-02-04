@@ -65,27 +65,6 @@ class TopicsService {
     }
     return this.topicsMap.get(id) || null;
   }
-
-  /**
-   * Get topic by name (case-insensitive)
-   */
-  getTopicByName(name: string): Topic | null {
-    if (!this.initialized) {
-      logger.warn('TopicsService not initialized');
-      return null;
-    }
-    return this.topicsByNameMap.get(name.toLowerCase()) || null;
-  }
-
-  /**
-   * Check if topic exists by ID
-   */
-  topicExists(id: number): boolean {
-    if (!this.initialized) {
-      return false;
-    }
-    return this.topicsMap.has(id);
-  }
 }
 
 export const topicsService = new TopicsService();

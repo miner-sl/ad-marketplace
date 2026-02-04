@@ -12,7 +12,6 @@ declare module 'fastify' {
  */
 export async function requestIdPlugin(
   fastify: any,
-  options: any
 ) {
   fastify.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
     const requestId = randomBytes(16).toString('hex');

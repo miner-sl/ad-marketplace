@@ -31,7 +31,8 @@
       "@assets": ["./src/assets"],
       "@hooks": ["./src/common/hooks"],
       "@config": ["./src/config"],
-      "@context": ["./src/context"]
+      "@context": ["./src/context"],
+      "@styles": ["./src/common/styles"]
     },
 
     /* Linting */

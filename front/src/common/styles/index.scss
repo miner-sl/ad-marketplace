@@ -1,26 +1,19 @@
-@use 'variables' as *;
-@use 'themes' as *;
+@use './variables.scss' as *;
+@use './themes.scss' as *;
 
 * {
-  margin: 0 !important;
-  padding: 0 !important;
+  margin: 0;
+  padding: 0;
   box-sizing: border-box;
 
   font-family:
     -apple-system, 'SF Pro Text', 'SF UI Text', system-ui, 'Helvetica Neue',
-    Helvetica, A rial, sans-serif;
+    Helvetica, Arial, sans-serif;
 
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
-}
-
-p {
-  margin-block-start: 0 !important;
-  margin-block-end: 0 !important;
-  margin-inline-start: 0 !important;
-  margin-inline-end: 0 !important;
 }
 
 html,

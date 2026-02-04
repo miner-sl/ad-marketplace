@@ -1,5 +1,6 @@
 import {useParams, useNavigate} from 'react-router-dom'
 import {useState, useEffect} from 'react'
+import {openTelegramLink} from '@tma.js/sdk-react'
 import {
   Block,
   BlockNew,
@@ -15,6 +16,7 @@ import {
   Icon,
   Spinner,
   useToast,
+  Button,
 } from '@components'
 import {useChannelQuery, useChannelStatsQuery, useSetChannelPricingMutation} from '@store-new'
 import {useTelegramUser} from '@hooks'
@@ -22,7 +24,8 @@ import {useAuth} from '@context'
 import {ROUTES_NAME} from '@routes'
 import type {AdFormat, Channel, ChannelStats} from '@types'
 import styles from './ChannelDetailsPage.module.scss'
-import {separateNumber, createMembersCount} from '@utils'
+import {separateNumber, createMembersCount, getChannelLink, checkIsMobile, hapticFeedback} from '@utils'
+import {useClipboard} from '@hooks'
 
 interface ChannelHeaderProps {
   channel: Channel
@@ -87,6 +90,7 @@ export const ChannelDetailsPage = () => {
   const userId = telegramUser?.id
   const {user} = useAuth()
   const setPricingMutation = useSetChannelPricingMutation()
+  const {copy} = useClipboard()
 
   // Check if current user is the channel owner
   const isChannelOwner = user && channel && user.id === channel.owner_id
@@ -165,6 +169,40 @@ export const ChannelDetailsPage = () => {
 
   const handleRequestPostClick = () => {
     navigate(ROUTES_NAME.MARKETPLACE_REQUEST_POST.replace(':id', id || ''))
+  }
+
+  const handleShareLink = () => {
+    hapticFeedback('soft')
+
+    const channelLink = getChannelLink(channel)
+    if (!channelLink) {
+      showToast({
+        type: 'error',
+        message: 'Channel link not available',
+      })
+      return
+    }
+
+    const {isMobile} = checkIsMobile()
+    if (isMobile) {
+      openTelegramLink(
+        `https://t.me/share/url?url=${encodeURI(channelLink)}&text=${channel.title || 'Check out this channel'}`
+      )
+    } else {
+      copy(channelLink, 'Link copied!')
+    }
+  }
+
+  const handleCopyLink = () => {
+    const channelLink = getChannelLink(channel)
+    if (!channelLink) {
+      showToast({
+        type: 'error',
+        message: 'Channel link not available',
+      })
+      return
+    }
+    copy(channelLink, 'Link copied')
   }
 
 
@@ -269,10 +307,30 @@ export const ChannelDetailsPage = () => {
       <PageLayout>
         <TelegramBackButton/>
 
-        {/* Channel Header */}
         <ChannelHeader channel={channel} stats={displayStats} />
-
-        {/* Statistics Section */}
+        <Block
+          margin="top"
+          marginValue={24}
+          row
+          justify="between"
+          align="center"
+          gap={10}
+        >
+          <div style={{ flex: 1 }}>
+            <Button
+              type="primary"
+              prefix={<Icon name="share" color="primary" size={24} />}
+              onClick={handleShareLink}
+            >
+              Share
+            </Button>
+          </div>
+          <div style={{ flex: 1 }}>
+            <Button type="accent" onClick={handleCopyLink}>
+              Copy Link
+            </Button>
+          </div>
+        </Block>
         {displayStats && (
           <Block margin="bottom" marginValue={24}>
             <Block paddingValue={16}>
@@ -322,7 +380,6 @@ export const ChannelDetailsPage = () => {
           </Block>
         )}
 
-        {/* Configuration Section */}
         <Block margin="top" marginValue={24}>
           <Block margin="bottom" marginValue={44}>
             <Group header="CONFIGURATION">
@@ -452,7 +509,8 @@ export const ChannelDetailsPage = () => {
           </Block>
         </Block>
 
-        {/* Footer */}
+
+
         <Block margin="top" marginValue="auto">
           <Text type="caption" align="center" color="tertiary">
             To request a post from {channel.title || 'this channel'},
@@ -461,7 +519,6 @@ export const ChannelDetailsPage = () => {
           </Text>
         </Block>
 
-        {/* Request Post Button */}
         {postPricing && userId && (
           <TelegramMainButton
             text="Request Post"

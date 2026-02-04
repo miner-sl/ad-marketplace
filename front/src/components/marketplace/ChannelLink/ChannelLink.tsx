@@ -1,6 +1,7 @@
 import { openTelegramLink } from '@tma.js/sdk-react'
 import { BlockNew, Text } from '@components'
 import type { Channel } from '@types'
+import { getChannelLink } from '@utils'
 
 interface ChannelLinkProps {
   channel?: Channel | null
@@ -19,19 +20,7 @@ export const ChannelLink = ({
     return null
   }
 
-  const getChannelLink = (): string | null => {
-    if (channel.username) {
-      return `https://t.me/${channel.username.replace('@', '')}`
-    }
-    if (channel.telegram_channel_id) {
-      // For private channels, use the channel ID format
-      const channelId = channel.telegram_channel_id.toString().replace('-100', '')
-      return `https://t.me/c/${channelId}`
-    }
-    return null
-  }
-
-  const channelLink = getChannelLink()
+  const channelLink = getChannelLink(channel)
   const channelName = channel.title || `@${channel.username || 'channel'}`
 
   const handleChannelClick = () => {

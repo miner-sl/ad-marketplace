@@ -25,10 +25,12 @@
   },
   "devDependencies": {
     "vite-plugin-mkcert": "^1.17.8",
+    "postcss": "^8.5.3",
     "postcss-preset-env": "^10.1.5",
     "@eslint/js": "^9.39.1",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
+    "cssnano": "^7.0.6",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
     "babel-plugin-react-compiler": "^1.0.0",

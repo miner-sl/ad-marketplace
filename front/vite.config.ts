@@ -34,6 +34,7 @@ export default defineConfig({
       '@hooks': path.resolve(__dirname, './src/common/hooks'),
       '@config': path.resolve(__dirname, './src/config'),
       '@context': path.resolve(__dirname, './src/context'),
+      '@styles': path.resolve(__dirname, './src/common/styles'),
     },
   },
   css: {

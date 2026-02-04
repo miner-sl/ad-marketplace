@@ -139,20 +139,6 @@ export class ChannelService {
   }
 
   /**
-   * Check if bot is admin of a channel
-   */
-  static async verifyBotAdminStatus(telegramChannelId: number): Promise<boolean> {
-    return await TelegramService.isBotAdmin(telegramChannelId);
-  }
-
-  /**
-   * Get channel info from Telegram
-   */
-  static async getChannelInfo(telegramChannelId: number) {
-    return await TelegramService.getChannelInfo(telegramChannelId);
-  }
-
-  /**
    * Update channel active status (activate/deactivate)
    * Validates ownership, verification status, and admin permissions
    */

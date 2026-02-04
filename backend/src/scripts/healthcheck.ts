@@ -14,4 +14,4 @@ async function healthCheck() {
   }
 }
 
-healthCheck();
+void healthCheck();

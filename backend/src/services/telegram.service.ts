@@ -180,8 +180,7 @@ export class TelegramService {
     try {
       // Try to get the message by attempting to forward it to ourselves
       // This is a workaround since Bot API doesn't have direct getMessage
-      const testChatId = channelId; // Would use a test chat in production
-      await bot.forwardMessage(testChatId, channelId, messageId);
+      await bot.forwardMessage(channelId, channelId, messageId);
 
       // If forward succeeds, message exists
       // For MVP, we assume unchanged if it exists

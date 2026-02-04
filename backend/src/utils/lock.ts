@@ -2,7 +2,7 @@ import Redlock from 'redlock';
 import getRedisClient from './redis';
 import logger from './logger';
 
-export type LockOperation = 
+export type LockOperation =
   | 'confirm_payment'
   | 'release_funds'
   | 'publish_post'
@@ -24,11 +24,11 @@ export interface LockResult {
 /**
  * Distributed lock service using Redlock algorithm
  * Redlock provides distributed locking across multiple Redis instances
- * 
+ *
  * Lock key format: deal:{dealId}:operation:{operationType}
  * Lock value: Unique lock ID (for safe release)
  * TTL: Auto-release after expiration (prevents deadlocks)
- * 
+ *
  * Features:
  * - Works with single or multiple Redis instances
  * - Automatic retry with exponential backoff
@@ -36,14 +36,14 @@ export interface LockResult {
  * - Deadlock prevention via TTL
  */
 export class DistributedLock {
-  private redlock: Redlock;
+  private readonly redlock: Redlock;
   private readonly defaultTTL = 30000;
   private readonly defaultRetryDelay = 100;
   private readonly defaultMaxRetries = 0
 
   constructor() {
     const redis = getRedisClient();
-    
+
     this.redlock = new Redlock(
       [redis],
       {
@@ -93,7 +93,7 @@ export class DistributedLock {
     // Create temporary Redlock instance with custom retry settings if needed
     // Redlock v5 acquire() doesn't take retry options, so we create a new instance
     let redlockInstance = this.redlock;
-    
+
     if (maxRetries > 0) {
       const redis = getRedisClient();
       redlockInstance = new Redlock(
@@ -121,13 +121,13 @@ export class DistributedLock {
         ttl,
       });
 
-      return { 
-        acquired: true, 
+      return {
+        acquired: true,
         lockId: lock.value // Redlock provides unique lock value
       };
     } catch (error: any) {
       // Redlock throws error if lock cannot be acquired
-      if (error.name === 'LockError' || 
+      if (error.name === 'LockError' ||
           error.message?.includes('unable to acquire') ||
           error.message?.includes('already locked')) {
         logger.debug(`Failed to acquire lock`, {
@@ -149,7 +149,7 @@ export class DistributedLock {
 
       // If Redis is unavailable, fail open (allow operation to proceed)
       // Database-level locks will still provide protection
-      if (error.message?.includes('ECONNREFUSED') || 
+      if (error.message?.includes('ECONNREFUSED') ||
           error.message?.includes('Connection is closed') ||
           error.message?.includes('Connection lost')) {
         logger.warn(`Redis unavailable, proceeding without distributed lock`, {
@@ -169,7 +169,7 @@ export class DistributedLock {
    * Note: For manual lock management, you need to store the Lock instance from acquire()
    * and call lock.release() on it. This method is kept for API compatibility but
    * withLock() is the recommended approach as it handles release automatically.
-   * 
+   *
    * @param dealId Deal ID
    * @param operation Operation type
    * @param lockId Lock ID returned from acquire() (not used, kept for API compatibility)
@@ -196,7 +196,7 @@ export class DistributedLock {
         dealId,
         operation,
       });
-      
+
       // Lock will expire automatically via TTL
     } catch (error: any) {
       logger.error(`Error releasing lock`, {
@@ -234,7 +234,7 @@ export class DistributedLock {
     // Create a temporary Redlock instance with custom retry settings if needed
     // For retry support, we'll need to create a new Redlock instance with custom settings
     let redlockInstance = this.redlock;
-    
+
     if (maxRetries > 0) {
       const redis = getRedisClient();
       redlockInstance = new Redlock(
@@ -279,7 +279,7 @@ export class DistributedLock {
       );
     } catch (error: any) {
       // Redlock throws LockError if lock cannot be acquired
-      if (error.name === 'LockError' || 
+      if (error.name === 'LockError' ||
           error.message?.includes('unable to acquire') ||
           error.message?.includes('already locked')) {
         throw new Error(
@@ -289,7 +289,7 @@ export class DistributedLock {
       }
 
       // For Redis connection errors, fail open
-      if (error.message?.includes('ECONNREFUSED') || 
+      if (error.message?.includes('ECONNREFUSED') ||
           error.message?.includes('Connection is closed') ||
           error.message?.includes('Connection lost')) {
         logger.warn(`Redis unavailable, proceeding without distributed lock`, {
@@ -326,13 +326,6 @@ export class DistributedLock {
       });
       return false;
     }
-  }
-
-  /**
-   * Get Redlock instance (for advanced usage)
-   */
-  getRedlock(): Redlock {
-    return this.redlock;
   }
 }
 

@@ -10,7 +10,18 @@ const botToken = process.env.TELEGRAM_BOT_TOKEN!;
 export const bot = new Telegraf(botToken);
 
 console.log(botToken)
-// Register handlers
+
+const formatDealsList = (deals: any[], header: string): string => {
+  return deals.reduce((message, d: any, index: number) => (
+    `${message}\n---\n` +
+      `${index + 1}. Deal #${d.id}\n` +
+      `   Status: ${d.status}\n` +
+      `   Price: ${d.price_ton} TON\n` +
+      `   Format: ${d.ad_format}\n` +
+      `   Use /deal ${d.id} for details\n\n`
+  ), `${header}\n\n`);
+};
+
 bot.start((ctx) => BotController.handleStart(ctx));
 bot.help((ctx) => BotController.handleHelp(ctx));
 
@@ -109,7 +120,7 @@ bot.on('callback_query', async (ctx) => {
 
   // Handle pricing done
   if (data.startsWith('pricing_done_')) {
-    const channelId = parseInt(data.split('_')[2]);
+    // const channelId = parseInt(data.split('_')[2]);
     await ctx.reply(
       `✅ Pricing setup complete!\n\n` +
       `Your channel is ready to receive deals.\n\n` +
@@ -340,14 +351,7 @@ bot.on('callback_query', async (ctx) => {
     if (deals.rows.length === 0) {
       await ctx.reply(`No deals found for channel ${channelId}`);
     } else {
-      let message = `🤝 Deals for Channel #${channelId}:\n\n`;
-      deals.rows.forEach((d: any, index: number) => {
-        message += `${index + 1}. Deal #${d.id}\n`;
-        message += `   Status: ${d.status}\n`;
-        message += `   Price: ${d.price_ton} TON\n`;
-        message += `   Format: ${d.ad_format}\n`;
-        message += `   Use /deal ${d.id} for details\n\n`;
-      });
+      const message = formatDealsList(deals.rows, `🤝 Deals for Channel #${channelId}:`);
       await ctx.reply(message);
     }
     try {
@@ -367,14 +371,7 @@ bot.on('callback_query', async (ctx) => {
     if (deals.rows.length === 0) {
       await ctx.reply(`No deals found for campaign ${campaignId}`);
     } else {
-      let message = `🤝 Deals for Campaign #${campaignId}:\n\n`;
-      deals.rows.forEach((d: any, index: number) => {
-        message += `${index + 1}. Deal #${d.id}\n`;
-        message += `   Status: ${d.status}\n`;
-        message += `   Price: ${d.price_ton} TON\n`;
-        message += `   Format: ${d.ad_format}\n`;
-        message += `   Use /deal ${d.id} for details\n\n`;
-      });
+      const message = formatDealsList(deals.rows, `🤝 Deals for Campaign #${campaignId}:`);
       await ctx.reply(message);
     }
     try {

@@ -9,7 +9,7 @@ import { isPrimaryWorker } from '../utils/cluster.util';
  * Service responsible for scheduling and processing scheduled posts
  * Runs on a cron schedule to batch process deals ready for publishing
  */
-export class PostSchedulerService {
+export class AutoPostSchedulerService {
   private readonly logger = logger;
   private isProcessing = false;
   private readonly batchSize = 100;
@@ -23,7 +23,7 @@ export class PostSchedulerService {
   }
 
   /**
-   * Start the scheduled post processing job
+   * Start the scheduled post-processing job
    * Runs every minute to check for deals ready to be published
    */
   start(): void {

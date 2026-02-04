@@ -50,30 +50,3 @@ export async function authMiddleware(
     });
   }
 }
-
-/**
- * Optional auth middleware - doesn't fail if token is missing
- * Useful for endpoints that work with or without auth
- */
-export async function optionalAuthMiddleware(
-  request: FastifyRequest,
-  reply: FastifyReply
-) {
-  try {
-    const authHeader = request.headers.authorization;
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7);
-      const payload = await authService.validateToken(token);
-
-      request.user = {
-        id: parseInt(payload.sub),
-        username: payload.username,
-        telegramId: payload.telegramId,
-      };
-    }
-  } catch (error: any) {
-    // Silently fail for optional auth
-    logger.debug('Optional auth failed', { error: error.message });
-  }
-}

@@ -1,6 +1,5 @@
 import { validateWebAppData, checkSignature } from '@grammyjs/validator';
 import env from '../utils/env';
-import logger from '../utils/logger';
 
 export interface TelegramUser {
   id: number;

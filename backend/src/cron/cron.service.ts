@@ -64,12 +64,12 @@ async function gracefulShutdown(signal: string) {
   process.exit(0);
 }
 
-process.once('SIGINT', () => gracefulShutdown('SIGINT'));
-process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.once('SIGINT', () => void gracefulShutdown('SIGINT'));
+process.once('SIGTERM', () => void gracefulShutdown('SIGTERM'));
 
 process.on('uncaughtException', (error: Error) => {
   logger.error('Uncaught exception', { error: error.message, stack: error.stack });
-  gracefulShutdown('uncaughtException');
+  void gracefulShutdown('uncaughtException');
 });
 
 process.on('unhandledRejection', (reason: any) => {
@@ -77,7 +77,7 @@ process.on('unhandledRejection', (reason: any) => {
     reason: reason?.message || reason,
     stack: reason?.stack,
   });
-  gracefulShutdown('unhandledRejection');
+  void gracefulShutdown('unhandledRejection');
 });
 
-startCronService();
+void startCronService();

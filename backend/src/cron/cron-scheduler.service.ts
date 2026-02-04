@@ -1,7 +1,7 @@
 import * as cron from 'node-cron';
 
 import {TelegramService} from '../services/telegram.service';
-import {PostSchedulerService} from '../services/post-scheduler.service';
+import {AutoPostSchedulerService} from '../services/auto-post-scheduler.service';
 import {AutoReleaseSchedulerService} from '../services/auto-release-scheduler.service';
 import {VerificationSchedulerService} from '../services/verification-scheduler.service';
 import {TonEscrowPaymentPollingService} from '../services/ton-escrow-payment-polling.service';
@@ -16,7 +16,7 @@ import {isPrimaryWorker} from '../utils/cluster.util';
 
 export class CronJobsSchedulerService {
   private static jobs: cron.ScheduledTask[] = [];
-  private static postSchedulerService: PostSchedulerService | null = null;
+  private static postSchedulerService: AutoPostSchedulerService | null = null;
   private static autoReleaseSchedulerService: AutoReleaseSchedulerService | null = null;
   private static verificationSchedulerService: VerificationSchedulerService | null = null;
   private static tonEscrowPaymentPollingService: TonEscrowPaymentPollingService | null = null;
@@ -32,7 +32,7 @@ export class CronJobsSchedulerService {
     logger.info('Starting cron jobs...');
 
     // Auto-release funds for verified deals (buyer didn't confirm)
-    this.postSchedulerService = new PostSchedulerService();
+    this.postSchedulerService = new AutoPostSchedulerService();
     this.postSchedulerService.onModuleInit();
     this.postSchedulerService.start();
 

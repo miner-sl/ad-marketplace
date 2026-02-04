@@ -6,7 +6,7 @@ async function runMigrations() {
   try {
     // Try source directory first (for tsx), then dist directory (for compiled)
     let migrationsDir = path.join(__dirname, 'migrations');
-    
+
     // If running from dist, try to find source migrations
     if (!fs.existsSync(migrationsDir) && __dirname.includes('dist')) {
       const sourceDir = path.join(__dirname, '../../src/db/migrations');
@@ -14,7 +14,7 @@ async function runMigrations() {
         migrationsDir = sourceDir;
       }
     }
-    
+
     if (!fs.existsSync(migrationsDir)) {
       console.log(`No migrations directory found. Checked: ${migrationsDir}`);
       return;
@@ -84,7 +84,7 @@ async function runMigrations() {
 }
 
 if (require.main === module) {
-  runMigrations();
+  void runMigrations();
 }
 
 export { runMigrations };

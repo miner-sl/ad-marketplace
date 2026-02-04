@@ -714,39 +714,39 @@ export class DealFlowService {
       };
     });
   }
-
-  /**
-   * Verify post and release funds
-   */
-  static async verifyAndRelease(dealId: number): Promise<any> {
-    const deal = await DealModel.findById(dealId);
-    if (!deal) {
-      throw new Error('Deal not found');
-    }
-
-    if (!deal.escrow_address || !deal.channel_owner_wallet_address) {
-      throw new Error('Escrow or recipient address not set');
-    }
-
-    // TODO Verify post exists (simplified for MVP)
-    const verified = true; // Would check actual post in production
-
-    if (verified) {
-      // Release funds to channel owner
-      await TONService.releaseFunds(
-        dealId,
-        deal.channel_owner_wallet_address!,
-        deal.price_ton.toString(),
-        `Payment for Deal #${dealId}`
-      );
-
-      await DealModel.updateStatus(dealId, 'completed');
-    } else {
-      // Refund to advertiser
-      // Would need advertiser address in production
-      await DealModel.updateStatus(dealId, 'refunded');
-    }
-
-    return await DealModel.findById(dealId);
-  }
+  //
+  // /**
+  //  * Verify post and release funds
+  //  */
+  // static async verifyAndRelease(dealId: number): Promise<any> {
+  //   const deal = await DealModel.findById(dealId);
+  //   if (!deal) {
+  //     throw new Error('Deal not found');
+  //   }
+  //
+  //   if (!deal.escrow_address || !deal.channel_owner_wallet_address) {
+  //     throw new Error('Escrow or recipient address not set');
+  //   }
+  //
+  //   // TODO Verify post exists (simplified for MVP)
+  //   const verified = true; // Would check actual post in production
+  //
+  //   if (verified) {
+  //     // Release funds to channel owner
+  //     await TONService.releaseFunds(
+  //       dealId,
+  //       deal.channel_owner_wallet_address!,
+  //       deal.price_ton.toString(),
+  //       `Payment for Deal #${dealId}`
+  //     );
+  //
+  //     await DealModel.updateStatus(dealId, 'completed');
+  //   } else {
+  //     // Refund to advertiser
+  //     // Would need advertiser address in production
+  //     await DealModel.updateStatus(dealId, 'refunded');
+  //   }
+  //
+  //   return await DealModel.findById(dealId);
+  // }
 }

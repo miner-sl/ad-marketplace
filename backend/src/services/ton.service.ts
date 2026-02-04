@@ -1,8 +1,8 @@
-import { Address, fromNano, toNano, internal, beginCell, Cell } from '@ton/core';
-import { mnemonicToWalletKey, mnemonicNew } from '@ton/crypto';
-import { WalletContractV4, TonClient, internal as tonInternal, SendMode } from '@ton/ton';
+import {Address, beginCell, fromNano, internal, toNano} from '@ton/core';
+import {mnemonicNew, mnemonicToWalletKey} from '@ton/crypto';
+import {TonClient, WalletContractV4} from '@ton/ton';
 import * as dotenv from 'dotenv';
-import { mockTx } from "./mock-tx.service";
+import {mockTx} from "./mock-tx.service";
 import logger from '../utils/logger';
 import db from '../db/connection';
 import crypto from 'crypto';
@@ -818,7 +818,7 @@ export class TONService {
 
         if (dealCheck.rows.length > 0) {
           const deal = dealCheck.rows[0];
-          
+
           // If deal is completed and has payment_tx_hash, funds were already released
           if (deal.status === 'completed' && deal.payment_tx_hash) {
             logger.warn(`Funds already released for Deal #${dealId}`, {

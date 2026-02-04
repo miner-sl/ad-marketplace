@@ -6,7 +6,7 @@ import { UserModel } from '../repositories/user.repository';
 import { TelegramService } from '../services/telegram.service';
 import { ChannelService } from '../services/channel.service';
 import { topicsService } from '../services/topics.service';
-import { listChannelsQuerySchema, setChannelPricingSchema, updateChannelStatusSchema } from '../utils/validation';
+import { setChannelPricingSchema, updateChannelStatusSchema } from '../utils/validation';
 import logger from '../utils/logger';
 
 export class ChannelsController {

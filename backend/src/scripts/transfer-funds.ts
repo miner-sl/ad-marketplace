@@ -192,4 +192,4 @@ Examples:
 }
 
 
-main();
+void main();

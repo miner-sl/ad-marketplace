@@ -41,7 +41,7 @@ export async function buildApp() {
   // Rate limiting will be registered for /api routes only
 
   // Request logging hook
-  app.addHook('onRequest', async (request, reply) => {
+  app.addHook('onRequest', async (request) => {
     logger.debug('Incoming request', {
       method: request.method,
       path: request.url,
@@ -100,7 +100,7 @@ export async function buildApp() {
       components: swaggerDocument.components,
     },
   });
-  
+
   await app.register(require('@fastify/swagger-ui'), {
     routePrefix: '/api-docs',
     uiConfig: {

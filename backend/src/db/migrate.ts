@@ -17,7 +17,7 @@ async function migrate() {
     let currentStatement = '';
     let inDoBlock = false;
     let dollarTag = '';
-    
+
     // Remove comments first
     const schemaWithoutComments = schema
       .split('\n')
@@ -29,14 +29,14 @@ async function migrate() {
         return line;
       })
       .join('\n');
-    
+
     // Split by semicolon but preserve DO blocks
     const parts = schemaWithoutComments.split(';');
-    
+
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i].trim();
       if (!part) continue;
-      
+
       // Check if this part starts a DO block
       if (part.match(/^DO\s+\$\$/) || part.match(/^DO\s+\$[a-zA-Z_]*\$/)) {
         inDoBlock = true;
@@ -45,11 +45,11 @@ async function migrate() {
         currentStatement = part;
         continue;
       }
-      
+
       // If we're in a DO block, accumulate until we find END
       if (inDoBlock) {
         currentStatement += ';' + part;
-        
+
         // Check if this part ends the DO block
         if (part.match(/^\s*END\s*$/) || part.match(new RegExp(`^\\s*END\\s*\\$${dollarTag}\\$\\s*$`))) {
           statements.push(currentStatement);
@@ -59,18 +59,18 @@ async function migrate() {
         }
         continue;
       }
-      
+
       // Regular statement
       if (currentStatement) {
         currentStatement += ';' + part;
       } else {
         currentStatement = part;
       }
-      
+
       statements.push(currentStatement);
       currentStatement = '';
     }
-    
+
     // Add any remaining statement
     if (currentStatement.trim()) {
       statements.push(currentStatement);
@@ -98,5 +98,5 @@ async function migrate() {
 }
 
 if (require.main === module) {
-  migrate();
+  void migrate();
 }

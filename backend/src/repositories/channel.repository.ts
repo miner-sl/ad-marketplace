@@ -108,20 +108,6 @@ export class ChannelRepository {
   }
 
   /**
-   * Get channel telegram_channel_id by channel ID
-   */
-  static async getTelegramChannelId(channelId: number): Promise<number | null> {
-    const result = await db.query(
-      'SELECT telegram_channel_id FROM channels WHERE id = $1',
-      [channelId]
-    );
-    if (!result?.rows || result.rows.length === 0) {
-      return null;
-    }
-    return result.rows[0]?.telegram_channel_id || null;
-  }
-
-  /**
    * List channels with filters (subscribers, price, ad_format)
    * Returns channels grouped by id with pricing array
    */

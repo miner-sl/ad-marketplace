@@ -379,14 +379,15 @@ export class DealModel {
    * Find verified deals that need automatic release (buyer didn't confirm)
    * After VERIFIED_TIMEOUT_HOURS, automatically release funds
    */
-  static async findVerifiedDealsForAutoRelease(): Promise<Deal[]> {
+  static async findVerifiedDealsForAutoRelease(limit: number = 100): Promise<Deal[]> {
     const timeoutHours = parseInt(process.env.VERIFIED_TIMEOUT_HOURS || '168', 10); // 7 days default
     const result = await db.query(
       `SELECT * FROM deals 
        WHERE status = 'verified' 
        AND post_verification_until < CURRENT_TIMESTAMP - INTERVAL '1 hour' * $1
-       ORDER BY post_verification_until ASC`,
-      [timeoutHours]
+       ORDER BY post_verification_until ASC
+       LIMIT $2`,
+      [timeoutHours, limit]
     );
     return result.rows;
   }

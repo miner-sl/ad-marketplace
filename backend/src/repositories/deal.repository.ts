@@ -161,14 +161,18 @@ export class DealRepository {
 
   /**
    * Get deals ready for verification with channel info (optimized query)
+   * @param limit - Maximum number of deals to return
    */
-  static async findDealsReadyForVerificationWithChannels(): Promise<any[]> {
+  static async findDealsReadyForVerificationWithChannels(limit: number = 100): Promise<any[]> {
     const result = await db.query(
       `SELECT d.*, c.telegram_channel_id
        FROM deals d
        INNER JOIN channels c ON d.channel_id = c.id
        WHERE d.status = 'posted' 
-       AND d.post_verification_until < CURRENT_TIMESTAMP`
+       AND d.post_verification_until < CURRENT_TIMESTAMP
+       ORDER BY d.post_verification_until ASC
+       LIMIT $1`,
+      [limit]
     );
     return result?.rows || [];
   }

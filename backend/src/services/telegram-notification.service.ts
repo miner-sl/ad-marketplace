@@ -381,6 +381,185 @@ export class TelegramNotificationService {
   }
 
   /**
+   * Notify both parties about deal auto-completion (buyer didn't confirm)
+   * Sends notifications to both advertiser and channel owner
+   */
+  static async notifyDealAutoCompleted(
+    dealId: number,
+    advertiserId: number,
+    channelOwnerId: number,
+    data: NotificationData
+  ): Promise<void> {
+    try {
+      await this.notifyDealCompleted(dealId, channelOwnerId, data);
+
+      const advertiser = await UserModel.findById(advertiserId);
+      if (!advertiser) {
+        logger.warn(`Advertiser #${advertiserId} not found for auto-completion notification`);
+        return;
+      }
+
+      await TelegramNotificationQueueService.queueTelegramMessage(
+        advertiser.telegram_id,
+        `⏰ Deal #${dealId} Auto-Completed\n\n` +
+        `You did not confirm publication within the timeout period.\n` +
+        `Funds have been automatically released to the channel owner.\n\n` +
+        `Use /deal ${dealId} to view details.`
+      );
+    } catch (error: any) {
+      logger.error(`Error sending auto-completion notifications`, {
+        dealId,
+        advertiserId,
+        channelOwnerId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Notify both parties about verification failure (post not found)
+   */
+  static async notifyVerificationFailed(dealId: number, advertiserId: number, channelOwnerId: number): Promise<void> {
+    try {
+      const advertiser = await UserModel.findById(advertiserId);
+      const channelOwner = await UserModel.findById(channelOwnerId);
+
+      if (advertiser) {
+        await TelegramNotificationQueueService.queueTelegramMessage(
+          advertiser.telegram_id,
+          `❌ Deal #${dealId} verification failed!\n\n` +
+          `The post was not found or was removed.\n` +
+          `Funds will be refunded to you.\n\n` +
+          `Use /deal ${dealId} to view details.`
+        );
+      }
+
+      if (channelOwner) {
+        await TelegramNotificationQueueService.queueTelegramMessage(
+          channelOwner.telegram_id,
+          `❌ Deal #${dealId} verification failed!\n\n` +
+          `The post was not found or was removed.\n` +
+          `Funds will be refunded to the advertiser.\n\n` +
+          `Use /deal ${dealId} to view details.`
+        );
+      }
+    } catch (error: any) {
+      logger.error(`Error sending verification failed notifications`, {
+        dealId,
+        advertiserId,
+        channelOwnerId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Notify channel owner that duration requirement not met
+   */
+  static async notifyDurationNotMet(
+    dealId: number,
+    channelOwnerId: number,
+    daysSinceFirstPublication: number,
+    minPublicationDurationDays: number
+  ): Promise<void> {
+    try {
+      const channelOwner = await UserModel.findById(channelOwnerId);
+      if (!channelOwner) {
+        logger.warn(`Channel owner #${channelOwnerId} not found for duration notification`);
+        return;
+      }
+
+      const remainingDays = Math.ceil(minPublicationDurationDays - daysSinceFirstPublication);
+      const message =
+        `📢 Deal #${dealId} Status Update\n\n` +
+        `The post has been verified (remained on channel for required duration).\n\n` +
+        `⚠️ Minimum publication duration not reached.\n` +
+        `Required: ${minPublicationDurationDays} days\n` +
+        `Elapsed: ${Math.floor(daysSinceFirstPublication)} days\n` +
+        `Remaining: ${remainingDays} day(s)\n\n` +
+        `Please wait until the minimum publication period is completed.\n\n` +
+        `Use /deal ${dealId} to view details.`;
+
+      await TelegramNotificationQueueService.queueTelegramMessage(channelOwner.telegram_id, message);
+    } catch (error: any) {
+      logger.error(`Error sending duration notification`, {
+        dealId,
+        channelOwnerId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Notify both parties about deal verification
+   */
+  static async notifyDealVerified(
+    dealId: number,
+    advertiserId: number,
+    channelOwnerId: number,
+    daysSinceFirstPublication: number,
+    minPublicationDurationDays: number
+  ): Promise<void> {
+    try {
+      const advertiser = await UserModel.findById(advertiserId);
+      const channelOwner = await UserModel.findById(channelOwnerId);
+
+      // Notify advertiser with confirmation button
+      if (advertiser) {
+        const confirmMessage =
+          `✅ Deal #${dealId} Verified!\n\n` +
+          `The post has remained on the channel for at least ${minPublicationDurationDays} days.\n` +
+          `Minimum requirement met:\n` +
+          `- Publication duration: ${Math.floor(daysSinceFirstPublication)}/${minPublicationDurationDays} days ✓\n\n` +
+          `Please confirm that the post is still visible and meets your requirements.\n\n` +
+          `After your confirmation, funds will be released to the channel owner.\n\n` +
+          `Use /deal ${dealId} to view details.`;
+
+        const confirmButtons = {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '✅ Confirm Publication', callback_data: `confirm_publication_${dealId}` }
+              ],
+              [
+                { text: '📋 View Deal', callback_data: `deal_details_${dealId}` }
+              ]
+            ]
+          }
+        };
+
+        await TelegramNotificationQueueService.queueTelegramMessage(
+          advertiser.telegram_id,
+          confirmMessage,
+          confirmButtons
+        );
+      }
+
+      if (channelOwner) {
+        await TelegramNotificationQueueService.queueTelegramMessage(
+          channelOwner.telegram_id,
+          `✅ Deal #${dealId} Verified!\n\n` +
+          `The post has been verified (remained on channel for ${Math.floor(daysSinceFirstPublication)} days).\n` +
+          `Minimum requirement met.\n` +
+          `Waiting for advertiser confirmation to release funds.\n\n` +
+          `Use /deal ${dealId} to view details.`
+        );
+      }
+    } catch (error: any) {
+      logger.error(`Error sending deal verified notifications`, {
+        dealId,
+        advertiserId,
+        channelOwnerId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Send message to other party in deal
    */
   static async notifyDealMessage(dealId: number, senderId: number, recipientId: number, messageText: string): Promise<void> {

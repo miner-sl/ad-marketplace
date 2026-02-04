@@ -165,6 +165,49 @@ export class TelegramNotificationService {
   }
 
   /**
+   * Notify both parties about payment confirmation
+   */
+  static async notifyPaymentConfirmed(
+    dealId: number,
+    advertiserId: number,
+    channelOwnerId: number,
+    priceTon: number
+  ): Promise<void> {
+    try {
+      const advertiser = await UserModel.findById(advertiserId);
+      const channelOwner = await UserModel.findById(channelOwnerId);
+
+      if (advertiser) {
+        await TelegramNotificationQueueService.queueTelegramMessage(
+          advertiser.telegram_id,
+          `✅ Payment confirmed for Deal #${dealId}!\n\n` +
+          `Amount: ${priceTon} TON\n` +
+          `The channel owner will now prepare the creative.\n\n` +
+          `Use /deal ${dealId} to view details.`
+        );
+      }
+
+      if (channelOwner) {
+        await TelegramNotificationQueueService.queueTelegramMessage(
+          channelOwner.telegram_id,
+          `✅ Payment received for Deal #${dealId}!\n\n` +
+          `Amount: ${priceTon} TON\n` +
+          `You can now submit the creative.\n\n` +
+          `Use /deal ${dealId} to view details.`
+        );
+      }
+    } catch (error: any) {
+      logger.error(`Error sending payment confirmed notifications`, {
+        dealId,
+        advertiserId,
+        channelOwnerId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Notify channel owner about payment received
    */
   static async notifyPaymentReceived(dealId: number, channelOwnerId: number, priceTon: number): Promise<void> {

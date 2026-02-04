@@ -86,7 +86,7 @@ export const ChannelDetailsPage = () => {
   const {showToast} = useToast()
 
   const {data: channel, isLoading} = useChannelQuery(channelId)
-  const {data: stats} = useChannelStatsQuery(channelId)
+  // const {data: stats} = useChannelStatsQuery(channelId)
   const telegramUser = useTelegramUser()
   const userId = telegramUser?.id
   const {user} = useAuth()
@@ -160,7 +160,7 @@ export const ChannelDetailsPage = () => {
     )
   }
 
-  const displayStats = stats || channel.stats
+  const displayStats =  channel.stats
   // For non-owners, only show active pricing
   const visiblePricing = isChannelOwner
     ? channel.pricing

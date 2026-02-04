@@ -112,13 +112,15 @@ export const MarketplaceHomePage = () => {
         <BlockNew gap={4}>
           <BlockNew gap={8} row>
             <Button
-              type="basic"
+              size='small'
+              type="secondary"
               onClick={() => navigate('/browse_channels')}
             >
               Browse Channels
             </Button>
             <Button
-              type="basic"
+              size='small'
+              type="secondary"
               onClick={() => navigate('/requests')}
             >
               Incoming Ads
@@ -126,19 +128,22 @@ export const MarketplaceHomePage = () => {
           </BlockNew>
           <BlockNew gap={8} row>
             <Button
-              type="basic"
+              size='small'
+              type="secondary"
               onClick={() => navigate(ROUTES_NAME.MARKETPLACE_ADVERTISER_MY_DEALS)}
             >
               My Deals
             </Button>
             <Button
-              type="basic"
+              size='small'
+              type="secondary"
               onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CHANNELS)}
             >
               My Channels
             </Button>
             <Button
-              type="basic"
+              size='small'
+              type="secondary"
               onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CAMPAIGNS)}
             >
               My Campaigns

@@ -1,8 +1,8 @@
 import cn from 'classnames'
 
-import styles from './ListToggler.module.scss'
+import styles from './ListToggler.module.scss';
 
-const webApp = window.Telegram?.WebApp
+import {hapticFeedback} from '@utils';
 
 interface ListTogglerProps {
   isEnabled: boolean
@@ -19,7 +19,7 @@ export const ListToggler = ({
 }: ListTogglerProps) => {
   const handleToggle = () => {
     if (!disabled) {
-      webApp?.HapticFeedback?.impactOccurred('soft')
+      hapticFeedback('soft')
       onChange(!isEnabled)
     }
   }
@@ -40,7 +40,7 @@ export const ListToggler = ({
       >
         <span
           className={cn(
-            styles.toggblerThumb,
+            styles.togglerThumb,
             isEnabled && styles.togglerThumbEnabled
           )}
         />

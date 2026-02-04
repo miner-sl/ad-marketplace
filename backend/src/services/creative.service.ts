@@ -1,4 +1,5 @@
-import { CreativeRepository, Creative } from '../repositories/creative.repository';
+import { CreativeRepository } from '../repositories/creative.repository';
+import { Creative } from '../models/creative.types';
 
 export class CreativeService {
   static async create(data: {

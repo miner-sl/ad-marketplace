@@ -1,10 +1,9 @@
 import * as cron from 'node-cron';
-import { Context } from 'telegraf';
 
 import { TONService } from '../services/ton.service';
 import { TelegramService } from '../services/telegram.service';
 import { DealFlowService } from '../services/deal-flow.service';
-import { BotController } from '../bot/bot.controller';
+import { PostSchedulerService } from '../services/post-scheduler.service';
 
 import { DealRepository } from '../repositories/deal.repository';
 
@@ -20,6 +19,7 @@ import { isPrimaryWorker } from '../utils/cluster.util';
 
 export class CronJobsSchedulerService {
   private static jobs: cron.ScheduledTask[] = [];
+  private static postSchedulerService: PostSchedulerService | null = null;
 
   /**
    * Start all cron jobs
@@ -30,13 +30,14 @@ export class CronJobsSchedulerService {
     }
     logger.info('Starting cron jobs...');
 
+    this.postSchedulerService = new PostSchedulerService();
+    this.postSchedulerService.onModuleInit();
+    this.postSchedulerService.start();
+
     // TODO maybe need to merge some jobs into one
     // TODO scalable jobs
     // Check for payments every 2 minutes
     this.startPaymentCheckJob();
-
-    // Check for scheduled posts every 5 minutes
-    this.startAutoPostJob();
 
     // Check for expired deals every 10 minutes
     this.startExpiredDealsJob();
@@ -50,7 +51,7 @@ export class CronJobsSchedulerService {
     // Auto-release funds for verified deals (buyer didn't confirm)
     this.startAutoReleaseJob();
 
-    logger.info(`Started ${this.jobs.length} cron job(s)`);
+    logger.info(`Started ${this.jobs.length} cron job(s) + PostSchedulerService`);
   }
 
   /**
@@ -59,6 +60,12 @@ export class CronJobsSchedulerService {
   static stopAll() {
     this.jobs.forEach(job => job.stop());
     this.jobs = [];
+
+    if (this.postSchedulerService) {
+      this.postSchedulerService.stop();
+      this.postSchedulerService = null;
+    }
+
     logger.info('Stopped all cron jobs');
   }
 
@@ -181,110 +188,6 @@ export class CronJobsSchedulerService {
     logger.info('Payment check job started (runs every 2 minutes)');
   }
 
-  /**
-   * Auto-post scheduled creatives
-   * Runs every 5 minutes
-   * Optimized: Batch fetches channels, creatives, and users to avoid N+1 queries
-   */
-  private static startAutoPostJob() {
-    const job = cron.schedule('*/1 * * * *', async () => {
-      try {
-        logger.debug('Checking for scheduled posts...');
-
-        // Use optimized query with JOIN to get channel info
-        const deals = await DealRepository.findDealsReadyForAutoPost(20);
-
-        if (deals.length === 0) {
-          return;
-        }
-
-        // Batch fetch all required data
-        const channelIds = Array.from(new Set(deals.map((d: any) => d.channel_id)));
-        const channelOwnerIds = Array.from(new Set(deals.map((d: any) => d.channel_owner_id)));
-
-        // Batch fetch channels and users
-        const channelsMap = await DealRepository.findChannelsByIds(channelIds);
-        const usersMap = await UserModel.findByIds(channelOwnerIds);
-
-        const now = new Date();
-
-        for (const deal of deals) {
-          console.log(`Processing deal for auto-post`, { dealId: deal.id, status: deal.status });
-          logger.debug(`Processing deal for auto-post`, { dealId: deal.id, status: deal.status });
-          try {
-            // Double-check that scheduled_post_time has passed
-            if (!deal.scheduled_post_time) {
-              logger.debug(`Skipping Deal #${deal.id}: No scheduled_post_time`, { dealId: deal.id });
-              continue;
-            }
-
-            const scheduledTime = new Date(deal.scheduled_post_time);
-
-            if (isNaN(scheduledTime.getTime())) {
-              logger.error(`Deal #${deal.id}: Invalid scheduled_post_time format`, { dealId: deal.id, scheduledPostTime: deal.scheduled_post_time });
-              continue;
-            }
-
-            if (scheduledTime > now) {
-              const diffMs = scheduledTime.getTime() - now.getTime();
-              const minutesUntilPublish = Math.ceil(diffMs / (1000 * 60));
-              logger.debug(`Skipping Deal #${deal.id}: Scheduled time hasn't arrived yet`, {
-                dealId: deal.id,
-                scheduled: scheduledTime.toISOString(),
-                now: now.toISOString(),
-                remainingMinutes: minutesUntilPublish
-              });
-              continue;
-            }
-
-            logger.info(`Deal #${deal.id}: Scheduled time has passed. Publishing...`, {
-              dealId: deal.id,
-              scheduled: scheduledTime.toISOString(),
-              now: now.toISOString()
-            });
-
-            // Get channel from batch-fetched map
-            const channel = channelsMap.get(deal.channel_id);
-            if (!channel || !channel.telegram_channel_id) {
-              logger.warn(`Deal #${deal.id}: Channel not found`, { dealId: deal.id, channelId: deal.channel_id });
-              continue;
-            }
-
-            // Get channel owner from batch-fetched map
-            const channelOwner = usersMap.get(deal.channel_owner_id);
-            if (!channelOwner) {
-              logger.warn(`Deal #${deal.id}: Channel owner not found`, { dealId: deal.id, channelOwnerId: deal.channel_owner_id });
-              continue;
-            }
-
-            // Create a minimal mock context for the handler
-            const mockCtx = {
-              from: { id: channelOwner.telegram_id },
-              reply: async (text: string) => {
-                logger.debug(`[Auto-post] ${text}`, { dealId: deal.id });
-                return Promise.resolve({} as any);
-              }
-            } as any as Context;
-
-            try {
-              await BotController.handlePublishPost(mockCtx, deal.id);
-              logger.info(`Auto-published Deal #${deal.id} via handlePublishPost`, { dealId: deal.id });
-            } catch (error: any) {
-              logger.error(`Error calling handlePublishPost for Deal #${deal.id}`, { dealId: deal.id, error: error.message, stack: error.stack });
-              throw error;
-            }
-          } catch (error: any) {
-            logger.error(`Error auto-posting Deal #${deal.id}`, { dealId: deal.id, error: error.message, stack: error.stack });
-          }
-        }
-      } catch (error: any) {
-        logger.error('Error in auto-post job', { error: error.message, stack: error.stack });
-      }
-    });
-
-    this.jobs.push(job);
-    logger.info('Auto-post job started (runs every 5 minutes)');
-  }
 
   /**
    * Cancel expired deals

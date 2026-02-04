@@ -1,5 +1,6 @@
 import jwt, {SignOptions} from 'jsonwebtoken';
-import { UserModel, User } from '../repositories/user.repository';
+import { UserModel } from '../repositories/user.repository';
+import { User } from '../models/user.types';
 import {TelegramUser, WebAppInitData } from './telegram-auth.service';
 import env from '../utils/env';
 import logger from '../utils/logger';

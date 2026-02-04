@@ -1,21 +1,6 @@
 import db from '../db/connection';
 import { withTx } from '../utils/transaction';
-
-export interface User {
-  id: number;
-  telegram_id: number;
-  username?: string;
-  first_name?: string;
-  last_name?: string;
-  photo_url?: string;
-  language_code?: string;
-  is_premium?: boolean;
-  wallet_address?: string;
-  is_channel_owner: boolean;
-  is_advertiser: boolean;
-  created_at: Date;
-  updated_at: Date;
-}
+import { User } from '../models/user.types';
 
 export class UserModel {
   static async findByTelegramId(telegramId: number): Promise<User | null> {

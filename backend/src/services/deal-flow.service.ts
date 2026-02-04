@@ -455,7 +455,7 @@ export class DealFlowService {
     }
 
     const postText = await PostService.getPostTextFromDeal(dealId);
-    const result = await PostService.publishPost(dealId, deal.channel_id, postText);
+    const result = await PostService.preparePublishPost(dealId, deal.channel_id, postText);
 
     return result;
   }

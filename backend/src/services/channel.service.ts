@@ -1,4 +1,5 @@
-import { ChannelModel, type Channel } from '../repositories/channel-model.repository';
+import { ChannelModel } from '../repositories/channel-model.repository';
+import { Channel } from '../models/channel.types';
 import { UserModel } from '../repositories/user.repository';
 import { TelegramService } from './telegram.service';
 import { topicsService } from './topics.service';

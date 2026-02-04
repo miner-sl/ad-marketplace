@@ -10,6 +10,7 @@ import { closeRedis } from './utils/redis';
 import { getWorkerId, isPrimaryWorker } from "./utils/cluster.util";
 import { topicsService } from './services/topics.service';
 import { buildApp } from './app';
+import { TelegramNotificationQueueService } from './services/telegram-notification-queue.service';
 
 const PORT = env.PORT;
 const isProd = env.NODE_ENV === 'production';
@@ -68,6 +69,19 @@ async function bootstrap(): Promise<void> {
     // Don't fail startup if topics fail to load, but log the error
   }
 
+  // Initialize Telegram notification queue service
+  try {
+    const notificationQueueService = TelegramNotificationQueueService.getInstance();
+    notificationQueueService.onModuleInit();
+    logger.info('Telegram notification queue service initialized');
+  } catch (error: any) {
+    logger.error('Failed to initialize Telegram notification queue service', {
+      error: error.message,
+      stack: error.stack,
+    });
+    // Don't fail startup if queue fails to initialize, but log the error
+  }
+
   const app = await buildApp();
 
   try {
@@ -123,6 +137,14 @@ async function bootstrap(): Promise<void> {
       logger.info('Database connections closed');
     } catch (error: any) {
       logger.error('Error closing database connections', { error: error.message });
+    }
+
+    try {
+      const notificationQueueService = TelegramNotificationQueueService.getInstance();
+      await notificationQueueService.close();
+      logger.info('Telegram notification queue closed');
+    } catch (error: any) {
+      logger.error('Error closing Telegram notification queue', { error: error.message });
     }
 
     try {

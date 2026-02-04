@@ -8,7 +8,7 @@ import { CampaignModel } from '../repositories/campaign-model.repository';
 import { TelegramService } from '../services/telegram.service';
 import { CreativeService } from '../services/creative.service';
 import { TONService } from '../services/ton.service';
-import { NotificationService } from '../services/notification.service';
+import { TelegramNotificationService } from '../services/telegram-notification.service';
 import { ChannelRepository } from '../repositories/channel.repository';
 import { DealRepository } from '../repositories/deal.repository';
 import { CreativeRepository } from '../repositories/creative.repository';
@@ -616,7 +616,7 @@ export class BotController {
 
           const channelInfo = await DealFlowService.getChannelInfoForDeal(dealId);
 
-          await NotificationService.notifyPaymentInvoice(dealId, acceptedDeal.advertiser_id, {
+          await TelegramNotificationService.notifyPaymentInvoice(dealId, acceptedDeal.advertiser_id, {
             dealId,
             channelId: channelInfo.channelId,
             channelName: channelInfo.channelName,
@@ -668,7 +668,7 @@ export class BotController {
     await DealFlowService.addDealMessage(dealId, user.id, messageText);
 
     const otherUserId = deal.channel_owner_id === user.id ? deal.advertiser_id : deal.channel_owner_id;
-    await NotificationService.notifyDealMessage(dealId, user.id, otherUserId, messageText);
+    await TelegramNotificationService.notifyDealMessage(dealId, user.id, otherUserId, messageText);
 
     await ctx.reply('✅ Message sent!');
   }
@@ -708,7 +708,7 @@ export class BotController {
     const briefPreview = briefText.substring(0, 200);
     const briefTextDisplay = briefText.length > 200 ? `${briefPreview}...` : briefPreview;
 
-    await NotificationService.notifyNewAdRequest(deal.id, deal.channel_owner_id, {
+    await TelegramNotificationService.notifyNewAdRequest(deal.id, deal.channel_owner_id, {
       dealId: deal.id,
       channelId: channelInfo.channelId,
       channelName: channelInfo.channelName,
@@ -1061,7 +1061,7 @@ export class BotController {
 
       const channelInfo = await DealFlowService.getChannelInfoForDeal(dealId);
 
-      await NotificationService.notifyPaymentInvoice(dealId, deal.advertiser_id, {
+      await TelegramNotificationService.notifyPaymentInvoice(dealId, deal.advertiser_id, {
         dealId,
         channelId: channelInfo.channelId,
         channelName: channelInfo.channelName,
@@ -1098,7 +1098,7 @@ export class BotController {
 
     const channelInfo = await DealFlowService.getChannelInfoForDeal(dealId);
 
-    await NotificationService.notifyDealDeclined(dealId, deal.advertiser_id, {
+    await TelegramNotificationService.notifyDealDeclined(dealId, deal.advertiser_id, {
       dealId,
       channelId: channelInfo.channelId,
       channelName: channelInfo.channelName,
@@ -1194,7 +1194,7 @@ export class BotController {
           await DealModel.updateStatus(dealId, 'paid');
         }
 
-        await NotificationService.notifyPaymentReceived(dealId, deal.channel_owner_id, deal.price_ton);
+        await TelegramNotificationService.notifyPaymentReceived(dealId, deal.channel_owner_id, deal.price_ton);
 
         await ctx.reply(
           `✅ Payment Confirmed!\n\n` +
@@ -1290,7 +1290,7 @@ export class BotController {
     await CreativeService.submit(dealId);
     await DealModel.updateStatus(dealId, 'creative_submitted');
 
-    await NotificationService.notifyCreativeSubmitted(dealId, deal.advertiser_id);
+    await TelegramNotificationService.notifyCreativeSubmitted(dealId, deal.advertiser_id);
 
     await ctx.reply('✅ Creative submitted! Waiting for advertiser approval.');
   }
@@ -1309,7 +1309,7 @@ export class BotController {
 
       const deal = await DealModel.findById(dealId);
       if (deal) {
-        await NotificationService.notifyCreativeApproved(dealId, deal.channel_owner_id);
+        await TelegramNotificationService.notifyCreativeApproved(dealId, deal.channel_owner_id);
       }
 
       await ctx.reply('✅ Creative approved! Channel owner can now publish.');
@@ -1505,7 +1505,7 @@ export class BotController {
 
     this.pendingDraftComments.delete(ctx.from!.id);
 
-    await NotificationService.notifyDealSentToDraft(pending.dealId, deal.advertiser_id, commentText);
+    await TelegramNotificationService.notifyDealSentToDraft(pending.dealId, deal.advertiser_id, commentText);
 
     await ctx.reply(
       `✅ Request sent to draft!\n\n` +
@@ -1536,7 +1536,7 @@ export class BotController {
     try {
       const { postLink } = await DealFlowService.publishPost(dealId, user.id);
 
-      await NotificationService.notifyPostPublished(dealId, deal.advertiser_id, postLink);
+      await TelegramNotificationService.notifyPostPublished(dealId, deal.advertiser_id, postLink);
 
       const ownerButtons: any[] = [];
       if (postLink) {
@@ -1613,7 +1613,7 @@ export class BotController {
         advertiserId: user.id,
       });
 
-      await NotificationService.notifyDealCompleted(dealId, deal.channel_owner_id, {
+      await TelegramNotificationService.notifyDealCompleted(dealId, deal.channel_owner_id, {
         dealId,
         priceTon: deal.price_ton,
         channelOwnerWalletAddress: deal.channel_owner_wallet_address,

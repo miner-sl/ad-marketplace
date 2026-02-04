@@ -5,13 +5,15 @@ import { env } from '../utils/env';
 import { withTx } from '../utils/transaction';
 import { distributedLock } from '../utils/lock';
 
+const minPostDurationHours = parseInt(String(env.MIN_POST_DURATION_HOURS || '24'), 10);
+
 export class PostService {
   /**
    * Publish post to channel
    * Returns post link and message ID
    * Uses distributed lock + FOR UPDATE lock to prevent race conditions between manual and auto-publish
    */
-  static async publishPost(dealId: number, channelId: number, postText: string): Promise<{
+  static async preparePublishPost(dealId: number, channelId: number, postText: string): Promise<{
     messageId: number;
     postLink: string;
   }> {
@@ -58,7 +60,8 @@ export class PostService {
           };
         }
 
-        if (deal.status !== 'paid') {
+        const allowedStatuses = ['paid', 'scheduled', 'creative_approved'];
+        if (!allowedStatuses.includes(deal.status)) {
           throw new Error(`Cannot publish post in status: ${deal.status}`);
         }
 
@@ -74,9 +77,9 @@ export class PostService {
         const telegramChannelId = channel.rows[0].telegram_channel_id;
         const channelUsername = channel.rows[0].username;
 
-        const sentMessage = await TelegramService.bot.sendMessage(
+        const sentMessage = await TelegramService.postToChannel(
           telegramChannelId,
-          postText
+          { text: postText }
         );
 
         const messageId = sentMessage.message_id;
@@ -85,7 +88,6 @@ export class PostService {
           throw new Error('Failed to get message ID from published post');
         }
 
-        const minPostDurationHours = parseInt(String(env.MIN_POST_DURATION_HOURS || '24'), 10);
         const verificationUntil = new Date();
         verificationUntil.setUTCHours(verificationUntil.getUTCHours() + minPostDurationHours);
 
@@ -96,7 +98,7 @@ export class PostService {
           `UPDATE deals 
            SET status = 'posted', actual_post_time = CURRENT_TIMESTAMP, 
                post_message_id = $1, post_verification_until = $2, updated_at = CURRENT_TIMESTAMP
-           WHERE id = $3 AND status = 'paid'
+           WHERE id = $3 AND status IN ('paid', 'scheduled', 'creative_approved')
            RETURNING *`,
           [messageId, verificationUntilUtc, dealId]
         );

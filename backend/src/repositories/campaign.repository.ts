@@ -1,5 +1,5 @@
 import db from '../db/connection';
-import { Campaign } from './campaign-model.repository';
+import { Campaign } from '../models/campaign.types';
 
 export interface CampaignListFilters {
   advertiser_id?: number;

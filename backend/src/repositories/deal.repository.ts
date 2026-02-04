@@ -141,8 +141,9 @@ export class DealRepository {
 
   /**
    * Get deals ready for auto-post with channel info (optimized query)
+   * Finds deals that are scheduled and ready to be published
    */
-  static async findDealsReadyForAutoPost(limit: number = 20): Promise<any[]> {
+  static async findPendingScheduledPosts(limit: number = 100): Promise<any[]> {
     const result = await db.query(
       `SELECT d.*, c.telegram_channel_id, c.owner_id as channel_owner_id
        FROM deals d
@@ -150,6 +151,7 @@ export class DealRepository {
        WHERE d.status IN ('scheduled', 'paid', 'creative_approved')
        AND d.scheduled_post_time IS NOT NULL
        AND d.scheduled_post_time <= NOW()
+       AND d.post_message_id IS NULL
        ORDER BY d.scheduled_post_time ASC
        LIMIT $1`,
       [limit]

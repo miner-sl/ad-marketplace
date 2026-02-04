@@ -1,5 +1,5 @@
 import { UserModel } from '../repositories/user.repository';
-import { TelegramService } from './telegram.service';
+import { TelegramNotificationQueueService } from './telegram-notification-queue.service';
 import logger from '../utils/logger';
 
 export interface NotificationData {
@@ -16,7 +16,7 @@ export interface NotificationData {
   commentText?: string;
 }
 
-export class NotificationService {
+export class TelegramNotificationService {
   /**
    * Notify advertiser about payment invoice after deal acceptance
    */
@@ -28,7 +28,7 @@ export class NotificationService {
         return;
       }
 
-      const invoiceMessage = 
+      const invoiceMessage =
         `💰 Payment Invoice for Deal #${dealId}\n\n` +
         (data.channelName ? `Channel: ${data.channelName}\n` : `Channel: #${data.channelId}\n`) +
         (data.adFormat ? `Format: ${data.adFormat}\n` : '') +
@@ -52,7 +52,11 @@ export class NotificationService {
         }
       };
 
-      await TelegramService.bot.sendMessage(advertiser.telegram_id, invoiceMessage, invoiceButtons);
+      await TelegramNotificationQueueService.queueTelegramMessage(
+        advertiser.telegram_id,
+        invoiceMessage,
+        invoiceButtons
+      );
     } catch (error: any) {
       logger.error(`Error sending payment invoice notification`, {
         dealId,
@@ -74,7 +78,7 @@ export class NotificationService {
         return;
       }
 
-      const notificationMessage = 
+      const notificationMessage =
         `📨 New Ad Request for Deal #${dealId}!\n\n` +
         (data.channelName ? `📺 Channel: ${data.channelName}\n` : '') +
         (data.priceTon ? `💰 Price: ${data.priceTon} TON\n` : '') +
@@ -99,7 +103,7 @@ export class NotificationService {
         }
       };
 
-      await TelegramService.bot.sendMessage(
+      await TelegramNotificationQueueService.queueTelegramMessage(
         channelOwner.telegram_id,
         notificationMessage,
         notificationButtons
@@ -125,7 +129,7 @@ export class NotificationService {
         return;
       }
 
-      const notificationMessage = 
+      const notificationMessage =
         `❌ Deal #${dealId} Declined\n\n` +
         `The channel owner has declined your ad request.\n\n` +
         (data.channelName ? `📺 Channel: ${data.channelName}\n` : '') +
@@ -145,7 +149,7 @@ export class NotificationService {
         }
       };
 
-      await TelegramService.bot.sendMessage(
+      await TelegramNotificationQueueService.queueTelegramMessage(
         advertiser.telegram_id,
         notificationMessage,
         notificationButtons
@@ -181,7 +185,7 @@ export class NotificationService {
         }
       };
 
-      await TelegramService.bot.sendMessage(
+      await TelegramNotificationQueueService.queueTelegramMessage(
         channelOwner.telegram_id,
         `✅ Payment received for Deal #${dealId}!\n\n` +
         `Amount: ${priceTon} TON\n` +
@@ -210,7 +214,7 @@ export class NotificationService {
         return;
       }
 
-      await TelegramService.bot.sendMessage(
+      await TelegramNotificationQueueService.queueTelegramMessage(
         advertiser.telegram_id,
         `📝 Creative submitted for Deal #${dealId}!\n\n` +
         `Please review and approve or request revisions.\n\n` +
@@ -237,7 +241,7 @@ export class NotificationService {
         return;
       }
 
-      await TelegramService.bot.sendMessage(
+      await TelegramNotificationQueueService.queueTelegramMessage(
         channelOwner.telegram_id,
         `✅ Creative approved for Deal #${dealId}!\n\n` +
         `You can now publish the post.\n\n` +
@@ -264,7 +268,7 @@ export class NotificationService {
         return;
       }
 
-      const confirmMessage = 
+      const confirmMessage =
         `📤 Post Published for Deal #${dealId}!\n\n` +
         `The channel owner has published the post.\n\n` +
         (postLink ? `🔗 View Post: <a href="${postLink}">Click here</a>\n\n` : '') +
@@ -286,7 +290,11 @@ export class NotificationService {
         parse_mode: 'HTML' as const
       };
 
-      await TelegramService.bot.sendMessage(advertiser.telegram_id, confirmMessage, confirmButtons);
+      await TelegramNotificationQueueService.queueTelegramMessage(
+        advertiser.telegram_id,
+        confirmMessage,
+        confirmButtons
+      );
     } catch (error: any) {
       logger.error(`Error sending post published notification`, {
         dealId,
@@ -308,7 +316,7 @@ export class NotificationService {
         return;
       }
 
-      const notificationMessage = 
+      const notificationMessage =
         `📝 Deal #${dealId} Sent to Draft\n\n` +
         `The channel owner has sent your request back for revision.\n\n` +
         `💬 Feedback:\n${commentText}\n\n` +
@@ -325,7 +333,7 @@ export class NotificationService {
         }
       };
 
-      await TelegramService.bot.sendMessage(
+      await TelegramNotificationQueueService.queueTelegramMessage(
         advertiser.telegram_id,
         notificationMessage,
         notificationButtons
@@ -351,7 +359,7 @@ export class NotificationService {
         return;
       }
 
-      await TelegramService.bot.sendMessage(
+      await TelegramNotificationQueueService.queueTelegramMessage(
         channelOwner.telegram_id,
         `✅ Deal #${dealId} Completed!\n\n` +
         `The advertiser has confirmed publication.\n` +
@@ -383,7 +391,7 @@ export class NotificationService {
         return;
       }
 
-      await TelegramService.bot.sendMessage(
+      await TelegramNotificationQueueService.queueTelegramMessage(
         recipient.telegram_id,
         `💬 New message in Deal #${dealId}:\n\n${messageText}\n\nUse /deal ${dealId} to view.`
       );

@@ -154,12 +154,13 @@ export async function buildApp() {
 
   // Error handler
   app.setErrorHandler((error, request, reply) => {
-    const status = error.statusCode || 500;
-    const message = error.message || 'Internal server error';
+    const errorObj = error as Error & { statusCode?: number };
+    const status = errorObj.statusCode || 500;
+    const message = errorObj.message || 'Internal server error';
 
     logger.error('Request error', {
       error: message,
-      stack: error.stack,
+      stack: errorObj.stack,
       status,
       method: request.method,
       path: request.url,
@@ -171,7 +172,7 @@ export async function buildApp() {
         ? 'Internal server error'
         : message,
       requestId: request.requestId,
-      ...(env.NODE_ENV !== 'production' && { stack: error.stack }),
+      ...(env.NODE_ENV !== 'production' && { stack: errorObj.stack }),
     });
   });
 

@@ -1,9 +1,22 @@
 import {useCallback, useState} from 'react'
 import {useNavigate} from 'react-router-dom'
 
-import {BlockNew, Button, ChannelCard, Page, PageLayout, Skeleton, TelegramMainButton, Text,} from '@components'
+import {
+  BlockNew,
+  Button,
+  Page,
+  PageLayout,
+  Skeleton,
+  TelegramMainButton,
+  Text,
+  Group,
+  GroupItem,
+  Image,
+  Icon,
+} from '@components'
 import {useCampaignsQuery, useChannelsQuery,} from '@store-new'
-import {ROUTES_NAME} from '@routes';
+import {ROUTES_NAME} from '@routes'
+import {pluralize, hapticFeedback} from '@utils'
 
 import styles from './MarketplaceHomePage.module.scss';
 
@@ -49,15 +62,71 @@ export const MarketplaceHomePage = () => {
   const activeTabIndex = tabs.findIndex((tab) => tab.value === activeTab)
 
   const contentSlides = [
-    <BlockNew gap={8}>
-      {(!channels || channels.length === 0) && (
-          <Text type="text" color="secondary" align="center">
-            No channels available
-          </Text>
+    <BlockNew id="channels-container">
+      {(!channels || channels.length === 0) ? (
+        <Text type="text" color="secondary" align="center">
+          No channels available
+        </Text>
+      ) : (
+        <Group>
+          {channels.map((channel) => {
+            const channelName = channel.title || `@${channel.username || 'channel'}`
+            const subscribersCount = channel.stats?.subscribers_count || 0
+            const postPricing = channel.pricing?.find((p) => p.ad_format === 'post' && p.is_active)
+            
+            return (
+              <GroupItem
+                key={channel.id}
+                text={
+                  <BlockNew row align="center" gap={8}>
+                    <Text type="text" weight="bold">
+                      {channelName}
+                    </Text>
+                    {channel.is_verified && (
+                      <Icon name="verified" size={16} />
+                    )}
+                  </BlockNew>
+                }
+                description={
+                  <BlockNew gap={6} row align="center" fadeIn={false}>
+                    {subscribersCount > 0 && (
+                      <>
+                        <Text type="caption2" color="tertiary">
+                          {pluralize(
+                            ['member', 'members', 'members'],
+                            subscribersCount
+                          )}
+                        </Text>
+                        <Text type="caption2" color="tertiary">
+                          •
+                        </Text>
+                      </>
+                    )}
+                    {postPricing && (
+                      <Text type="caption2" color="accent">
+                        {postPricing.price_ton} TON
+                      </Text>
+                    )}
+                  </BlockNew>
+                }
+                chevron
+                before={
+                  <Image
+                    src={null}
+                    size={40}
+                    borderRadius={50}
+                    fallback={channelName}
+                  />
+                }
+                onClick={() => {
+                  hapticFeedback('soft')
+                  navigate(ROUTES_NAME.MARKETPLACE_CHANNEL_DETAILS.replace(':id', channel.id.toString()))
+                }}
+              />
+            )
+          })}
+        </Group>
       )}
-      {channels?.map((channel) => (
-          <ChannelCard key={channel.id} channel={channel} />
-      ))}
     </BlockNew>,
     // <BlockNew gap={8}>
     //   {(!campaigns || campaigns.length === 0) && (

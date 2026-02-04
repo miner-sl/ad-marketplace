@@ -1,0 +1,18 @@
+.root {
+  display: inline-block;
+  padding: 2px 4px;
+  border-radius: 6px;
+  background: var(--color-background-tertiary);
+}
+
+.format-post {
+  background: rgba(33, 150, 243, 0.1);
+}
+
+.format-forward {
+  background: rgba(158, 158, 158, 0.1);
+}
+
+.format-story {
+  background: rgba(76, 175, 80, 0.1);
+}

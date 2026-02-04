@@ -9,9 +9,10 @@ interface IconProps {
   size?: IconSize
   color?: 'danger' | 'tertiary' | 'secondary' | 'accent' | 'primary' | 'brown'
   className?: string
+  onClick?: (e: React.MouseEvent) => void
 }
 
-export const Icon = ({ name, size, color, className }: IconProps) => {
+export const Icon = ({ name, size, color, className, onClick }: IconProps) => {
   const IconName = getIcon(name)
 
   if (!IconName) return null
@@ -22,8 +23,10 @@ export const Icon = ({ name, size, color, className }: IconProps) => {
         styles.icon,
         size && styles[`size-${size}`],
         color && styles[`color-${color}`],
+        onClick && styles.clickable,
         className
       )}
+      onClick={onClick}
     >
       {IconName}
     </div>

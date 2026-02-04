@@ -1,6 +1,20 @@
 import {useParams} from 'react-router-dom'
 import {openTelegramLink} from '@tma.js/sdk-react'
-import {BlockNew, Button, DealStatusBadge, PageLayout, Page, TelegramBackButton, TelegramMainButton, Text, ChannelLink, useToast} from '@components'
+import {
+  Block,
+  BlockNew,
+  DealStatusBadge,
+  PageLayout,
+  Page,
+  TelegramBackButton,
+  TelegramMainButton,
+  Text,
+  Image,
+  ListItem,
+  Group,
+  Icon,
+  useToast,
+} from '@components'
 import {
   useAcceptDealMutation,
   useApproveCreativeMutation,
@@ -8,11 +22,53 @@ import {
   useRejectDealMutation,
   useRequestCreativeRevisionMutation,
 } from '@store-new'
-// import { useUser } from '@store'
 import styles from './DealDetailsPage.module.scss'
-import {separateNumber, collapseAddress} from "@utils";
-import {useTelegramUser, useClipboard} from "@hooks";
-import config from '@config';
+import {separateNumber, collapseAddress, createMembersCount} from "@utils"
+import {useTelegramUser, useClipboard} from "@hooks"
+import config from '@config'
+import type {Deal, ChannelStats, Creative} from '@types'
+
+interface DealHeaderProps {
+  deal: Deal
+  stats?: ChannelStats
+}
+
+const DealHeader = ({ deal, stats }: DealHeaderProps) => {
+  const subscribersCount = stats?.subscribers_count || deal.channel?.stats?.subscribers_count || 0
+
+  return (
+    <>
+      <Block align="center">
+        <Image
+          size={112}
+          src={null}
+          borderRadius={50}
+          fallback={deal.channel?.title || `Deal #${deal.id}`}
+        />
+      </Block>
+      <Block margin="top" marginValue={12} row justify="center" align="center" gap={4}>
+        <Text type="title" align="center" weight="bold">
+          Deal #{deal.id}
+        </Text>
+        <DealStatusBadge status={deal.status} />
+      </Block>
+      {deal.channel?.title && (
+        <Block margin="top" marginValue={8}>
+          <Text type="text" align="center" color="tertiary">
+            {deal.channel.title}
+          </Text>
+        </Block>
+      )}
+      {subscribersCount > 0 && (
+        <Block margin="top" marginValue={8}>
+          <Text type="caption2" color="tertiary" align="center">
+            {createMembersCount(subscribersCount)}
+          </Text>
+        </Block>
+      )}
+    </>
+  )
+}
 
 export const DealDetailsPage = () => {
   const {id} = useParams<{ id: string }>()
@@ -27,7 +83,9 @@ export const DealDetailsPage = () => {
   const rejectDealMutation = useRejectDealMutation()
   const approveCreativeMutation = useApproveCreativeMutation()
   const requestRevisionMutation = useRequestCreativeRevisionMutation()
-  const creative = undefined;
+  // TODO: Uncomment when useDealCreativeQuery is implemented
+  // const { data: creative } = useDealCreativeQuery(dealId)
+  const creative: Creative | null = null
   // const submitCreativeMutation = useSubmitCreativeMutation()
   const {copy} = useClipboard()
   const {showToast} = useToast()
@@ -62,7 +120,7 @@ export const DealDetailsPage = () => {
 
 
   const getTONScanUrl = (address: string): string => {
-    const baseUrl = config.isDev 
+    const baseUrl = config.isDev
       ? 'https://testnet.tonscan.org'
       : 'https://tonscan.org';
     return `${baseUrl}/address/${address}`;
@@ -138,121 +196,194 @@ export const DealDetailsPage = () => {
   }
 
   const isAdvertiserUser = typeof deal.advertiser === 'object' && deal.advertiser !== null
-    ? deal.advertiser.telegram_id === user?.id 
+    ? deal.advertiser.telegram_id === user?.id
     : false
   const showPaymentButton = isAdvertiserUser && deal.status === 'payment_pending' && deal.escrow_address !== undefined;
+
+  const channelStats = deal.channel?.stats
 
   return (
     <Page back>
       <PageLayout>
         <TelegramBackButton/>
-        <BlockNew gap={16} className={styles.container}>
-          <BlockNew padding="0 16px">
-            <BlockNew row justify="between" align="center" gap={12}>
-              <Text type="title">
-                Deal #{deal.id}
-              </Text>
-              <DealStatusBadge status={deal.status}/>
-            </BlockNew>
-          </BlockNew>
 
-          <BlockNew gap={12} padding="0 16px">
-            <BlockNew gap={4}>
-              <ChannelLink channel={deal.channel} />
+        {/* Deal Header */}
+        <DealHeader deal={deal} stats={channelStats} />
+
+        {/* Statistics Section */}
+        {channelStats && (
+          <Block margin="bottom" marginValue={24}>
+            <Block paddingValue={16}>
+              <Group header="STATISTICS">
+                {channelStats.subscribers_count && (
+                  <ListItem
+                    padding="6px 16px"
+                    text={
+                      <Text type="text">
+                        👥 {separateNumber(channelStats.subscribers_count)} subscribers
+                      </Text>
+                    }
+                  />
+                )}
+                {channelStats.average_views && (
+                  <ListItem
+                    padding="6px 16px"
+                    text={
+                      <Text type="text">
+                        👁️ {separateNumber(channelStats.average_views)} average views
+                      </Text>
+                    }
+                  />
+                )}
+                {channelStats.average_reach && (
+                  <ListItem
+                    padding="6px 16px"
+                    text={
+                      <Text type="text">
+                        📊 {separateNumber(channelStats.average_reach)} average reach
+                      </Text>
+                    }
+                  />
+                )}
+              </Group>
+            </Block>
+          </Block>
+        )}
+
+        {/* Deal Information Section */}
+        <Block margin="top" marginValue={24}>
+          <Block margin="bottom" marginValue={44}>
+            <Group header="DEAL INFORMATION">
+              <ListItem
+                padding="6px 16px"
+                text={
+                  <BlockNew row align="center" gap={8}>
+                    <Text type="text" weight="medium">
+                      Ad Format:
+                    </Text>
+                    <Text type="text" color="accent">
+                      {deal.ad_format}
+                    </Text>
+                  </BlockNew>
+                }
+              />
+              <ListItem
+                padding="6px 16px"
+                text={
+                  <BlockNew row align="center" gap={8}>
+                    <Text type="text" weight="medium">
+                      Price:
+                    </Text>
+                    <Text type="text" color="accent">
+                      {deal.price_ton} TON
+                    </Text>
+                  </BlockNew>
+                }
+              />
               {typeof deal.advertiser === 'object' && deal.advertiser !== null && (
-                <BlockNew row gap={8}>
-                  <Text type="text" color="secondary">
-                    Advertiser:
-                  </Text>
-                  <span style={{ textDecoration: 'underline' }}>
-                    <Text
-                      type="text"
+                <ListItem
+                  padding="6px 16px"
+                  text={
+                    <BlockNew row align="center" gap={8}>
+                      <Text type="text" weight="medium">
+                        Advertiser:
+                      </Text>
+                      <div onClick={handleAdvertiserClick} className={styles.clickable}>
+                        <Text
+                          type="text"
+                          color="accent"
+                        >
+                          {deal.advertiser.username
+                            ? `@${deal.advertiser.username}`
+                            : deal.advertiser.first_name || `User #${deal.advertiser.telegram_id}`}
+                        </Text>
+                      </div>
+                    </BlockNew>
+                  }
+                />
+              )}
+              {deal.escrow_address && (
+                <ListItem
+                  padding="6px 16px"
+                  text={
+                    <BlockNew row align="center" gap={8} className={styles.flexRow}>
+                      <Text type="text" weight="medium">
+                        Escrow Address:
+                      </Text>
+                      <div onClick={handleEscrowAddressClick} className={styles.clickable}>
+                        <Text
+                          type="text"
+                          color="accent"
+                        >
+                          {collapseAddress(deal.escrow_address, 4)}
+                        </Text>
+                      </div>
+                    </BlockNew>
+                  }
+                  after={
+                    <Icon
+                      name="share"
+                      size={20}
                       color="accent"
-                      onClick={handleAdvertiserClick}
-                    >
-                      {deal.advertiser.username 
-                        ? `@${deal.advertiser.username}` 
-                        : deal.advertiser.first_name || `User #${deal.advertiser.telegram_id}`}
-                    </Text>
-                  </span>
-                </BlockNew>
+                      className={styles.clickable}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        copy(deal.escrow_address!, 'Escrow address copied')
+                      }}
+                    />
+                  }
+                />
               )}
-              {deal.channel?.stats && (
-                <BlockNew row gap={12} marginValue={8}>
-                  {deal.channel.stats.subscribers_count && (
-                    <Text type="caption" color="secondary">
-                      👥 {separateNumber(deal.channel.stats.subscribers_count)}
+              {deal.scheduled_post_time && (
+                <ListItem
+                  padding="6px 16px"
+                  text={
+                    <Text type="text">
+                      Scheduled Post Time: {new Date(deal.scheduled_post_time).toLocaleString()}
                     </Text>
-                  )}
-                  {deal.channel.stats.average_views && (
-                    <Text type="caption" color="secondary">
-                      👁️ {separateNumber(deal.channel.stats.average_views)}
-                    </Text>
-                  )}
-                </BlockNew>
+                  }
+                />
               )}
-            </BlockNew>
+              {deal.messages && deal.messages.length > 0 && deal.messages[0]?.message_text && (
+                <ListItem
+                  padding="6px 16px"
+                  text={
+                    <Text type="text">
+                      Message: {deal.messages[0].message_text}
+                    </Text>
+                  }
+                />
+              )}
+            </Group>
+          </Block>
+        </Block>
 
-            <BlockNew row>
-              <Text type="text">Ad Format: {deal.ad_format}</Text>
-            </BlockNew>
-
-            <BlockNew row>
-              <Text type="text" color="accent">Price: {deal.price_ton} TON</Text>
-            </BlockNew>
-
-            {deal.escrow_address && (
-              <BlockNew row gap={8} align="center">
-                <Text
-                  type="text"
-                  onClick={handleEscrowAddressClick}
-                >
-                  Escrow Address: {collapseAddress(deal.escrow_address, 4)}
-                </Text>
-                <span
-                  onClick={() => copy(deal.escrow_address!, 'Escrow address copied')}
-                  style={{
-                    cursor: 'pointer',
-                    padding: '4px 8px',
-                    fontSize: '14px',
-                    backgroundColor: 'var(--color-backgroundTertiary)',
-                    borderRadius: '8px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minWidth: '32px',
-                    height: '32px',
-                  }}
-                >
-                  📋
-                </span>
-              </BlockNew>
-            )}
-
-            {deal.scheduled_post_time && (
-              <BlockNew row>
-                <Text type="text">Scheduled Post Time: {new Date(deal.scheduled_post_time).toLocaleString()}</Text>
-              </BlockNew>
-            )}
-
-            {deal.messages && deal.messages.length > 0 && deal.messages[0]?.message_text && (
-              <BlockNew row>
-                <Text type="text">Message: {deal.messages[0].message_text}</Text>
-              </BlockNew>
-            )}
-
-            {creative && (
-              <BlockNew gap={4} marginValue={16}>
-                <BlockNew row>
-                  <Text type="text">Creative Status: {creative.status}</Text>
-                </BlockNew>
+        {/* Creative Section */}
+        {/* TODO: Uncomment when useDealCreativeQuery is implemented
+        {creative && (
+          <Block margin="top" marginValue={24}>
+            <Block margin="bottom" marginValue={44}>
+              <Group header="CREATIVE">
+                <ListItem
+                  padding="6px 16px"
+                  text={
+                    <Text type="text">
+                      Status: {creative.status}
+                    </Text>
+                  }
+                />
                 {creative.revision_notes && (
-                  <Text type="text" color="danger">
-                    Revision Notes: {creative.revision_notes}
-                  </Text>
+                  <ListItem
+                    padding="6px 16px"
+                    text={
+                      <Text type="text" color="danger">
+                        Revision Notes: {creative.revision_notes}
+                      </Text>
+                    }
+                  />
                 )}
                 {isAdvertiser && creative.status === 'pending' && (
-                  <BlockNew row gap={8} marginValue={8}>
+                  <BlockNew row gap={8} paddingValue={16}>
                     <Button
                       type="primary"
                       onClick={handleApproveCreative}
@@ -269,57 +400,100 @@ export const DealDetailsPage = () => {
                     </Button>
                   </BlockNew>
                 )}
-              </BlockNew>
-            )}
+              </Group>
+            </Block>
+          </Block>
+        )}
+        */}
 
-            {canInteract && deal.status === 'pending' && (
-              <BlockNew row gap={8} marginValue={16}>
-                {isChannelOwner && (
+        {/* Actions Section */}
+        {(canInteract && deal.status === 'pending') || (deal.owner && deal.status === 'pending') ? (
+          <Block margin="top" marginValue={24}>
+            <Block margin="bottom" marginValue={44}>
+              <Group header="ACTIONS">
+                {isChannelOwner && deal.status === 'pending' && (
                   <>
-                    <Button
-                      type="primary"
+                    <ListItem
+                      padding="6px 16px"
+                      text={
+                        <Text type="text" color="accent">
+                          Accept Deal
+                        </Text>
+                      }
+                      before={
+                        <Icon name="checkmark" size={28} color="accent" />
+                      }
                       onClick={handleAcceptDeal}
                       disabled={acceptDealMutation.isPending}
-                    >
-                      Accept Deal
-                    </Button>
-                    <Button
-                      type="danger"
+                    />
+                    <ListItem
+                      padding="6px 16px"
+                      text={
+                        <Text type="text" color="danger">
+                          Reject Deal
+                        </Text>
+                      }
+                      before={
+                        <Icon name="cross" size={28} color="danger" />
+                      }
                       onClick={handleRejectDeal}
                       disabled={rejectDealMutation.isPending}
-                    >
-                      Reject
-                    </Button>
+                    />
                   </>
                 )}
-              </BlockNew>
-            )}
-            {(deal.owner && deal.status === 'pending') && (
-              <BlockNew row gap={8} marginValue={16}>
-                <Button
-                  type="danger"
-                  onClick={handleAcceptDeal}
-                  disabled={acceptDealMutation.isPending}
-                >
-                  Accept
-                </Button>
-                <Button
-                  type="danger"
-                  onClick={handleRejectDeal}
-                  disabled={rejectDealMutation.isPending}
-                >
-                  Decline
-                </Button>
-                <Button
-                  type="secondary"
-                  onClick={handleRequestChanges}
-                >
-                  Request Changes
-                </Button>
-              </BlockNew>
-            )}
-          </BlockNew>
-        </BlockNew>
+                {deal.owner && deal.status === 'pending' && (
+                  <>
+                    <ListItem
+                      padding="6px 16px"
+                      text={
+                        <Text type="text" color="accent">
+                          Accept
+                        </Text>
+                      }
+                      before={
+                        <Icon name="checkmark" size={28} color="accent" />
+                      }
+                      onClick={handleAcceptDeal}
+                      disabled={acceptDealMutation.isPending}
+                    />
+                    <ListItem
+                      padding="6px 16px"
+                      text={
+                        <Text type="text" color="danger">
+                          Decline
+                        </Text>
+                      }
+                      before={
+                        <Icon name="cross" size={28} color="danger" />
+                      }
+                      onClick={handleRejectDeal}
+                      disabled={rejectDealMutation.isPending}
+                    />
+                    <ListItem
+                      padding="6px 16px"
+                      text={
+                        <Text type="text">
+                          Request Changes
+                        </Text>
+                      }
+                      before={
+                        <Icon name="share" size={28} color="accent" />
+                      }
+                      onClick={handleRequestChanges}
+                    />
+                  </>
+                )}
+              </Group>
+            </Block>
+          </Block>
+        ) : null}
+
+        {/* Footer */}
+        <Block margin="top" marginValue="auto">
+          <Text type="caption" align="center" color="tertiary">
+            Deal #{deal.id} • Status: {deal.status}
+          </Text>
+        </Block>
       </PageLayout>
 
       {showPaymentButton && (

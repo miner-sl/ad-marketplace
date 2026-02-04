@@ -22,7 +22,7 @@ export const MyChannelsPage = () => {
       <PageLayout>
         <TelegramBackButton />
         <BlockNew gap={16} className={styles.container}>
-          <BlockNew padding="0 16px">
+          <BlockNew>
             <Text type="title" weight="bold">
               My Channels
             </Text>

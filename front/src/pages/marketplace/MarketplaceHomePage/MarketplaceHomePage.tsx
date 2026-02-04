@@ -123,7 +123,7 @@ export const MarketplaceHomePage = () => {
               type="secondary"
               onClick={() => navigate('/requests')}
             >
-              Incoming Ads
+              Ads Requests
             </Button>
           </BlockNew>
           <BlockNew gap={8} row>

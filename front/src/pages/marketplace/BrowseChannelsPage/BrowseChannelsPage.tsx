@@ -107,7 +107,7 @@ export const BrowseChannelsPage = () => {
       <PageLayout>
         <TelegramBackButton />
         <BlockNew gap={16} className={styles.container}>
-          <BlockNew padding="0 16px">
+          <BlockNew>
             <BlockNew row justify="between" align="center">
               <Text type="title2" weight="bold">
                 Browse Channels

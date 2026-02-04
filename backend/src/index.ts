@@ -2,7 +2,7 @@ import cluster from 'cluster';
 import os from 'os';
 
 import bot from './bot';
-import { CronJobsSchedulerService } from './cron/jobs-scheduler.service';
+import { CronJobsSchedulerService } from './cron/cron-scheduler.service';
 import logger from './utils/logger';
 import env from './utils/env';
 import db from './db/connection';

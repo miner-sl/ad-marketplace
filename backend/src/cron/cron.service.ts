@@ -3,10 +3,10 @@
  * This service runs independently from the main API server
  */
 import * as dotenv from 'dotenv';
-import { CronJobsSchedulerService } from './cron/jobs-scheduler.service';
-import logger from './utils/logger';
-import env from './utils/env';
-import db from './db/connection';
+import { CronJobsSchedulerService } from './cron-scheduler.service';
+import logger from '../utils/logger';
+import env from '../utils/env';
+import db from '../db/connection';
 
 dotenv.config();
 

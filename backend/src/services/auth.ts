@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, {SignOptions} from 'jsonwebtoken';
 import { UserModel, User } from '../models/User';
 import { telegramAuthService, TelegramUser, WebAppInitData } from './telegramAuth';
 import env from '../utils/env';
@@ -32,7 +32,6 @@ export class AuthService {
    * Login with Telegram widget authentication
    */
   async loginWithTelegramWidget(telegramUser: TelegramUser): Promise<AuthResponse> {
-    // Find or create user
     let user = await UserModel.findByTelegramId(telegramUser.id);
 
     if (!user) {
@@ -46,7 +45,6 @@ export class AuthService {
       // Otherwise, use tg_<telegram_id> format which should be unique
       const finalUsername = username;
 
-      // Create new user
       user = await UserModel.create({
         telegram_id: telegramUser.id,
         username: finalUsername,
@@ -57,7 +55,6 @@ export class AuthService {
         is_premium: telegramUser.is_premium ?? false,
       });
     } else {
-      // Update existing user
       await UserModel.update({
         telegram_id: telegramUser.id,
         username: telegramUser.username && telegramUser.username !== '' 
@@ -69,7 +66,6 @@ export class AuthService {
         language_code: telegramUser.language_code,
         is_premium: telegramUser.is_premium ?? false,
       });
-      // Re-fetch user to get updated data
       const updatedUser = await UserModel.findByTelegramId(telegramUser.id);
       if (!updatedUser) {
         throw new Error('Failed to update user');
@@ -77,7 +73,6 @@ export class AuthService {
       user = updatedUser;
     }
 
-    // Generate JWT token
     const payload: JwtPayload = {
       sub: user.id.toString(),
       username: user.username || `tg_${user.telegram_id}`,
@@ -85,8 +80,8 @@ export class AuthService {
     };
 
     const accessToken = jwt.sign(payload, env.JWT_SECRET, {
-      expiresIn: env.JWT_EXPIRES_IN || '7d',
-    });
+      expiresIn: env.JWT_EXPIRES_IN ||'7D',
+    } as SignOptions);
 
     return {
       user: {

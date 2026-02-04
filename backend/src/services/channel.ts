@@ -1,7 +1,7 @@
 import { ChannelModel, type Channel } from '../models/Channel';
 import { UserModel } from '../models/User';
 import { TelegramService } from './telegram';
-
+import { topicsService } from './topics';
 import logger from '../utils/logger';
 
 export interface ChannelRegistrationResult {
@@ -25,7 +25,8 @@ export class ChannelService {
    */
   static async registerChannel(
     telegramUserId: number,
-    telegramChannelId: number
+    telegramChannelId: number,
+    topicId?: number
   ): Promise<ChannelRegistrationResult> {
     try {
       const user = await UserModel.findByTelegramId(telegramUserId);
@@ -70,12 +71,25 @@ export class ChannelService {
 
       const channelInfo = await TelegramService.getChannelInfo(telegramChannelId);
 
+      // Validate topic if provided (using cached topics service)
+      if (topicId !== undefined) {
+        const topic = topicsService.getTopicById(topicId);
+        if (!topic) {
+          return {
+            success: false,
+            error: 'FAILED_TO_CREATE',
+            message: `Topic with id ${topicId} not found`,
+          };
+        }
+      }
+
       const channel = await ChannelModel.create({
         owner_id: user.id,
         telegram_channel_id: telegramChannelId,
         username: channelInfo.username,
         title: channelInfo.title,
         description: channelInfo.description,
+        topic_id: topicId,
       });
 
       await ChannelModel.updateBotAdmin(channel.id, botId);

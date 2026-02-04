@@ -70,7 +70,7 @@ export const env: EnvConfig = {
   TELEGRAM_WEBHOOK_URL: getEnvVar('TELEGRAM_WEBHOOK_URL', false),
   
   JWT_SECRET: getEnvVar('JWT_SECRET', true),
-  JWT_EXPIRES_IN: getEnvVar('JWT_EXPIRES_IN', false, '7d'),
+  JWT_EXPIRES_IN: getEnvVar('JWT_EXPIRES_IN', false, '7D'),
   
   DATABASE_URL: getEnvVar('DATABASE_URL', false),
   DB_HOST: getEnvVar('DB_HOST', false, 'localhost'),

@@ -8,9 +8,18 @@ export interface Channel {
   username?: string;
   title?: string;
   description?: string;
+  topic_id?: number;
   bot_admin_id?: number;
   is_verified: boolean;
   is_active: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface Topic {
+  id: number;
+  name: string;
+  description?: string;
   created_at: Date;
   updated_at: Date;
 }
@@ -45,14 +54,30 @@ export class ChannelModel {
     username?: string;
     title?: string;
     description?: string;
+    topic_id?: number;
   }): Promise<Channel> {
     const result = await db.query(
-      `INSERT INTO channels (owner_id, telegram_channel_id, username, title, description)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO channels (owner_id, telegram_channel_id, username, title, description, topic_id)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [data.owner_id, data.telegram_channel_id, data.username, data.title, data.description]
+      [data.owner_id, data.telegram_channel_id, data.username, data.title, data.description, data.topic_id || null]
     );
     return result.rows[0];
+  }
+
+  static async findAllTopics(): Promise<Topic[]> {
+    const result = await db.query(
+      'SELECT * FROM topics ORDER BY name ASC'
+    );
+    return result.rows;
+  }
+
+  static async findTopicById(id: number): Promise<Topic | null> {
+    const result = await db.query(
+      'SELECT * FROM topics WHERE id = $1',
+      [id]
+    );
+    return result.rows[0] || null;
   }
 
   static async findByTelegramId(telegramChannelId: number): Promise<Channel | null> {

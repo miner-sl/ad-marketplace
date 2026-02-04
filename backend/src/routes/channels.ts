@@ -4,6 +4,7 @@ import { ChannelRepository } from '../repositories/ChannelRepository';
 import { UserModel } from '../models/User';
 import { TelegramService } from '../services/telegram';
 import { ChannelService } from '../services/channel';
+import { topicsService } from '../services/topics';
 import { validateBody } from '../middleware/validation';
 import { authMiddleware } from '../middleware/auth';
 import { createChannelSchema } from '../utils/validation';
@@ -77,10 +78,12 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
       }
 
       const { telegram_channel_id } = request.body as any;
+      const topic_id = (request.body as any)?.topic_id ? parseInt((request.body as any).topic_id) : undefined;
 
       const result = await ChannelService.registerChannel(
         request.user.telegramId,
-        telegram_channel_id
+        telegram_channel_id,
+        topic_id
       );
 
       if (!result.success) {
@@ -174,6 +177,34 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
         stack: error.stack,
         channelId: request.id,
       });
+      reply.code(500).send({ error: error.message });
+    }
+  });
+
+  // Get all topics (from cached singleton)
+  fastify.get('/topics', async (request, reply) => {
+    try {
+      const topics = topicsService.getAllTopics();
+      return topics;
+    } catch (error: any) {
+      logger.error('Failed to get topics', { error: error.message });
+      reply.code(500).send({ error: error.message });
+    }
+  });
+
+  // Get topic by ID (from cached singleton)
+  fastify.get('/topics/:id', async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const topic = topicsService.getTopicById(parseInt(id));
+
+      if (!topic) {
+        return reply.code(404).send({ error: 'Topic not found' });
+      }
+
+      return topic;
+    } catch (error: any) {
+      logger.error('Failed to get topic', { error: error.message, topicId: (request.params as { id: string }).id });
       reply.code(500).send({ error: error.message });
     }
   });

@@ -17,6 +17,7 @@ import { requestIdPlugin } from './middleware/requestId';
 import db from './db/connection';
 import { closeRedis } from './utils/redis';
 import { getWorkerId, isPrimaryWorker } from "./utils/cluster.util";
+import { topicsService } from './services/topics';
 
 const PORT = env.PORT;
 const isProd = env.NODE_ENV === 'production';
@@ -187,7 +188,7 @@ async function buildApp() {
 function runTgBot() {
   if (!isPrimaryWorker()) {
     const workerId = getWorkerId();
-    this.logger.log(
+    logger.info(
       `Worker ${String(workerId)}: Skipping Telegram setup (handled by primary worker)`,
     );
     return;
@@ -227,6 +228,17 @@ function runTgBot() {
 }
 
 async function bootstrap(): Promise<void> {
+  try {
+    await topicsService.initialize();
+    logger.info('Topics service initialized successfully');
+  } catch (error: any) {
+    logger.error('Failed to initialize topics service', {
+      error: error.message,
+      stack: error.stack,
+    });
+    // Don't fail startup if topics fail to load, but log the error
+  }
+
   const app = await buildApp();
 
   try {

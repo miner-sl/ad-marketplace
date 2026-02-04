@@ -35,7 +35,7 @@ const formatAdFormatLabel = (format: AdFormat | ''): string => {
 export const BrowseChannelsPage = () => {
   const navigate = useNavigate()
   const [filters, setFilters] = useState<ChannelFilters>({
-    limit: 50,
+    limit: 14,
   })
   const [showFilters, setShowFilters] = useState(false)
   const [searchInput, setSearchInput] = useState('')
@@ -103,7 +103,7 @@ export const BrowseChannelsPage = () => {
 
   const resetFilters = () => {
     setSearchInput('')
-    setFilters({ limit: 50 })
+    setFilters({ limit: 14 })
   }
 
   return (

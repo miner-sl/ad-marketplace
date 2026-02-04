@@ -7,6 +7,8 @@ import {
   Text,
   Button,
   Image,
+  Group,
+  GroupItem,
 } from '@components'
 import { useAuth } from '@context'
 import styles from './ProfilePage.module.scss'
@@ -49,8 +51,7 @@ export function ProfilePage() {
   return (
     <Page>
       <PageLayout>
-        <BlockNew gap={24} className={styles.container}>
-          {/* Profile Header */}
+        <BlockNew gap={2} className={styles.container}>
           <BlockNew gap={12} className={styles.header}>
             <Image
               src={user.photoUrl || undefined}
@@ -75,69 +76,61 @@ export function ProfilePage() {
             </BlockNew>
           </BlockNew>
 
-          {/* User Info */}
-          <BlockNew gap={16} className={styles.infoSection}>
-            <BlockNew gap={8}>
-              <Text type="title2" weight="bold">
-                User Information
-              </Text>
-            </BlockNew>
-
-            <BlockNew gap={12}>
+          <BlockNew margin="top" marginValue={24}>
+            <Group header="USER INFORMATION">
               {(user.telegram_id || user.telegramId) && (
-                <BlockNew row gap={8}>
-                  <Text type="text" color="secondary">
-                    Telegram ID:
-                  </Text>
-                  <Text type="text" weight="medium">
-                    {user.telegram_id || user.telegramId}
-                  </Text>
-                </BlockNew>
+                <GroupItem
+                  text="Telegram ID"
+                  after={
+                    <Text type="text" weight="medium">
+                      {user.telegram_id || user.telegramId}
+                    </Text>
+                  }
+                />
               )}
 
               {((user.is_channel_owner || user.isChannelOwner) ||
                 (user.is_advertiser || user.isAdvertiser)) && (
-                <BlockNew row gap={8}>
-                  <Text type="text" color="secondary">
-                    Roles:
-                  </Text>
-                  <Text type="text" weight="medium">
-                    {[
-                      (user.is_channel_owner || user.isChannelOwner) &&
-                        'Channel Owner',
-                      (user.is_advertiser || user.isAdvertiser) && 'Advertiser',
-                    ]
-                      .filter(Boolean)
-                      .join(', ')}
-                  </Text>
-                </BlockNew>
+                <GroupItem
+                  text="Roles"
+                  after={
+                    <Text type="text" weight="medium">
+                      {[
+                        (user.is_channel_owner || user.isChannelOwner) &&
+                          'Channel Owner',
+                        (user.is_advertiser || user.isAdvertiser) && 'Advertiser',
+                      ]
+                        .filter(Boolean)
+                        .join(', ')}
+                    </Text>
+                  }
+                />
               )}
 
               {user.languageCode && (
-                <BlockNew row gap={8}>
-                  <Text type="text" color="secondary">
-                    Language:
-                  </Text>
-                  <Text type="text" weight="medium">
-                    {user.languageCode.toUpperCase()}
-                  </Text>
-                </BlockNew>
+                <GroupItem
+                  text="Language"
+                  after={
+                    <Text type="text" weight="medium">
+                      {user.languageCode.toUpperCase()}
+                    </Text>
+                  }
+                />
               )}
 
               {user.isPremium && (
-                <BlockNew row gap={8}>
-                  <Text type="text" color="secondary">
-                    Status:
-                  </Text>
-                  <Text type="text" weight="medium" color="accent">
-                    ⭐ Premium
-                  </Text>
-                </BlockNew>
+                <GroupItem
+                  text="Status"
+                  after={
+                    <Text type="text" weight="medium" color="accent">
+                      ⭐ Premium
+                    </Text>
+                  }
+                />
               )}
-            </BlockNew>
+            </Group>
           </BlockNew>
 
-          {/* Logout Button */}
           {!isTelegramMiniApp && (
             <BlockNew gap={12}>
               <Button type="danger" onClick={handleLogout}>

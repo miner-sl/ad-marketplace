@@ -1,9 +1,10 @@
-export const goTo = (link: string) => {
-  const webApp = window.Telegram?.WebApp
+import { openTelegramLink, openLink } from '@tma.js/sdk-react'
 
+export const goTo = (link: string) => {
   if (link.includes('t.me')) {
-    webApp?.openTelegramLink(link)
+    openTelegramLink(link)
   } else {
-    webApp?.openLink(link)
+    openLink(link)
   }
 }
+

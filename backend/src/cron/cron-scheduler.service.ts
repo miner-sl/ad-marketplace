@@ -1,18 +1,18 @@
 import * as cron from 'node-cron';
 
-import { TelegramService } from '../services/telegram.service';
-import { PostSchedulerService } from '../services/post-scheduler.service';
-import { AutoReleaseSchedulerService } from '../services/auto-release-scheduler.service';
-import { VerificationSchedulerService } from '../services/verification-scheduler.service';
-import { TonEscrowPaymentPollingService } from '../services/ton-escrow-payment-polling.service';
+import {TelegramService} from '../services/telegram.service';
+import {PostSchedulerService} from '../services/post-scheduler.service';
+import {AutoReleaseSchedulerService} from '../services/auto-release-scheduler.service';
+import {VerificationSchedulerService} from '../services/verification-scheduler.service';
+import {TonEscrowPaymentPollingService} from '../services/ton-escrow-payment-polling.service';
+import {
+  TelegramChannelStatsRefreshSchedulerService
+} from '../services/telegram-channel-stats-refresh-scheduler.service';
 
-import { DealModel } from '../repositories/deal-model.repository';
-import { ChannelModel } from '../repositories/channel-model.repository';
-import { UserModel } from '../repositories/user.repository';
-
-import db from '../db/connection';
+import {DealModel} from '../repositories/deal-model.repository';
+import {UserModel} from '../repositories/user.repository';
 import logger from '../utils/logger';
-import { isPrimaryWorker } from '../utils/cluster.util';
+import {isPrimaryWorker} from '../utils/cluster.util';
 
 export class CronJobsSchedulerService {
   private static jobs: cron.ScheduledTask[] = [];
@@ -20,6 +20,7 @@ export class CronJobsSchedulerService {
   private static autoReleaseSchedulerService: AutoReleaseSchedulerService | null = null;
   private static verificationSchedulerService: VerificationSchedulerService | null = null;
   private static tonEscrowPaymentPollingService: TonEscrowPaymentPollingService | null = null;
+  private static telegramChannelStatsRefreshSchedulerService: TelegramChannelStatsRefreshSchedulerService | null = null;
 
   /**
    * Start all cron jobs
@@ -30,14 +31,17 @@ export class CronJobsSchedulerService {
     }
     logger.info('Starting cron jobs...');
 
+    // Auto-release funds for verified deals (buyer didn't confirm)
     this.postSchedulerService = new PostSchedulerService();
     this.postSchedulerService.onModuleInit();
     this.postSchedulerService.start();
 
+    // Check for scheduled posts every 5 minutes
     this.autoReleaseSchedulerService = new AutoReleaseSchedulerService();
     this.autoReleaseSchedulerService.onModuleInit();
     this.autoReleaseSchedulerService.start();
 
+    // Check for posts ready for verification every hour
     this.verificationSchedulerService = new VerificationSchedulerService();
     this.verificationSchedulerService.onModuleInit();
     this.verificationSchedulerService.start();
@@ -46,16 +50,18 @@ export class CronJobsSchedulerService {
     this.tonEscrowPaymentPollingService.onModuleInit();
     this.tonEscrowPaymentPollingService.start();
 
+    // Refresh channel stats daily at 2 AM
+    this.telegramChannelStatsRefreshSchedulerService = new TelegramChannelStatsRefreshSchedulerService();
+    this.telegramChannelStatsRefreshSchedulerService.onModuleInit();
+    this.telegramChannelStatsRefreshSchedulerService.start();
+
     // TODO maybe need to merge some jobs into one
     // TODO scalable jobs
 
     // Check for expired deals every 10 minutes
     // this.startExpiredDealsJob();
 
-    // Refresh channel stats daily at 2 AM
-    this.startTelegramChannelStatsRefreshJob();
-
-    logger.info(`Started ${this.jobs.length} cron job(s) + PostSchedulerService + AutoReleaseSchedulerService + VerificationSchedulerService + TonEscrowPaymentPollingService`);
+    logger.info(`Started ${this.jobs.length} cron job(s) + PostSchedulerService + AutoReleaseSchedulerService + VerificationSchedulerService + TonEscrowPaymentPollingService + TelegramChannelStatsRefreshSchedulerService`);
   }
 
   /**
@@ -83,6 +89,11 @@ export class CronJobsSchedulerService {
     if (this.tonEscrowPaymentPollingService) {
       this.tonEscrowPaymentPollingService.stop();
       this.tonEscrowPaymentPollingService = null;
+    }
+
+    if (this.telegramChannelStatsRefreshSchedulerService) {
+      this.telegramChannelStatsRefreshSchedulerService.stop();
+      this.telegramChannelStatsRefreshSchedulerService = null;
     }
 
     logger.info('Stopped all cron jobs');
@@ -151,38 +162,5 @@ export class CronJobsSchedulerService {
 
     this.jobs.push(job);
     logger.info('Expired deals job started (runs every 10 minutes)');
-  }
-
-
-  /**
-   * Refresh channel stats
-   * Runs daily at 2 AM
-   */
-  private static startTelegramChannelStatsRefreshJob() {
-    const job = cron.schedule('0 2 * * *', async () => {
-      try {
-        logger.info('Refreshing channel stats...');
-
-        const channels = await db.query(
-          'SELECT id, telegram_channel_id FROM channels WHERE is_active = TRUE'
-        );
-
-        for (const channel of channels.rows) {
-          try {
-            const stats = await TelegramService.fetchChannelStats(channel.telegram_channel_id);
-            await ChannelModel.saveStats(channel.id, stats);
-
-            logger.info(`Refreshed stats for Channel #${channel.id}`, { channelId: channel.id });
-          } catch (error: any) {
-            logger.error(`Error refreshing stats for Channel #${channel.id}`, { channelId: channel.id, error: error.message, stack: error.stack });
-          }
-        }
-      } catch (error: any) {
-        logger.error('Error in stats refresh job', { error: error.message, stack: error.stack });
-      }
-    });
-
-    this.jobs.push(job);
-    logger.info('Stats refresh job started (runs daily at 2 AM)');
   }
 }

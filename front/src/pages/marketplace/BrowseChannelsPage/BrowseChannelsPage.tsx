@@ -10,16 +10,12 @@ import {
   Button,
   ListInput,
   Group,
-  GroupItem,
-  Image,
-  Icon,
   Block,
   Dropdown,
-  AdFormatBadge,
+  ChannelListItem,
+  Icon,
 } from '@components'
 import { useChannelsQuery, type EnhancedChannel } from '@store-new'
-import { ROUTES_NAME } from '@routes'
-import {pluralize, hapticFeedback} from '@utils'
 import {useDebounce} from '@hooks'
 import type { ChannelFilters, AdFormat } from '@types'
 
@@ -35,7 +31,7 @@ const formatAdFormatLabel = (format: AdFormat | ''): string => {
 export const BrowseChannelsPage = () => {
   const navigate = useNavigate()
   const [filters, setFilters] = useState<ChannelFilters>({
-    limit: 14,
+    limit: 14, // TODO calculate limit based on screen size
   })
   const [showFilters, setShowFilters] = useState(false)
   const [searchInput, setSearchInput] = useState('')
@@ -259,79 +255,14 @@ export const BrowseChannelsPage = () => {
           ) : channels && channels.length > 0 ? (
             <BlockNew id="channels-container">
               <Group>
-                {channels.map((channel: EnhancedChannel) => {
-                  const { activeAdFormats, topic, channelName, subscribersCount, postPricing } = channel
-
-                  return (
-                    <GroupItem
-                      key={channel.id}
-                      text={
-                        <BlockNew row align="center" gap={8}>
-                          <Text type="text" weight="bold">
-                            {channelName}
-                          </Text>
-                          {channel.is_verified && (
-                            <Icon name="verified" size={16} />
-                          )}
-                          {activeAdFormats.length > 0 && (
-                            <BlockNew row gap={4} align="center">
-                              {activeAdFormats.map((format) => (
-                                <AdFormatBadge key={format} format={format} />
-                              ))}
-                            </BlockNew>
-                          )}
-                          {topic && (
-                            <div style={{ padding: '2px 8px', borderRadius: '6px', background: 'var(--color-background-tertiary)' }}>
-                              <Text type="caption" color="secondary">
-                                {topic.name}
-                              </Text>
-                            </div>
-                          )}
-                        </BlockNew>
-                      }
-                      description={
-                        <BlockNew gap={6} row align="center" fadeIn={false}>
-                          {subscribersCount > 0 && (
-                            <>
-                              <Text type="caption2" color="tertiary">
-                                {pluralize(
-                                  ['member', 'members', 'members'],
-                                  subscribersCount
-                                )}
-                              </Text>
-                              <Text type="caption2" color="tertiary">
-                                •
-                              </Text>
-                            </>
-                          )}
-                          {postPricing && (
-                            <Text type="caption2" color="accent">
-                              {postPricing.price_ton} TON
-                            </Text>
-                          )}
-                        </BlockNew>
-                      }
-                      chevron
-                      before={
-                        <Image
-                          src={null}
-                          size={40}
-                          borderRadius={50}
-                          fallback={channelName}
-                        />
-                      }
-                      onClick={() => {
-                        hapticFeedback('soft')
-                        navigate(
-                          ROUTES_NAME.MARKETPLACE_CHANNEL_DETAILS.replace(
-                            ':id',
-                            channel.id.toString()
-                          )
-                        )
-                      }}
-                    />
-                  )
-                })}
+                {channels.map((channel: EnhancedChannel) => (
+                  <ChannelListItem
+                    key={channel.id}
+                    channel={channel}
+                    showAdFormats
+                    showTopic
+                  />
+                ))}
               </Group>
             </BlockNew>
           ) : (

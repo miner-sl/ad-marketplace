@@ -1,52 +1,58 @@
 import { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
 import { ChannelModel } from '../models/Channel';
 import { ChannelRepository } from '../repositories/ChannelRepository';
 import { UserModel } from '../models/User';
 import { TelegramService } from '../services/telegram';
 import { ChannelService } from '../services/channel';
 import { topicsService } from '../services/topics';
-import { validateBody } from '../middleware/validation';
+import { validateBody, validateQuery } from '../middleware/validation';
 import { authMiddleware } from '../middleware/auth';
-import { createChannelSchema } from '../utils/validation';
+import { createChannelSchema, listChannelsQuerySchema } from '../utils/validation';
 import logger from '../utils/logger';
 
 const channelsRouter: FastifyPluginAsync = async (fastify) => {
-  // List channels with filters
-  fastify.get('/', async (request, reply) => {
+  // List channels with filters (requires authentication)
+  fastify.get('/', {
+    preHandler: [authMiddleware, validateQuery(listChannelsQuerySchema)],
+  }, async (request, reply) => {
     try {
-      const {
-        min_subscribers,
-        max_subscribers,
-        min_price,
-        max_price,
-        ad_format,
-        search,
-        limit = 50,
-        offset = 0,
-      } = request.query as any;
+      const query = request.query as {
+        min_subscribers?: number;
+        max_subscribers?: number;
+        min_price?: number;
+        max_price?: number;
+        ad_format?: string;
+        search?: string;
+        ownerTelegramId?: boolean;
+        status?: 'active' | 'inactive' | 'moderation';
+        limit?: number;
+        offset?: number;
+      };
 
       const filters = {
-        min_subscribers: min_subscribers !== undefined && min_subscribers !== null && min_subscribers !== '' 
-          ? parseInt(min_subscribers as string) 
+        min_subscribers: query.min_subscribers,
+        max_subscribers: query.max_subscribers,
+        min_price: query.min_price,
+        max_price: query.max_price,
+        ad_format: query.ad_format,
+        search: query.search,
+        ownerTelegramId: query.ownerTelegramId
+          ? request.user?.id
           : undefined,
-        max_subscribers: max_subscribers !== undefined && max_subscribers !== null && max_subscribers !== '' 
-          ? parseInt(max_subscribers as string) 
-          : undefined,
-        min_price: min_price !== undefined && min_price !== null && min_price !== '' 
-          ? parseFloat(min_price as string) 
-          : undefined,
-        max_price: max_price !== undefined && max_price !== null && max_price !== '' 
-          ? parseFloat(max_price as string) 
-          : undefined,
-        ad_format: ad_format as string | undefined,
-        search: search as string | undefined,
-        limit: parseInt(limit as string),
-        offset: parseInt(offset as string),
+        status: query.status,
+        limit: query.limit || 50,
+        offset: query.offset || 0,
       };
 
       const channels = await ChannelRepository.listChannelsWithFilters(filters);
       return channels;
     } catch (error: any) {
+      logger.error('Failed to list channels', {
+        error: error.message,
+        stack: error.stack,
+        userId: request.user?.id,
+      });
       reply.code(500).send({ error: error.message });
     }
   });

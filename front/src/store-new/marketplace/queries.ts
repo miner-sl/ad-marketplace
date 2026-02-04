@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '@context'
 import { TANSTACK_GC_TIME, TANSTACK_KEYS, TANSTACK_TTL } from '@utils'
 import type {
   Channel,
@@ -31,10 +32,14 @@ export interface EnhancedChannel extends Omit<Channel, 'topic'> {
   channelName: string
   subscribersCount: number
   postPricing: ChannelPricing | undefined
+  isOwner: boolean
 }
 
 // Channels
 export const useChannelsQuery = (filters?: ChannelFilters) => {
+  const { user } = useAuth()
+  const userId = user?.id
+
   console.log('useChannelsQuery hook called with filters:', filters)
   return useQuery<Channel[], Error, EnhancedChannel[]>({
     queryKey: [...TANSTACK_KEYS.CHANNELS, filters],
@@ -47,7 +52,7 @@ export const useChannelsQuery = (filters?: ChannelFilters) => {
     select: (channels: Channel[]): EnhancedChannel[] => {
       return channels.map((channel) => {
         const activePricing = channel.pricing?.filter((p) => p.is_active) || []
-        const activeAdFormats = activePricing.map((p) => p.ad_format)
+        const activeAdFormats = activePricing.filter(p => p.ad_format === 'post').map((p) => p.ad_format)
         const topic =
           channel.topic ||
           (channel.topic_id
@@ -56,6 +61,7 @@ export const useChannelsQuery = (filters?: ChannelFilters) => {
         const channelName = channel.title || `@${channel.username || 'channel'}`
         const subscribersCount = channel.stats?.subscribers_count || 0
         const postPricing = channel.pricing?.find((p) => p.ad_format === 'post' && p.is_active)
+        const isOwner = userId !== undefined && userId === channel.owner_id
 
         return {
           ...channel,
@@ -64,6 +70,7 @@ export const useChannelsQuery = (filters?: ChannelFilters) => {
           channelName,
           subscribersCount,
           postPricing,
+          isOwner,
         } as EnhancedChannel
       })
     },

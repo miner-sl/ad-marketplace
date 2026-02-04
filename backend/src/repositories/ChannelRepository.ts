@@ -22,6 +22,8 @@ export interface ChannelListFilters {
   max_price?: number;
   ad_format?: string;
   search?: string;
+  ownerTelegramId?: number;
+  status?: 'active' | 'inactive' | 'moderation';
   limit?: number;
   offset?: number;
 }
@@ -129,8 +131,10 @@ export class ChannelRepository {
       max_subscribers,
       min_price,
       max_price,
-      ad_format,
+      ad_format, // TODO support multiple formats selected ad_formats: AdFormat[]
       search,
+      ownerTelegramId,
+      status,
       limit = 50,
       offset = 0,
     } = filters;
@@ -139,10 +143,10 @@ export class ChannelRepository {
     const pricingParams: any[] = [];
     let pricingParamCount = 1;
 
-    if (ad_format) {
+    // if (ad_format) {
       pricingConditions += ` AND cp_filter.ad_format = $${pricingParamCount++}`;
-      pricingParams.push(ad_format);
-    }
+      pricingParams.push('post');
+    // }
     if (min_price !== undefined) {
       pricingConditions += ` AND cp_filter.price_ton >= $${pricingParamCount++}`;
       pricingParams.push(min_price);
@@ -152,6 +156,7 @@ export class ChannelRepository {
       pricingParams.push(max_price);
     }
 
+    console.log({ownerTelegramId});
     // Query to get unique channels with stats
     let query = `
       SELECT DISTINCT c.*, cs.subscribers_count, cs.average_views
@@ -162,10 +167,15 @@ export class ChannelRepository {
         ORDER BY stats_date DESC 
         LIMIT 1
       ) cs ON true
-      WHERE c.is_active = TRUE
+      WHERE 1=1
     `;
     const params: any[] = [];
     let paramCount = 1;
+
+    // Default: only show active channels if status not specified
+    if (!status) {
+      query += ` AND c.is_active = TRUE`;
+    }
 
     if (min_subscribers !== undefined) {
       query += ` AND cs.subscribers_count >= $${paramCount++}`;
@@ -175,7 +185,7 @@ export class ChannelRepository {
       query += ` AND cs.subscribers_count <= $${paramCount++}`;
       params.push(max_subscribers);
     }
-    
+
     if (search && search.trim() !== '') {
       query += ` AND (
         c.title ILIKE $${paramCount} OR 
@@ -183,6 +193,28 @@ export class ChannelRepository {
       )`;
       params.push(`%${search.trim()}%`);
       paramCount++;
+    }
+
+    // Filter by owner's Telegram ID
+    if (ownerTelegramId !== undefined) {
+      query += ` AND c.owner_id = $${paramCount++}`;
+      params.push(ownerTelegramId);
+    }
+
+    // Filter by status
+    if (status) {
+      switch (status) {
+        case 'active':
+          query += ` AND c.is_active = TRUE`;
+          break;
+        case 'inactive':
+          query += ` AND c.is_active = FALSE`;
+          break;
+        case 'moderation':
+          // Moderation means not verified - adjust based on your business logic
+          query += ` AND c.is_verified = FALSE`;
+          break;
+      }
     }
 
     // Add pricing filter condition if any pricing filters exist

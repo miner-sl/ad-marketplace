@@ -60,3 +60,42 @@ export const dealRequestsQuerySchema = z.object({
   telegram_id: z.string().regex(/^\d+$/).transform(Number),
   limit: z.string().regex(/^\d+$/).transform(Number).optional(),
 });
+
+export const listChannelsQuerySchema = z.object({
+  min_subscribers: z.preprocess(
+    (val) => (typeof val === 'string' ? parseInt(val, 10) : val),
+    z.number().int().positive().optional()
+  ),
+  max_subscribers: z.preprocess(
+    (val) => (typeof val === 'string' ? parseInt(val, 10) : val),
+    z.number().int().positive().optional()
+  ),
+  min_price: z.preprocess(
+    (val) => (typeof val === 'string' ? parseFloat(val) : val),
+    z.number().positive().optional()
+  ),
+  max_price: z.preprocess(
+    (val) => (typeof val === 'string' ? parseFloat(val) : val),
+    z.number().positive().optional()
+  ),
+  ad_format: z.enum(['post', 'story', 'forward']).optional(),
+  search: z.string().optional(),
+  ownerTelegramId: z.preprocess(
+    (val) => {
+      if (typeof val === 'string') {
+        return val === 'true';
+      }
+      return val;
+    },
+    z.boolean().optional()
+  ),
+  status: z.enum(['active', 'inactive', 'moderation']).optional(),
+  limit: z.preprocess(
+    (val) => (typeof val === 'string' ? parseInt(val, 10) : val ?? 50),
+    z.number().int().positive().default(50)
+  ),
+  offset: z.preprocess(
+    (val) => (typeof val === 'string' ? parseInt(val, 10) : val ?? 0),
+    z.number().int().nonnegative().default(0)
+  ),
+});

@@ -1,12 +1,8 @@
 import { z } from 'zod';
 
 export const createChannelSchema = z.object({
-  telegram_id: z.number(),
   telegram_channel_id: z.number(),
   username: z.string().optional(),
-  first_name: z.string().optional(),
-  last_name: z.string().optional(),
-  bot_token: z.string(),
 });
 
 export const createDealSchema = z.object({

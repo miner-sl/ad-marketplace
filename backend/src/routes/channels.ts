@@ -3,8 +3,11 @@ import { ChannelModel } from '../models/Channel';
 import { ChannelRepository } from '../repositories/ChannelRepository';
 import { UserModel } from '../models/User';
 import { TelegramService } from '../services/telegram';
+import { ChannelService } from '../services/channel';
 import { validateBody } from '../middleware/validation';
+import { authMiddleware } from '../middleware/auth';
 import { createChannelSchema } from '../utils/validation';
+import logger from '../utils/logger';
 
 const channelsRouter: FastifyPluginAsync = async (fastify) => {
   // List channels with filters
@@ -63,52 +66,76 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
 
   // Register channel
   fastify.post('/', {
-    preHandler: [validateBody(createChannelSchema)],
+    preHandler: [authMiddleware, validateBody(createChannelSchema)],
   }, async (request, reply) => {
     try {
-      const { telegram_id, telegram_channel_id, bot_token, username, first_name, last_name } = request.body as any;
-
-      // Find or create user
-      const user = await UserModel.findOrCreate({
-        telegram_id,
-        username,
-        first_name,
-        last_name,
-      });
-
-      // Verify bot is admin
-      const isAdmin = await TelegramService.isBotAdmin(telegram_channel_id);
-      if (!isAdmin) {
+      if (!request.user?.telegramId) {
         return reply.code(400).send({
-          error: 'Bot must be added as admin to the channel',
+          error: 'Invalid user',
+          message: 'Telegram ID not found in token',
         });
       }
 
-      // Get channel info
-      const channelInfo = await TelegramService.getChannelInfo(telegram_channel_id);
+      const { telegram_channel_id } = request.body as any;
 
-      // Create channel
-      const channel = await ChannelModel.create({
-        owner_id: user.id,
-        telegram_channel_id,
-        username: channelInfo.username,
-        title: channelInfo.title,
-        description: channelInfo.description,
-      });
+      const result = await ChannelService.registerChannel(
+        request.user.telegramId,
+        telegram_channel_id
+      );
 
-      // Update bot admin ID
-      await ChannelModel.updateBotAdmin(channel.id, parseInt(bot_token.split(':')[0]));
+      if (!result.success) {
+        switch (result.error) {
+          case 'USER_NOT_FOUND':
+            return reply.code(404).send({
+              error: result.error,
+              message: result.message || 'User not found',
+            });
 
-      // Fetch and save stats
-      const stats = await TelegramService.fetchChannelStats(telegram_channel_id);
-      await ChannelModel.saveStats(channel.id, stats);
+          case 'CHANNEL_ALREADY_EXISTS':
+            return reply.code(409).send({
+              error: result.error,
+              message: result.message || 'Channel already registered',
+              channel: result.channel,
+            });
 
-      // Update user role
-      await UserModel.updateRole(telegram_id, 'channel_owner', true);
+          case 'BOT_NOT_ADMIN':
+            return reply.code(400).send({
+              error: result.error,
+              message: result.message || 'Bot is not admin of the channel',
+            });
 
-      return channel;
+          case 'FAILED_TO_CREATE':
+            return reply.code(500).send({
+              error: result.error,
+              message: result.message || 'Failed to register channel',
+            });
+
+          default:
+            return reply.code(500).send({
+              error: 'UNKNOWN_ERROR',
+              message: result.message || 'An error occurred',
+            });
+        }
+      }
+
+      if (result.channel) {
+        const stats = await TelegramService.fetchChannelStats(telegram_channel_id);
+        await ChannelModel.saveStats(result.channel.id, stats);
+
+        if (request.user.telegramId) {
+          await UserModel.updateRole(request.user.telegramId, 'channel_owner', true);
+        }
+      }
+
+      return result.channel;
     } catch (error: any) {
-      reply.code(500).send({ error: error.message });
+      logger.error('Channel registration endpoint error', {
+        error: error.message,
+        stack: error.stack,
+        userId: request.user?.id,
+        telegramId: request.user?.telegramId,
+      });
+      return reply.code(500).send({ error: error.message });
     }
   });
 
@@ -142,6 +169,11 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
       const savedStats = await ChannelModel.saveStats(parseInt(id), stats);
       return savedStats;
     } catch (error: any) {
+      logger.error('Channel stats refresh endpoint error', {
+        error: error.message,
+        stack: error.stack,
+        channelId: request.id,
+      });
       reply.code(500).send({ error: error.message });
     }
   });

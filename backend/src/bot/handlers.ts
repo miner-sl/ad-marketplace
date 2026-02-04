@@ -3,6 +3,7 @@ import { UserModel } from '../models/User';
 import { DealFlowService } from '../services/dealFlow';
 import { DealModel } from '../models/Deal';
 import { ChannelModel } from '../models/Channel';
+import { ChannelService } from '../services/channel';
 import { CampaignModel } from '../models/Campaign';
 import { TelegramService } from '../services/telegram';
 import { CreativeService } from '../services/creative';
@@ -792,14 +793,9 @@ export class BotHandlers {
   }
 
   /**
-   * Check bot admin status
+   * Check bot admin status and register channel
    */
   static async checkBotAdmin(ctx: Context, channelId?: number) {
-    const user = await UserModel.findByTelegramId(ctx.from!.id);
-    if (!user) {
-      return ctx.reply('Please use /start first');
-    }
-
     if (!channelId) {
       await ctx.reply(
         `Please provide channel ID:\n\n` +
@@ -812,52 +808,64 @@ export class BotHandlers {
       return;
     }
 
-    const isAdmin = await TelegramService.isBotAdmin(channelId);
+    const result = await ChannelService.registerChannel(ctx.from!.id, channelId);
 
-    if (!isAdmin) {
-      await ctx.reply(
-        `❌ Bot is not admin of channel ${channelId}\n\n` +
-        `Please add @${(await TelegramService.bot.getMe()).username} as admin to your channel and try again.`
-      );
-      return;
+    if (!result.success) {
+      switch (result.error) {
+        case 'USER_NOT_FOUND':
+          await ctx.reply(result.message || 'Please use /start first');
+          return;
+
+        case 'BOT_NOT_ADMIN':
+          await ctx.reply(
+            `❌ Bot is not admin of channel ${channelId}\n\n` +
+            `Please add @${result.botUsername || 'the bot'} as admin to your channel and try again.`
+          );
+          return;
+
+        case 'CHANNEL_ALREADY_EXISTS':
+          const channelName = result.channelInfo?.title ||
+                            result.channelInfo?.username ||
+                            `Channel #${channelId}`;
+          await ctx.reply(
+            `✅ Channel already registered!\n\n` +
+            `Channel: ${channelName}\n` +
+            `Use /mychannels to manage.`
+          );
+          return;
+
+        case 'FAILED_TO_CREATE':
+          await ctx.reply(
+            `❌ Failed to register channel: ${result.message || 'Unknown error'}\n\n` +
+            `Please try again or contact support.`
+          );
+          return;
+
+        default:
+          await ctx.reply(
+            `❌ An error occurred: ${result.message || 'Unknown error'}`
+          );
+          return;
+      }
     }
 
-    // Get channel info
-    const channelInfo = await TelegramService.getChannelInfo(channelId);
+    if (result.channel && result.channelInfo) {
+      const channelName = result.channel.title ||
+                         result.channel.username ||
+                         `Channel #${result.channel.id}`;
 
-    // Check if channel already exists
-    const existing = await ChannelModel.findByTelegramId(channelId);
-    if (existing) {
       await ctx.reply(
-        `✅ Channel already registered!\n\n` +
-        `Channel: ${channelInfo.title || channelInfo.username || `Channel #${channelId}`}\n` +
-        `Use /mychannels to manage.`
+        `✅ Channel registered successfully!\n\n` +
+        `Channel: ${channelName}\n` +
+        `ID: ${result.channel.id}\n\n` +
+        `Next steps:\n` +
+        `• Set pricing using /set_price_${result.channel.id} <format> <amount>\n` +
+        `• Or use the button below:`,
+        Markup.inlineKeyboard([
+          [Markup.button.callback('💰 Set Pricing', `set_pricing_menu_${result.channel.id}`)]
+        ])
       );
-      return;
     }
-
-    // Create channel
-    const channel = await ChannelModel.create({
-      owner_id: user.id,
-      telegram_channel_id: channelId,
-      username: channelInfo.username,
-      title: channelInfo.title,
-      description: channelInfo.description
-    });
-
-    await ChannelModel.updateBotAdmin(channel.id, (await TelegramService.bot.getMe()).id);
-
-    await ctx.reply(
-      `✅ Channel registered successfully!\n\n` +
-      `Channel: ${channel.title || channel.username || `Channel #${channel.id}`}\n` +
-      `ID: ${channel.id}\n\n` +
-      `Next steps:\n` +
-      `• Set pricing using /set_price_${channel.id} <format> <amount>\n` +
-      `• Or use the button below:`,
-      Markup.inlineKeyboard([
-        [Markup.button.callback('💰 Set Pricing', `set_pricing_menu_${channel.id}`)]
-      ])
-    );
   }
 
   /**

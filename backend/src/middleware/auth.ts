@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { authService } from '../services/auth';
+import { authService } from '../services/auth.service';
 import logger from '../utils/logger';
 
 declare module 'fastify' {
@@ -21,9 +21,8 @@ export async function authMiddleware(
   reply: FastifyReply
 ) {
   try {
-    // Get token from Authorization header
     const authHeader = request.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return reply.code(401).send({
         error: 'Unauthorized',
@@ -33,10 +32,8 @@ export async function authMiddleware(
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
-    // Validate token
     const payload = await authService.validateToken(token);
 
-    // Attach user to request
     request.user = {
       id: parseInt(payload.sub),
       username: payload.username,
@@ -64,11 +61,11 @@ export async function optionalAuthMiddleware(
 ) {
   try {
     const authHeader = request.headers.authorization;
-    
+
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
       const payload = await authService.validateToken(token);
-      
+
       request.user = {
         id: parseInt(payload.sub),
         username: payload.username,

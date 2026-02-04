@@ -1,7 +1,7 @@
-import { ChannelModel, type Channel } from '../models/Channel';
-import { UserModel } from '../models/User';
-import { TelegramService } from './telegram';
-import { topicsService } from './topics';
+import { ChannelModel, type Channel } from '../repositories/channel-model.repository';
+import { UserModel } from '../repositories/user.repository';
+import { TelegramService } from './telegram.service';
+import { topicsService } from './topics.service';
 import { withTx } from '../utils/transaction';
 import logger from '../utils/logger';
 

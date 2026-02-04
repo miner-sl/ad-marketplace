@@ -1,18 +1,14 @@
-import { FastifyPluginAsync } from 'fastify';
-import { DealModel } from '../models/Deal';
-import { DealRepository } from '../repositories/DealRepository';
-import { CreativeRepository } from '../repositories/CreativeRepository';
-import { DealFlowService } from '../services/dealFlow';
-import { UserModel } from '../models/User';
-import { ChannelModel } from '../models/Channel';
-import { validateBody, validateQuery } from '../middleware/validation';
-import { createDealSchema, confirmPaymentSchema, submitCreativeSchema, listDealsQuerySchema, dealRequestsQuerySchema } from '../utils/validation';
+import { FastifyRequest, FastifyReply } from 'fastify';
+import { DealModel } from '../repositories/deal-model.repository';
+import { DealRepository } from '../repositories/deal.repository';
+import { CreativeRepository } from '../repositories/creative.repository';
+import { DealFlowService } from '../services/deal-flow.service';
+import { UserModel } from '../repositories/user.repository';
+import { ChannelModel } from '../repositories/channel-model.repository';
+import logger from '../utils/logger';
 
-const dealsRouter: FastifyPluginAsync = async (fastify) => {
-  // List deals
-  fastify.get('/', {
-    preHandler: [validateQuery(listDealsQuerySchema)],
-  }, async (request, reply) => {
+export class DealsController {
+  static async listDeals(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { user_id, status, deal_type, limit } = request.query as any;
       let deals;
@@ -34,14 +30,15 @@ const dealsRouter: FastifyPluginAsync = async (fastify) => {
 
       return deals;
     } catch (error: any) {
+      logger.error('Failed to list deals', {
+        error: error.message,
+        stack: error.stack,
+      });
       reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Get deal requests for channel owner by Telegram ID
-  fastify.get('/requests', {
-    preHandler: [validateQuery(dealRequestsQuerySchema)],
-  }, async (request, reply) => {
+  static async getDealRequests(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { telegram_id, limit: limitValue } = request.query as any;
       const dealsLimit = limitValue ?? 20;
@@ -52,12 +49,15 @@ const dealsRouter: FastifyPluginAsync = async (fastify) => {
       if (error.message === 'User not found') {
         return reply.code(404).send({ error: error.message });
       }
+      logger.error('Failed to get deal requests', {
+        error: error.message,
+        stack: error.stack,
+      });
       reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Get deal details
-  fastify.get('/:id', async (request, reply) => {
+  static async getDealById(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
       const deal = await DealModel.findByIdWithChannel(parseInt(id));
@@ -72,16 +72,6 @@ const dealsRouter: FastifyPluginAsync = async (fastify) => {
         const telegramId = Number(telegramIdStr);
         if (!isNaN(telegramId)) {
           user = await UserModel.findByTelegramId(telegramId);
-          // if (user) {
-            // console.log(deal, user.id);
-            // const isAuthorized =
-            //   deal.channel_owner_id === user.id ||
-            //   deal.advertiser_id === user.id;
-
-            // if (!isAuthorized) {
-            //   return reply.code(403).send({ error: 'Unauthorized: You are not authorized to view this deal' });
-            // }
-          // }
         }
       }
 
@@ -111,14 +101,16 @@ const dealsRouter: FastifyPluginAsync = async (fastify) => {
         creative,
       };
     } catch (error: any) {
+      logger.error('Failed to get deal', {
+        error: error.message,
+        stack: error.stack,
+        dealId: (request.params as { id: string }).id,
+      });
       reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Create deal
-  fastify.post('/', {
-    preHandler: [validateBody(createDealSchema)],
-  }, async (request, reply) => {
+  static async createDeal(request: FastifyRequest, reply: FastifyReply) {
     try {
       const {
         pricing_id,
@@ -150,40 +142,47 @@ const dealsRouter: FastifyPluginAsync = async (fastify) => {
 
       return result;
     } catch (error: any) {
+      logger.error('Failed to create deal', {
+        error: error.message,
+        stack: error.stack,
+      });
       reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Accept deal
-  fastify.post('/:id/accept', async (request, reply) => {
+  static async acceptDeal(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
       const { channel_owner_id } = request.body as any;
       const deal = await DealFlowService.acceptDeal(parseInt(id), channel_owner_id);
       return deal;
     } catch (error: any) {
+      logger.error('Failed to accept deal', {
+        error: error.message,
+        stack: error.stack,
+        dealId: (request.params as { id: string }).id,
+      });
       reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Confirm payment
-  fastify.post('/:id/payment', {
-    preHandler: [validateBody(confirmPaymentSchema)],
-  }, async (request, reply) => {
+  static async confirmPayment(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
       const { tx_hash } = request.body as any;
       const deal = await DealFlowService.confirmPayment(parseInt(id), tx_hash);
       return deal;
     } catch (error: any) {
+      logger.error('Failed to confirm payment', {
+        error: error.message,
+        stack: error.stack,
+        dealId: (request.params as { id: string }).id,
+      });
       reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Submit creative
-  fastify.post('/:id/creative', {
-    preHandler: [validateBody(submitCreativeSchema)],
-  }, async (request, reply) => {
+  static async submitCreative(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
       const { channel_owner_id, content_type, content_data } = request.body as any;
@@ -194,24 +193,32 @@ const dealsRouter: FastifyPluginAsync = async (fastify) => {
       );
       return creative;
     } catch (error: any) {
+      logger.error('Failed to submit creative', {
+        error: error.message,
+        stack: error.stack,
+        dealId: (request.params as { id: string }).id,
+      });
       reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Approve creative
-  fastify.post('/:id/creative/approve', async (request, reply) => {
+  static async approveCreative(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
       const { advertiser_id } = request.body as any;
       const deal = await DealFlowService.approveCreative(parseInt(id), advertiser_id);
       return deal;
     } catch (error: any) {
+      logger.error('Failed to approve creative', {
+        error: error.message,
+        stack: error.stack,
+        dealId: (request.params as { id: string }).id,
+      });
       reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Request revision
-  fastify.post('/:id/creative/revision', async (request, reply) => {
+  static async requestRevision(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
       const { advertiser_id, notes } = request.body as any;
@@ -222,12 +229,16 @@ const dealsRouter: FastifyPluginAsync = async (fastify) => {
       );
       return deal;
     } catch (error: any) {
+      logger.error('Failed to request revision', {
+        error: error.message,
+        stack: error.stack,
+        dealId: (request.params as { id: string }).id,
+      });
       reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Schedule post
-  fastify.post('/:id/schedule', async (request, reply) => {
+  static async schedulePost(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
       const { post_time } = request.body as any;
@@ -237,20 +248,27 @@ const dealsRouter: FastifyPluginAsync = async (fastify) => {
       );
       return deal;
     } catch (error: any) {
+      logger.error('Failed to schedule post', {
+        error: error.message,
+        stack: error.stack,
+        dealId: (request.params as { id: string }).id,
+      });
       reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Cancel deal
-  fastify.post('/:id/cancel', async (request, reply) => {
+  static async cancelDeal(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
       const deal = await DealModel.cancel(parseInt(id));
       return deal;
     } catch (error: any) {
+      logger.error('Failed to cancel deal', {
+        error: error.message,
+        stack: error.stack,
+        dealId: (request.params as { id: string }).id,
+      });
       reply.code(500).send({ error: error.message });
     }
-  });
-};
-
-export default dealsRouter;
+  }
+}

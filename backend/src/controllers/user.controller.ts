@@ -1,17 +1,9 @@
-import { FastifyPluginAsync } from 'fastify';
-import { UserModel } from '../models/User';
-import { validateQuery } from '../middleware/validation';
-import { z } from 'zod';
+import { FastifyRequest, FastifyReply } from 'fastify';
+import { UserModel } from '../repositories/user.repository';
+import logger from '../utils/logger';
 
-const getUserMeQuerySchema = z.object({
-  telegram_id: z.string().regex(/^\d+$/).transform(Number),
-});
-
-const userRouter: FastifyPluginAsync = async (fastify) => {
-  // Get current user info
-  fastify.get('/me', {
-    preHandler: [validateQuery(getUserMeQuerySchema)],
-  }, async (request, reply) => {
+export class UserController {
+  static async getCurrentUser(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { telegram_id } = request.query as any;
       
@@ -24,7 +16,6 @@ const userRouter: FastifyPluginAsync = async (fastify) => {
         };
       }
 
-      // Return user info without sensitive data
       return {
         registered: true,
         user: {
@@ -39,12 +30,15 @@ const userRouter: FastifyPluginAsync = async (fastify) => {
         },
       };
     } catch (error: any) {
+      logger.error('Failed to get current user', {
+        error: error.message,
+        stack: error.stack,
+      });
       reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Register/update user
-  fastify.post('/register', async (request, reply) => {
+  static async registerUser(request: FastifyRequest, reply: FastifyReply) {
     try {
       const {
         telegram_id,
@@ -82,9 +76,11 @@ const userRouter: FastifyPluginAsync = async (fastify) => {
         },
       };
     } catch (error: any) {
+      logger.error('Failed to register user', {
+        error: error.message,
+        stack: error.stack,
+      });
       reply.code(500).send({ error: error.message });
     }
-  });
-};
-
-export default userRouter;
+  }
+}

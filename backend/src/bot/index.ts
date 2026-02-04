@@ -1,7 +1,7 @@
 import { Telegraf, Markup } from 'telegraf';
 import * as dotenv from 'dotenv';
-import { BotHandlers } from './handlers';
-import { ChannelModel } from '../models/Channel';
+import { BotController } from './bot.controller';
+import { ChannelModel } from '../repositories/channel-model.repository';
 import db from '../db/connection';
 
 dotenv.config();
@@ -11,31 +11,31 @@ export const bot = new Telegraf(botToken);
 
 console.log(botToken)
 // Register handlers
-bot.start((ctx) => BotHandlers.handleStart(ctx));
-bot.help((ctx) => BotHandlers.handleHelp(ctx));
+bot.start((ctx) => BotController.handleStart(ctx));
+bot.help((ctx) => BotController.handleHelp(ctx));
 
-bot.command('mydeals', (ctx) => BotHandlers.handleMyDeals(ctx));
-bot.command('mychannels', (ctx) => BotHandlers.handleMyChannels(ctx));
-bot.command('mycampaigns', (ctx) => BotHandlers.handleMyCampaigns(ctx));
-bot.command('browse_channels', (ctx) => BotHandlers.handleBrowseChannels(ctx));
-bot.command('requests', (ctx) => BotHandlers.handleIncomingRequests(ctx));
+bot.command('mydeals', (ctx) => BotController.handleMyDeals(ctx));
+bot.command('mychannels', (ctx) => BotController.handleMyChannels(ctx));
+bot.command('mycampaigns', (ctx) => BotController.handleMyCampaigns(ctx));
+bot.command('browse_channels', (ctx) => BotController.handleBrowseChannels(ctx));
+bot.command('requests', (ctx) => BotController.handleIncomingRequests(ctx));
 bot.command('register_channel', async (ctx) => {
   const args = ctx.message.text.split(' ');
   // Check if channel ID provided: /register_channel -1001234567890
   if (args.length > 1) {
     const channelId = parseInt(args[1]);
     if (channelId) {
-      await BotHandlers.checkBotAdmin(ctx, channelId);
+      await BotController.checkBotAdmin(ctx, channelId);
       return;
     }
   }
-  await BotHandlers.handleRegisterChannel(ctx);
+  await BotController.handleRegisterChannel(ctx);
 });
 
 bot.command('verify_admins', async (ctx) => {
   const args = ctx.message.text.split(' ');
   const channelId = args.length > 1 ? parseInt(args[1]) : undefined;
-  await BotHandlers.handleVerifyAdmins(ctx, channelId);
+  await BotController.handleVerifyAdmins(ctx, channelId);
 });
 
 // Handle set price command: /set_price_<channel_id> <format> <amount>
@@ -45,7 +45,7 @@ bot.hears(/^\/set_price_(\d+)\s+(\w+)\s+([\d.]+)$/, async (ctx) => {
     const channelId = parseInt(match[1]);
     const format = match[2];
     const amount = parseFloat(match[3]);
-    await BotHandlers.handleSetPriceCommand(ctx, channelId, format, amount);
+    await BotController.handleSetPriceCommand(ctx, channelId, format, amount);
   }
 });
 
@@ -54,7 +54,7 @@ bot.command('deal', async (ctx) => {
   if (args.length < 2) {
     return ctx.reply('Usage: /deal <deal_id>');
   }
-  await BotHandlers.handleDeal(ctx, args[1]);
+  await BotController.handleDeal(ctx, args[1]);
 });
 
 // Handle callback queries (button clicks)
@@ -69,7 +69,7 @@ bot.on('callback_query', async (ctx) => {
     const dealId = parseInt(parts[2]);
     const action = parts[3];
     const userId = parseInt(parts[4]);
-    await BotHandlers.handleDealAction(ctx, dealId, action, userId);
+    await BotController.handleDealAction(ctx, dealId, action, userId);
     return;
   }
 
@@ -77,7 +77,7 @@ bot.on('callback_query', async (ctx) => {
   if (data.startsWith('check_bot_admin_')) {
     const channelIdStr = data.split('_').pop();
     const channelId = channelIdStr === 'new' ? undefined : parseInt(channelIdStr || '0');
-    await BotHandlers.checkBotAdmin(ctx, channelId);
+    await BotController.checkBotAdmin(ctx, channelId);
     return;
   }
 
@@ -89,7 +89,7 @@ bot.on('callback_query', async (ctx) => {
       const channelId = parseInt(parts[2]);
       const format = parts.slice(3).join('_'); // Handle formats with underscores
       if (channelId && format) {
-        await BotHandlers.handleSetPricing(ctx, channelId, format);
+        await BotController.handleSetPricing(ctx, channelId, format);
         return;
       }
     }
@@ -98,7 +98,7 @@ bot.on('callback_query', async (ctx) => {
   // Handle view pricing
   if (data.startsWith('view_pricing_')) {
     const channelId = parseInt(data.split('_')[2]);
-    await BotHandlers.handleViewPricing(ctx, channelId);
+    await BotController.handleViewPricing(ctx, channelId);
     try {
       await ctx.answerCbQuery('Loading pricing');
     } catch {
@@ -144,7 +144,7 @@ bot.on('callback_query', async (ctx) => {
   // Handle deal details
   if (data.startsWith('deal_details_')) {
     const dealId = parseInt(data.split('_')[2]);
-    await BotHandlers.handleDeal(ctx, dealId.toString());
+    await BotController.handleDeal(ctx, dealId.toString());
     try {
       await ctx.answerCbQuery('Loading deal details');
     } catch {
@@ -219,7 +219,7 @@ bot.on('callback_query', async (ctx) => {
       const adFormat = parts[3];
       const priceTon = parseFloat(parts[4]);
       if (channelId && adFormat && priceTon) {
-        await BotHandlers.handleCreateDealRequest(ctx, channelId, adFormat, priceTon);
+        await BotController.handleCreateDealRequest(ctx, channelId, adFormat, priceTon);
         return;
       }
     }
@@ -228,90 +228,90 @@ bot.on('callback_query', async (ctx) => {
   // Handle accept request
   if (data.startsWith('accept_request_')) {
     const dealId = parseInt(data.split('_')[2]);
-    await BotHandlers.handleAcceptRequest(ctx, dealId);
+    await BotController.handleAcceptRequest(ctx, dealId);
     return;
   }
 
   // Handle decline request
   if (data.startsWith('decline_request_')) {
     const dealId = parseInt(data.split('_')[2]);
-    await BotHandlers.handleDeclineRequest(ctx, dealId);
+    await BotController.handleDeclineRequest(ctx, dealId);
     return;
   }
 
   // Handle confirm payment button
   if (data.startsWith('confirm_payment_')) {
     const dealId = parseInt(data.split('_')[2]);
-    await BotHandlers.handleConfirmPaymentButton(ctx, dealId);
+    await BotController.handleConfirmPaymentButton(ctx, dealId);
     return;
   }
 
   // Handle copy escrow address button
   if (data.startsWith('copy_escrow_')) {
     const dealId = parseInt(data.split('_')[2]);
-    await BotHandlers.handleCopyEscrowAddress(ctx, dealId);
+    await BotController.handleCopyEscrowAddress(ctx, dealId);
     return;
   }
 
   // Handle draft creative button
   if (data.startsWith('draft_creative_')) {
     const dealId = parseInt(data.split('_')[2]);
-    await BotHandlers.handleDraftCreative(ctx, dealId);
+    await BotController.handleDraftCreative(ctx, dealId);
     return;
   }
 
   // Handle submit creative button
   if (data.startsWith('submit_creative_')) {
     const dealId = parseInt(data.split('_')[2]);
-    await BotHandlers.handleSubmitCreative(ctx, dealId);
+    await BotController.handleSubmitCreative(ctx, dealId);
     return;
   }
 
   // Handle approve creative button
   if (data.startsWith('approve_creative_')) {
     const dealId = parseInt(data.split('_')[2]);
-    await BotHandlers.handleApproveCreative(ctx, dealId);
+    await BotController.handleApproveCreative(ctx, dealId);
     return;
   }
 
   // Handle request revision button
   if (data.startsWith('request_revision_')) {
     const dealId = parseInt(data.split('_')[2]);
-    await BotHandlers.handleRequestRevision(ctx, dealId);
+    await BotController.handleRequestRevision(ctx, dealId);
     return;
   }
 
   // Handle publish post button
   if (data.startsWith('publish_post_')) {
     const dealId = parseInt(data.split('_')[2]);
-    await BotHandlers.handlePublishPost(ctx, dealId);
+    await BotController.handlePublishPost(ctx, dealId);
     return;
   }
 
   // Handle confirm publication button
   if (data.startsWith('confirm_publication_')) {
     const dealId = parseInt(data.split('_')[2]);
-    await BotHandlers.handleConfirmPublication(ctx, dealId);
+    await BotController.handleConfirmPublication(ctx, dealId);
     return;
   }
 
   // Handle send to draft button
   if (data.startsWith('send_to_draft_')) {
     const dealId = parseInt(data.split('_')[3]);
-    await BotHandlers.handleSendToDraft(ctx, dealId);
+    await BotController.handleSendToDraft(ctx, dealId);
     return;
   }
 
   // Handle channel actions
   if (data.startsWith('refresh_stats_')) {
     const channelId = parseInt(data.split('_')[2]);
-    await BotHandlers.handleRefreshStats(ctx, channelId);
+    await BotController.handleRefreshStats(ctx, channelId);
     return;
   }
 
   if (data.startsWith('set_pricing_menu_')) {
     const channelId = parseInt(data.split('_')[3]);
-    await BotHandlers.handleSetPricingMenu(ctx, channelId);
+    await BotController.handleSetPricingMenu(ctx, channelId);
     try {
       await ctx.answerCbQuery('Pricing menu');
     } catch {
@@ -322,7 +322,7 @@ bot.on('callback_query', async (ctx) => {
 
   if (data.startsWith('view_admins_')) {
     const channelId = parseInt(data.split('_')[2]);
-    await BotHandlers.handleVerifyAdmins(ctx, channelId);
+    await BotController.handleVerifyAdmins(ctx, channelId);
     try {
       await ctx.answerCbQuery('Loading admins');
     } catch {
@@ -403,19 +403,19 @@ bot.on('callback_query', async (ctx) => {
 
   if (data.startsWith('pause_campaign_')) {
     const campaignId = parseInt(data.split('_')[2]);
-    await BotHandlers.handlePauseCampaign(ctx, campaignId);
+    await BotController.handlePauseCampaign(ctx, campaignId);
     return;
   }
 
   if (data.startsWith('close_campaign_')) {
     const campaignId = parseInt(data.split('_')[2]);
-    await BotHandlers.handleCloseCampaign(ctx, campaignId);
+    await BotController.handleCloseCampaign(ctx, campaignId);
     return;
   }
 
   if (data.startsWith('reactivate_campaign_')) {
     const campaignId = parseInt(data.split('_')[2]);
-    await BotHandlers.handleReactivateCampaign(ctx, campaignId);
+    await BotController.handleReactivateCampaign(ctx, campaignId);
     return;
   }
 
@@ -437,7 +437,7 @@ bot.on('text', async (ctx) => {
       const dealId = parseInt(parts[0]);
       const messageText = parts.slice(1).join(' ');
       if (dealId && messageText) {
-        await BotHandlers.handleDealMessage(ctx, dealId, messageText);
+        await BotController.handleDealMessage(ctx, dealId, messageText);
         return;
       }
     } else {
@@ -448,31 +448,31 @@ bot.on('text', async (ctx) => {
 
   // Handle cancel command
   if (text === '/cancel') {
-    await BotHandlers.handleCancelPendingRequest(ctx);
+    await BotController.handleCancelPendingRequest(ctx);
     return;
   }
 
   // Check if user is waiting to submit brief
-  if (BotHandlers.isWaitingForBrief(ctx.from!.id)) {
-    await BotHandlers.handleBriefSubmission(ctx, text);
+  if (BotController.isWaitingForBrief(ctx.from!.id)) {
+    await BotController.handleBriefSubmission(ctx, text);
     return;
   }
 
   // Check if user is waiting to submit creative draft
-  if (BotHandlers.isWaitingForCreativeDraft(ctx.from!.id)) {
-    await BotHandlers.handleCreativeDraftSubmission(ctx, text);
+  if (BotController.isWaitingForCreativeDraft(ctx.from!.id)) {
+    await BotController.handleCreativeDraftSubmission(ctx, text);
     return;
   }
 
   // Check if user is waiting to submit revision notes
-  if (BotHandlers.isWaitingForRevisionNotes(ctx.from!.id)) {
-    await BotHandlers.handleRevisionNotesSubmission(ctx, text);
+  if (BotController.isWaitingForRevisionNotes(ctx.from!.id)) {
+    await BotController.handleRevisionNotesSubmission(ctx, text);
     return;
   }
 
   // Check if user is waiting to submit draft comment
-  if (BotHandlers.isWaitingForDraftComment(ctx.from!.id)) {
-    await BotHandlers.handleDraftCommentSubmission(ctx, text);
+  if (BotController.isWaitingForDraftComment(ctx.from!.id)) {
+    await BotController.handleDraftCommentSubmission(ctx, text);
     return;
   }
 

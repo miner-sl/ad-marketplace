@@ -1,5 +1,5 @@
-import { UserModel } from '../models/User';
-import { TelegramService } from './telegram';
+import { UserModel } from '../repositories/user.repository';
+import { TelegramService } from './telegram.service';
 import logger from '../utils/logger';
 
 export interface NotificationData {

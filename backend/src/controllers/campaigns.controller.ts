@@ -1,12 +1,10 @@
-import { FastifyPluginAsync } from 'fastify';
-import { CampaignRepository } from '../repositories/CampaignRepository';
-import { UserModel } from '../models/User';
-import { validateBody } from '../middleware/validation';
-import { createCampaignSchema } from '../utils/validation';
+import { FastifyRequest, FastifyReply } from 'fastify';
+import { CampaignRepository } from '../repositories/campaign.repository';
+import { UserModel } from '../repositories/user.repository';
+import logger from '../utils/logger';
 
-const campaignsRouter: FastifyPluginAsync = async (fastify) => {
-  // List campaigns with filters
-  fastify.get('/', async (request, reply) => {
+export class CampaignsController {
+  static async listCampaigns(request: FastifyRequest, reply: FastifyReply) {
     try {
       const {
         advertiser_id,
@@ -29,12 +27,15 @@ const campaignsRouter: FastifyPluginAsync = async (fastify) => {
       const campaigns = await CampaignRepository.listCampaignsWithFilters(filters);
       return campaigns;
     } catch (error: any) {
+      logger.error('Failed to list campaigns', {
+        error: error.message,
+        stack: error.stack,
+      });
       reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Get campaign details
-  fastify.get('/:id', async (request, reply) => {
+  static async getCampaignById(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
       const campaign = await CampaignRepository.findById(parseInt(id));
@@ -43,14 +44,16 @@ const campaignsRouter: FastifyPluginAsync = async (fastify) => {
       }
       return campaign;
     } catch (error: any) {
+      logger.error('Failed to get campaign', {
+        error: error.message,
+        stack: error.stack,
+        campaignId: (request.params as { id: string }).id,
+      });
       reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Create campaign
-  fastify.post('/', {
-    preHandler: [validateBody(createCampaignSchema)],
-  }, async (request, reply) => {
+  static async createCampaign(request: FastifyRequest, reply: FastifyReply) {
     try {
       const {
         telegram_id,
@@ -90,12 +93,15 @@ const campaignsRouter: FastifyPluginAsync = async (fastify) => {
 
       return campaign;
     } catch (error: any) {
+      logger.error('Failed to create campaign', {
+        error: error.message,
+        stack: error.stack,
+      });
       reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Update campaign
-  fastify.put('/:id', async (request, reply) => {
+  static async updateCampaign(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
       const {
@@ -118,9 +124,12 @@ const campaignsRouter: FastifyPluginAsync = async (fastify) => {
 
       return campaign;
     } catch (error: any) {
+      logger.error('Failed to update campaign', {
+        error: error.message,
+        stack: error.stack,
+        campaignId: (request.params as { id: string }).id,
+      });
       reply.code(500).send({ error: error.message });
     }
-  });
-};
-
-export default campaignsRouter;
+  }
+}

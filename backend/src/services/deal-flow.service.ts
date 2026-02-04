@@ -1,13 +1,13 @@
-import { DealModel } from '../models/Deal';
-import { ChannelModel } from '../models/Channel';
-import { UserModel } from '../models/User';
-import { TONService } from './ton';
-import { CreativeService } from './creative';
-import { PostService } from './post';
+import { DealModel } from '../repositories/deal-model.repository';
+import { ChannelModel } from '../repositories/channel-model.repository';
+import { UserModel } from '../repositories/user.repository';
+import { TONService } from './ton.service';
+import { CreativeService } from './creative.service';
+import { PostService } from './post.service';
 import { withTx } from '../utils/transaction';
 import db from '../db/connection';
-import { DealRepository } from '../repositories/DealRepository';
-import { ChannelRepository } from '../repositories/ChannelRepository';
+import { DealRepository } from '../repositories/deal.repository';
+import { ChannelRepository } from '../repositories/channel.repository';
 import logger from '../utils/logger';
 import { distributedLock } from '../utils/lock';
 

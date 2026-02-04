@@ -1,9 +1,8 @@
 import jwt, {SignOptions} from 'jsonwebtoken';
-import { UserModel, User } from '../models/User';
-import { telegramAuthService, TelegramUser, WebAppInitData } from './telegramAuth';
+import { UserModel, User } from '../repositories/user.repository';
+import {TelegramUser, WebAppInitData } from './telegram-auth.service';
 import env from '../utils/env';
 import logger from '../utils/logger';
-import { withTx } from '../utils/transaction';
 
 export interface JwtPayload {
   sub: string; // User ID

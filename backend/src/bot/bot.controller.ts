@@ -1,20 +1,20 @@
 import { Context, Markup } from 'telegraf';
-import { UserModel } from '../models/User';
-import { DealFlowService } from '../services/dealFlow';
-import { DealModel } from '../models/Deal';
-import { ChannelModel } from '../models/Channel';
-import { ChannelService } from '../services/channel';
-import { CampaignModel } from '../models/Campaign';
-import { TelegramService } from '../services/telegram';
-import { CreativeService } from '../services/creative';
-import { TONService } from '../services/ton';
-import { NotificationService } from '../services/notification';
-import { ChannelRepository } from '../repositories/ChannelRepository';
-import { DealRepository } from '../repositories/DealRepository';
-import { CreativeRepository } from '../repositories/CreativeRepository';
+import { UserModel } from '../repositories/user.repository';
+import { DealFlowService } from '../services/deal-flow.service';
+import { DealModel } from '../repositories/deal-model.repository';
+import { ChannelModel } from '../repositories/channel-model.repository';
+import { ChannelService } from '../services/channel.service';
+import { CampaignModel } from '../repositories/campaign-model.repository';
+import { TelegramService } from '../services/telegram.service';
+import { CreativeService } from '../services/creative.service';
+import { TONService } from '../services/ton.service';
+import { NotificationService } from '../services/notification.service';
+import { ChannelRepository } from '../repositories/channel.repository';
+import { DealRepository } from '../repositories/deal.repository';
+import { CreativeRepository } from '../repositories/creative.repository';
 import logger from '../utils/logger';
 
-export class BotHandlers {
+export class BotController {
   /**
    * Escape Markdown special characters
    */

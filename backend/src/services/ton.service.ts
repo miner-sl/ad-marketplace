@@ -2,7 +2,7 @@ import { Address, fromNano, toNano, internal, beginCell, Cell } from '@ton/core'
 import { mnemonicToWalletKey, mnemonicNew } from '@ton/crypto';
 import { WalletContractV4, TonClient, internal as tonInternal, SendMode } from '@ton/ton';
 import * as dotenv from 'dotenv';
-import { mockTx } from "./mockTx";
+import { mockTx } from "./mock-tx.service";
 import logger from '../utils/logger';
 import db from '../db/connection';
 import crypto from 'crypto';

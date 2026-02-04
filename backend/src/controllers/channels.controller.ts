@@ -1,21 +1,16 @@
-import { FastifyPluginAsync } from 'fastify';
+import { FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { ChannelModel } from '../models/Channel';
-import { ChannelRepository } from '../repositories/ChannelRepository';
-import { UserModel } from '../models/User';
-import { TelegramService } from '../services/telegram';
-import { ChannelService } from '../services/channel';
-import { topicsService } from '../services/topics';
-import { validateBody, validateQuery } from '../middleware/validation';
-import { authMiddleware } from '../middleware/auth';
-import { createChannelSchema, listChannelsQuerySchema, setChannelPricingSchema, updateChannelStatusSchema } from '../utils/validation';
+import { ChannelModel } from '../repositories/channel-model.repository';
+import { ChannelRepository } from '../repositories/channel.repository';
+import { UserModel } from '../repositories/user.repository';
+import { TelegramService } from '../services/telegram.service';
+import { ChannelService } from '../services/channel.service';
+import { topicsService } from '../services/topics.service';
+import { listChannelsQuerySchema, setChannelPricingSchema, updateChannelStatusSchema } from '../utils/validation';
 import logger from '../utils/logger';
 
-const channelsRouter: FastifyPluginAsync = async (fastify) => {
-  // List channels with filters (requires authentication)
-  fastify.get('/', {
-    preHandler: [authMiddleware, validateQuery(listChannelsQuerySchema)],
-  }, async (request, reply) => {
+export class ChannelsController {
+  static async getChannelsByFilters(request: FastifyRequest, reply: FastifyReply) {
     try {
       const query = request.query as {
         min_subscribers?: number;
@@ -55,10 +50,9 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
       });
       reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Get channel details
-  fastify.get('/:id', async (request, reply) => {
+  static async getChannelById(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
       const channel = await ChannelRepository.findByIdWithDetails(parseInt(id));
@@ -71,12 +65,9 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
     } catch (error: any) {
       reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Register channel
-  fastify.post('/', {
-    preHandler: [authMiddleware, validateBody(createChannelSchema)],
-  }, async (request, reply) => {
+  static async registerChannel(request: FastifyRequest, reply: FastifyReply) {
     try {
       if (!request.user?.telegramId) {
         return reply.code(400).send({
@@ -148,12 +139,9 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
       });
       return reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Set pricing
-  fastify.post('/:id/pricing', {
-    preHandler: [authMiddleware, validateBody(setChannelPricingSchema)],
-  }, async (request, reply) => {
+  static async setChannelPricing(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
       const channelId = parseInt(id);
@@ -165,9 +153,9 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
       }
 
       if (ownerId !== request.user?.id) {
-        return reply.code(403).send({ 
+        return reply.code(403).send({
           error: 'Forbidden',
-          message: 'You do not have permission to set pricing for this channel' 
+          message: 'You do not have permission to set pricing for this channel'
         });
       }
 
@@ -187,21 +175,18 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
       });
       reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Update channel status (activate/deactivate)
-  fastify.patch('/:id/status', {
-    preHandler: [authMiddleware, validateBody(updateChannelStatusSchema)],
-  }, async (request, reply) => {
+  static async updateChannelStatus(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
       const channelId = parseInt(id);
       const body = request.body as z.infer<typeof updateChannelStatusSchema>;
 
       if (!request.user?.telegramId || !request.user?.id) {
-        return reply.code(401).send({ 
+        return reply.code(401).send({
           error: 'Unauthorized',
-          message: 'Telegram ID or user ID not found in token' 
+          message: 'Telegram ID or user ID not found in token'
         });
       }
 
@@ -233,15 +218,14 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
         userId: request.user?.id,
       });
 
-      reply.code(500).send({ 
+      reply.code(500).send({
         error: 'Failed to update channel status',
-        message: error.message 
+        message: error.message
       });
     }
-  });
+  }
 
-  // Refresh channel stats
-  fastify.post('/:id/refresh-stats', async (request, reply) => {
+  static async refreshChannelStats(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
       const channel = await ChannelRepository.findById(parseInt(id));
@@ -260,10 +244,9 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
       });
       reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Get all topics (from cached singleton)
-  fastify.get('/topics', async (request, reply) => {
+  static async getAllTopics(request: FastifyRequest, reply: FastifyReply) {
     try {
       const topics = topicsService.getAllTopics();
       return topics;
@@ -271,10 +254,9 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
       logger.error('Failed to get topics', { error: error.message });
       reply.code(500).send({ error: error.message });
     }
-  });
+  }
 
-  // Get topic by ID (from cached singleton)
-  fastify.get('/topics/:id', async (request, reply) => {
+  static async getTopicById(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
       const topic = topicsService.getTopicById(parseInt(id));
@@ -288,7 +270,5 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
       logger.error('Failed to get topic', { error: error.message, topicId: (request.params as { id: string }).id });
       reply.code(500).send({ error: error.message });
     }
-  });
-};
-
-export default channelsRouter;
+  }
+}

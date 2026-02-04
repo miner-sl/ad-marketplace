@@ -126,7 +126,6 @@ export class ChannelRepository {
    * Returns channels grouped by id with pricing array
    */
   static async listChannelsWithFilters(filters: ChannelListFilters): Promise<any[]> {
-    console.log({filters});
     const {
       min_subscribers,
       max_subscribers,
@@ -227,7 +226,6 @@ export class ChannelRepository {
     query += ` ORDER BY c.created_at DESC LIMIT $${paramCount++} OFFSET $${paramCount++}`;
     params.push(limit, offset);
 
-    console.log({query, params});
     const channelsResult = await db.query(query, params);
     const channels = channelsResult?.rows || [];
 

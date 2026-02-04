@@ -7,9 +7,9 @@
  */
 
 import * as dotenv from 'dotenv';
-import { TONService } from '../services/ton';
+import { TONService } from '../services/ton.service';
 import db from '../db/connection';
-import { UserModel } from '../models/User';
+import { UserModel } from '../repositories/user.repository';
 
 dotenv.config();
 

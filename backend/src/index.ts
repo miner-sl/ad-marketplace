@@ -4,11 +4,11 @@ import os from 'os';
 import * as path from 'path';
 import YAML from 'yamljs';
 
-import channelsRouter from './routes/channels';
-import dealsRouter from './routes/deals';
-import campaignsRouter from './routes/campaigns';
-import userRouter from './routes/user';
-import authRouter from './routes/auth';
+import channelsRouter from './routes/channels.route';
+import dealsRouter from './routes/deals.route';
+import campaignsRouter from './routes/campaigns.route';
+import userRouter from './routes/user.route';
+import authRouter from './routes/auth.route';
 import bot from './bot';
 import { CronJobs } from './cron/jobs';
 import logger from './utils/logger';
@@ -17,7 +17,7 @@ import { requestIdPlugin } from './middleware/requestId';
 import db from './db/connection';
 import { closeRedis } from './utils/redis';
 import { getWorkerId, isPrimaryWorker } from "./utils/cluster.util";
-import { topicsService } from './services/topics';
+import { topicsService } from './services/topics.service';
 
 const PORT = env.PORT;
 const isProd = env.NODE_ENV === 'production';

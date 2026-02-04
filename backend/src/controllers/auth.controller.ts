@@ -1,8 +1,7 @@
-import { FastifyPluginAsync } from 'fastify';
-import { authService } from '../services/auth';
-import { telegramAuthService } from '../services/telegramAuth';
-import { authMiddleware } from '../middleware/auth';
+import { FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
+import { authService } from '../services/auth.service';
+import { telegramAuthService } from '../services/telegram-auth.service';
 import logger from '../utils/logger';
 
 // Validation schemas
@@ -22,16 +21,13 @@ const telegramWebAppAuthSchema = z.object({
   initData: z.string(),
 });
 
-const authRouter: FastifyPluginAsync = async (fastify) => {
-  // Login with Telegram widget
-  fastify.post('/telegram/widget', async (request, reply) => {
+export class AuthController {
+  static async loginWithTelegramWidget(request: FastifyRequest, reply: FastifyReply) {
     try {
       const body = telegramWidgetAuthSchema.parse(request.body);
 
-      // Validate Telegram auth data
       const validatedUser = telegramAuthService.validateWidgetAuth(body);
 
-      // Login and get JWT token
       const result = await authService.loginWithTelegramWidget(validatedUser);
 
       return result;
@@ -53,17 +49,14 @@ const authRouter: FastifyPluginAsync = async (fastify) => {
         message: error.message || 'Invalid Telegram auth data',
       });
     }
-  });
+  }
 
-  // Login with Telegram Mini App (Web App)
-  fastify.post('/telegram/webapp', async (request, reply) => {
+  static async loginWithTelegramWebApp(request: FastifyRequest, reply: FastifyReply) {
     try {
       const body = telegramWebAppAuthSchema.parse(request.body);
 
-      // Validate Web App init data
       const validatedData = telegramAuthService.validateWebAppInitData(body.initData);
 
-      // Login and get JWT token
       const result = await authService.loginWithTelegramMiniApp(validatedData);
 
       return result;
@@ -85,21 +78,15 @@ const authRouter: FastifyPluginAsync = async (fastify) => {
         message: error.message || 'Invalid Telegram init data',
       });
     }
-  });
+  }
 
-  // Logout (client should discard token)
-  fastify.post('/logout', {
-    preHandler: [authMiddleware],
-  }, async (request, reply) => {
+  static async logout(request: FastifyRequest, reply: FastifyReply) {
     // In stateless JWT, logout is handled client-side by discarding the token
     // Server doesn't need to do anything
     return { success: true };
-  });
+  }
 
-  // Get current user info
-  fastify.get('/me', {
-    preHandler: [authMiddleware],
-  }, async (request, reply) => {
+  static async getCurrentUser(request: FastifyRequest, reply: FastifyReply) {
     try {
       if (!request.user) {
         return reply.code(401).send({
@@ -138,7 +125,5 @@ const authRouter: FastifyPluginAsync = async (fastify) => {
         error: 'Internal server error',
       });
     }
-  });
-};
-
-export default authRouter;
+  }
+}

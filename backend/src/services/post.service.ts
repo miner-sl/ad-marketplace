@@ -1,4 +1,4 @@
-import { TelegramService } from './telegram';
+import { TelegramService } from './telegram.service';
 import db from '../db/connection';
 import logger from '../utils/logger';
 import { env } from '../utils/env';

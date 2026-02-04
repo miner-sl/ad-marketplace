@@ -1,4 +1,4 @@
-import { ChannelModel, Topic } from '../models/Channel';
+import { ChannelModel, Topic } from '../repositories/channel-model.repository';
 import logger from '../utils/logger';
 
 /**

@@ -1,16 +1,16 @@
 import * as cron from 'node-cron';
 import { Context } from 'telegraf';
 
-import { TONService } from '../services/ton';
-import { TelegramService } from '../services/telegram';
-import { DealFlowService } from '../services/dealFlow';
-import { BotHandlers } from '../bot/handlers';
+import { TONService } from '../services/ton.service';
+import { TelegramService } from '../services/telegram.service';
+import { DealFlowService } from '../services/deal-flow.service';
+import { BotController } from '../bot/bot.controller';
 
-import { DealRepository } from '../repositories/DealRepository';
+import { DealRepository } from '../repositories/deal.repository';
 
-import { DealModel } from '../models/Deal';
-import { ChannelModel } from '../models/Channel';
-import { UserModel } from '../models/User';
+import { DealModel } from '../repositories/deal-model.repository';
+import { ChannelModel } from '../repositories/channel-model.repository';
+import { UserModel } from '../repositories/user.repository';
 
 import db from '../db/connection';
 import logger from '../utils/logger';
@@ -267,7 +267,7 @@ export class CronJobs {
             } as any as Context;
 
             try {
-              await BotHandlers.handlePublishPost(mockCtx, deal.id);
+              await BotController.handlePublishPost(mockCtx, deal.id);
               logger.info(`Auto-published Deal #${deal.id} via handlePublishPost`, { dealId: deal.id });
             } catch (error: any) {
               logger.error(`Error calling handlePublishPost for Deal #${deal.id}`, { dealId: deal.id, error: error.message, stack: error.stack });

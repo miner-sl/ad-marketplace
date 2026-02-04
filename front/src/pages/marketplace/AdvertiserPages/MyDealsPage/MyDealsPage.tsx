@@ -89,12 +89,7 @@ export const MyDealsPage = () => {
                 onClick={() => handleToggleDropdown()}
                 ref={buttonRef}
               >
-                <Icon name="sortArrows" size={18} color="secondary" />
-                <span style={{ marginLeft: '8px' }}>
-                  <Text type="text" color="secondary">
-                    {formatStatusLabel(selectedStatus)}
-                  </Text>
-                </span>
+                <Icon name="sortArrows" size={18} color='tertiary' />
                 <Dropdown
                   active={isDropdownOpen}
                   options={dropdownOptions}
@@ -103,7 +98,7 @@ export const MyDealsPage = () => {
                     setSelectedStatus(value as DealStatus | 'all')
                   }
                   onClose={() => handleToggleDropdown(false)}
-                  triggerRef={buttonRef as React.RefObject<HTMLElement> | undefined}
+                  triggerRef={buttonRef as React.RefObject<HTMLElement>}
                 />
               </div>
             </BlockNew>

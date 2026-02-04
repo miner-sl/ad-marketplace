@@ -4,6 +4,7 @@
 
 .filters {
   margin-bottom: 8px;
+  width: fit-content;
 }
 
 .orderByContainer {
@@ -12,7 +13,7 @@
   cursor: pointer;
   padding: 8px 12px;
   border-radius: 8px;
-  background: var(--color-backgroundSecondary);
+  background: var(--color-backgroundPrimary);
   transition: background 0.2s;
   position: relative;
 }

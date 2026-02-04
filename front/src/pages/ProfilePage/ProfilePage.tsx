@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { openTelegramLink } from '@tma.js/sdk-react'
 import {
   BlockNew,
   PageLayout,
@@ -36,6 +37,15 @@ export function ProfilePage() {
     .charAt(0)
     .toUpperCase()
 
+  const handleUsernameClick = () => {
+    if (user.username) {
+      openTelegramLink(`https://t.me/${user.username.replace('@', '')}`)
+    } else if (user.telegram_id || user.telegramId) {
+      // For users without username, use user ID
+      openTelegramLink(`https://t.me/user${user.telegram_id || user.telegramId}`)
+    }
+  }
+
   return (
     <Page>
       <PageLayout>
@@ -53,9 +63,14 @@ export function ProfilePage() {
                 {displayName}
               </Text>
               {user.username && (
-                <Text type="text" color="secondary" align="center">
-                  @{user.username}
-                </Text>
+                <span 
+                  onClick={handleUsernameClick}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <Text type="text" color="accent" align="center">
+                    @{user.username}
+                  </Text>
+                </span>
               )}
             </BlockNew>
           </BlockNew>

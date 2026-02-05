@@ -25,9 +25,9 @@ import {useClipboard, useTelegramUser} from '@hooks'
 import {useAuth} from '@context'
 import {ROUTES_NAME} from '@routes'
 import type {AdFormat, Channel, ChannelStats} from '@types'
-import {PREDEFINED_TOPICS} from '@common/constants/topics'
 import styles from './ChannelDetailsPage.module.scss'
 import {checkIsMobile, createMembersCount, getChannelLink, hapticFeedback, separateNumber} from '@utils'
+import {PREDEFINED_TOPICS} from "../../../common/constants/topics";
 
 interface ChannelHeaderProps {
   channel: Channel
@@ -597,7 +597,7 @@ export const ChannelDetailsPage = () => {
                               className={styles.priceInput}
                             />
                             <Text type="text" color="secondary">
-                              TON
+                              USDT
                             </Text>
                           </>
                         ) : (
@@ -608,7 +608,7 @@ export const ChannelDetailsPage = () => {
                               </Text>
                             </div>
                             <Text type="text" color={isEnabled ? 'accent' : 'secondary'}>
-                              {postPricing?.price_ton !== undefined ? postPricing?.price_ton : '-'} TON
+                              {postPricing?.price_ton !== undefined ? postPricing?.price_ton : '-'} USDT
                             </Text>
                           </>
                         )}

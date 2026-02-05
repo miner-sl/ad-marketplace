@@ -28,7 +28,7 @@ export class DealsController {
         });
       }
 
-      return deals;
+      return deals.map((deal) =>({...deal, price_ton: parseInt(deal.price_ton) }));
     } catch (error: any) {
       logger.error('Failed to list deals', {
         error: error.message,

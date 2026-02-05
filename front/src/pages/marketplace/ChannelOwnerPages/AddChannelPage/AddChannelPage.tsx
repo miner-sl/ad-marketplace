@@ -94,7 +94,7 @@ export const AddChannelPage = () => {
 
     if (!priceTon.trim()) {
       showToast({
-        message: 'Please enter price in TON',
+        message: 'Please enter price in USDT',
         type: 'warning',
       })
       return
@@ -225,7 +225,7 @@ export const AddChannelPage = () => {
 
               <BlockNew gap={4}>
                 <Text type="text" weight="medium">
-                  Price (TON) *
+                  Price (USDT) *
                 </Text>
                 <Text type="caption" color="secondary">
                   Set the price for posting ads in your channel

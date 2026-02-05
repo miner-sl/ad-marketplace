@@ -39,12 +39,9 @@ export const ChannelListItem = ({
     is_active,
   } = channel
 
-  // Determine channel status
-  // For now, we only have is_active boolean, but if moderation status exists, it would be checked here
   const channelStatus: 'active' | 'inactive' | 'moderation' = is_active
     ? 'active'
     : 'inactive'
-
 
   const handleClick = () => {
     hapticFeedback('soft')
@@ -84,20 +81,7 @@ export const ChannelListItem = ({
               ))}
             </BlockNew>
           )}
-          {showTopic && topic && (
-            <div
-              style={{
-                padding: '2px 4px',
-                borderRadius: '6px',
-                background: 'var(--color-background-tertiary)',
-              }}
-            >
-              <Text type="caption" color="secondary" weight="medium">
-                {topic.name}
-              </Text>
-            </div>
-          )}
-         
+
         </BlockNew>
       }
       description={
@@ -114,8 +98,21 @@ export const ChannelListItem = ({
           )}
           {postPricing && (
             <Text type="caption2" color="accent">
-              {postPricing.price_ton} TON
+              {postPricing.price_ton} USDT
             </Text>
+          )}
+          {showTopic && topic && (
+            <div
+              style={{
+                padding: '2px 4px',
+                borderRadius: '6px',
+                background: 'var(--color-background-tertiary)',
+              }}
+            >
+              <Text type="caption" color="secondary" weight="medium">
+                {topic.name}
+              </Text>
+            </div>
           )}
           {showStatus && <ChannelStatusBadge status={channelStatus} />}
         </BlockNew>

@@ -37,7 +37,7 @@ export class ChannelService {
   static async registerChannel(
     telegramUserId: number,
     username: string,
-    priceTon: number,
+    priceTon?: number,
     topicId?: number
   ): Promise<ChannelRegistrationResult> {
     try {
@@ -120,14 +120,16 @@ export class ChannelService {
 
         const newChannel = channelResult.rows[0];
 
-        // Create default pricing for 'post' format
-        await ChannelModel.setPricingWithClient(
-          client,
-          newChannel.id,
-          'post',
-          priceTon,
-          true
-        );
+        if (priceTon) {
+          // Create default pricing for 'post' format
+          await ChannelModel.setPricingWithClient(
+            client,
+            newChannel.id,
+            'post',
+            priceTon,
+            true
+          );
+        }
 
         return newChannel;
       });
@@ -284,7 +286,7 @@ export class ChannelService {
 
       // Check if bot is admin
       const isAdmin = await TelegramService.isBotAdmin(telegramChannelId);
-      
+
       return isAdmin;
     } catch (error: any) {
       logger.error('Failed to validate channel admin status', {

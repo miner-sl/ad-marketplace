@@ -20,7 +20,6 @@ import type {
 
 export const channelsAPI = {
   getChannels: async (filters?: ChannelFilters): Promise<Channel[]> => {
-    console.log('getChannels', filters);
     const { data, ok, error } = await MarketplaceService.getChannels(filters)
     if (!ok || !data) {
       throw new Error(error || 'Failed to fetch channels')
@@ -197,7 +196,6 @@ export const dealsAPI = {
     if (!ok || !data) {
       throw new Error(error || 'Failed to fetch deals')
     }
-    console.log(data)
     return data
   },
 

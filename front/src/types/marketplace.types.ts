@@ -157,6 +157,7 @@ export interface ChannelFilters {
   ad_format?: AdFormat
   min_views?: number
   language?: string
+  topic_id?: number
   ownerTelegramId?: boolean
   limit?: number
   offset?: number

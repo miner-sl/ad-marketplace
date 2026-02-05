@@ -1,5 +1,5 @@
 .root {
-  background-color: #000000d2;
+  background-color: var(--color-background-overlay);
   position: fixed;
   top: 0;
   left: 0;
@@ -28,7 +28,7 @@
   border-top-left-radius: 14px;
   border-top-right-radius: 14px;
   background-color: var(--tgui--secondary_bg_color);
-  padding: 40px 16px 44px 16px;
+  padding: 16px 16px 44px 16px;
   z-index: 3000000;
   transform: translateY(100%);
   animation: fadeOut 0.3s ease-in-out;
@@ -38,6 +38,7 @@
 .sheetActive {
   animation: fadeIn 0.3s ease-in-out;
   transform: translateY(-100%);
+  background: var(--color-background-secondary);
 }
 
 .content {

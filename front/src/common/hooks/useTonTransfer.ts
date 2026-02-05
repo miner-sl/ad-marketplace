@@ -2,26 +2,26 @@ import { useTonConnectUI } from '@tonconnect/ui-react'
 import { useToast } from '@components'
 
 /**
- * Hook for handling TON transfers using TON Connect
+ * Hook for handling USDT transfers using TON Connect
  */
 export function useTonTransfer() {
   const [tonConnectUI] = useTonConnectUI()
   const { showToast } = useToast()
 
   /**
-   * Transfer TON to a specified address
+   * Transfer USDT to a specified address
    * @param toAddress - The recipient address (bounceable or non-bounceable)
-   * @param amountTon - The amount in TON (will be converted to nanotons)
+   * @param amountUSDT - The amount in TON (will be converted to nanotons)
    * @param comment - Optional comment for the transaction
    * @returns Promise that resolves when transaction is sent
    */
   const transferTon = async (
     toAddress: string,
-    amountTon: number,
+    amountUSDT: number,
     comment?: string
   ): Promise<void> => {
     try {
-      console.log('Sending TON...', comment);
+      console.log('Sending USDT...', comment);
       // TODO implement with TON connect
       // Check if wallet is connected
       if (!tonConnectUI.account) {
@@ -33,7 +33,7 @@ export function useTonTransfer() {
       }
 
       // Convert TON to nanotons (1 TON = 1,000,000,000 nanotons)
-      const amountNanotons = (amountTon * 1_000_000_000).toString()
+      const amountNanotons = (amountUSDT).toString()
 
       // Create transaction
       const transaction = {
@@ -59,7 +59,7 @@ export function useTonTransfer() {
 
       return Promise.resolve()
     } catch (error: any) {
-      console.error('TON transfer error:', error)
+      console.error('USDT transfer error:', error)
 
       // Handle user rejection
       if (error?.message?.includes('User rejected') || error?.code === 300) {

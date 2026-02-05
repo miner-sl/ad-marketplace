@@ -53,13 +53,10 @@ export const useChannelsQuery = (filters?: ChannelFilters) => {
   const { user } = useAuth()
   const userId = user?.id
 
-  console.log('useChannelsQuery hook called with filters:', filters)
   return useQuery<Channel[], Error, EnhancedChannel[]>({
     queryKey: [...TANSTACK_KEYS.CHANNELS, filters],
     queryFn: async () => {
-      console.log('useChannelsQuery queryFn executing with filters:', filters)
       const result = await channelsAPI.getChannels(filters)
-      console.log('useChannelsQuery queryFn result:', result)
       return result
     },
     select: (channels: Channel[]): EnhancedChannel[] => {

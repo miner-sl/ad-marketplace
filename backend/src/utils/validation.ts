@@ -82,6 +82,10 @@ export const listChannelsQuerySchema = z.object({
   ),
   ad_format: z.enum(['post', 'story', 'forward']).optional(),
   search: z.string().optional(),
+  topic_id: z.preprocess(
+    (val) => (typeof val === 'string' ? parseInt(val) : val),
+    z.number().positive().optional()
+  ),
   ownerTelegramId: z.preprocess(
     (val) => {
       if (typeof val === 'string') {

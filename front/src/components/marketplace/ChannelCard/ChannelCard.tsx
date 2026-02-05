@@ -48,14 +48,14 @@ export const ChannelCard = ({
               </Text>
               {channel.price_ton && (
                 <span className={styles.priceBadge}>
-                  {channel.price_ton} TON
+                  {channel.price_ton} USDT
                 </span>
               )}
               {pricingList.length > 0 && (
                 <>
                   {pricingList.map((pricing) => (
                     <span key={pricing.id} className={styles.formatBadge}>
-                      {pricing.ad_format.charAt(0).toUpperCase() + pricing.ad_format.slice(1)}: {pricing.price_ton} TON
+                      {pricing.ad_format.charAt(0).toUpperCase() + pricing.ad_format.slice(1)}: {pricing.price_ton} USDT
                     </span>
                   ))}
                 </>
@@ -82,7 +82,7 @@ export const ChannelCard = ({
             {showPricing && postPricing && (
               <Block marginValue={8}>
                 <Text type="text" weight="bold" color="accent">
-                  {postPricing.price_ton} TON per post
+                  {postPricing.price_ton} USDT per post
                 </Text>
               </Block>
             )}

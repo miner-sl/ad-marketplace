@@ -4,12 +4,16 @@
 
 .filters {
   border-radius: 12px;
-  padding: 16px;
 }
+//
+//.filterContainer {
+//  background: var(--color-background-base);
+//}
 
 .orderByContainer {
   display: flex;
   align-items: center;
+  gap: 8px;
   cursor: pointer;
   padding: 8px 12px;
   border-radius: 8px;

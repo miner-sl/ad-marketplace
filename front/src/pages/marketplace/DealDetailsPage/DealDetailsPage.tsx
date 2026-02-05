@@ -222,7 +222,7 @@ export const DealDetailsPage = () => {
     if (!isConnected) {
       showToast({
         type: 'error',
-        message: 'Please connect your TON wallet first'
+        message: 'Please connect your USDT wallet first'
       })
       return
     }
@@ -408,7 +408,7 @@ export const DealDetailsPage = () => {
                     Price:
                   </Text>
                   <Text type="text" color="accent">
-                    {deal?.price_ton?.toFixed?.(2) || '-'} TON
+                    {deal?.price_ton?.toFixed?.(2) || '-'} USDT
                   </Text>
                 </BlockNew>
               }
@@ -613,7 +613,7 @@ export const DealDetailsPage = () => {
 
       {showPaymentButton && (
         <TelegramMainButton
-          text={`Pay ${deal.price_ton} TON`}
+          text={`Pay ${deal.price_ton} USDT`}
           onClick={handlePayDeal}
           isVisible={true}
         />

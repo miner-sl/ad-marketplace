@@ -115,6 +115,7 @@ export const MyDealsPage = () => {
                 {filteredDeals.map((deal) => {
                   const channelName = deal.channel?.title || `@${deal.channel?.username || 'channel'}`
                   const subscribersCount = deal.channel?.stats?.subscribers_count || 0
+                  const isApproved = deal.status === 'approved';
 
                   return (
                     <GroupItem
@@ -132,6 +133,16 @@ export const MyDealsPage = () => {
                           <Text type="caption2" color="tertiary">
                             {channelName}
                           </Text>
+                          {isApproved && (
+                            <>
+                              <Text type="caption2" color="tertiary">
+                                •
+                              </Text>
+                              <Text type="caption2" color="tertiary">
+                                {deal.scheduled_post_time}
+                              </Text>
+                            </>
+                          )}
                           {subscribersCount > 0 && (
                             <>
                               <Text type="caption2" color="tertiary">
@@ -146,7 +157,7 @@ export const MyDealsPage = () => {
                             </>
                           )}
                           <Text type="caption2" color="tertiary">
-                            • {deal.price_ton?.toFixed?.(2) || '-'} TON
+                            • {deal.price_ton !== undefined ? deal.price_ton?.toFixed?.(2) + ' USDT' :''}
                           </Text>
                         </BlockNew>
                       }

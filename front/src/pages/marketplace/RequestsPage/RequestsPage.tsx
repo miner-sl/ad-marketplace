@@ -92,7 +92,7 @@ export const RequestsPage = () => {
                             </>
                           )}
                           <Text type="caption2" color="tertiary">
-                            • {deal.price_ton?.toFixed?.(2) || '-'} TON
+                            • {deal.price_ton?.toFixed?.(2) || '-'} USDT
                           </Text>
                         </BlockNew>
                       }

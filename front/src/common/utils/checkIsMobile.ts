@@ -1,6 +1,6 @@
 export const checkIsMobile = () => {
-  const webApp = window?.Telegram?.WebApp
 
+  const webApp = window?.Telegram?.WebApp
   return {
     isMobile: webApp
       ? webApp?.platform === 'ios' ||

@@ -53,7 +53,7 @@ export const DealCard = ({deal, onClick}: DealCardProps) => {
               Format: <strong>{deal.ad_format}</strong>
             </Text>
             <Text type="text" weight="bold" color="accent">
-              Price: {deal.price_ton} TON
+              Price: {deal.price_ton} USDT
             </Text>
           </Block>
           {deal.channel?.stats && (

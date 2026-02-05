@@ -852,82 +852,82 @@ export class BotController {
       );
     }
   }
-
-  /**
-   * Check bot admin status and register channel
-   */
-  static async checkBotAdmin(ctx: Context, channelId?: number) {
-    if (!channelId) {
-      await ctx.reply(
-        `Please provide channel ID:\n\n` +
-        `/register_channel -1001234567890\n\n` +
-        `Or use the button below:`,
-        Markup.inlineKeyboard([
-          [Markup.button.callback('✅ Check Bot Admin Status', 'check_bot_admin_new')]
-        ])
-      );
-      return;
-    }
-
-    const result = await ChannelService.registerChannel(ctx.from!.id, channelId);
-
-    if (!result.success) {
-      switch (result.error) {
-        case 'USER_NOT_FOUND':
-          await ctx.reply(result.message || 'Please use /start first');
-          return;
-
-        case 'BOT_NOT_ADMIN':
-          await ctx.reply(
-            `❌ Bot is not admin of channel ${channelId}\n\n` +
-            `Please add @${result.botUsername || 'the bot'} as admin to your channel and try again.`
-          );
-          return;
-
-        case 'CHANNEL_ALREADY_EXISTS':
-          const channelName = result.channelInfo?.title ||
-                            result.channelInfo?.username ||
-                            `Channel #${channelId}`;
-          await ctx.reply(
-            `✅ Channel already registered!\n\n` +
-            `Channel: ${channelName}\n` +
-            `Use /mychannels to manage.`
-          );
-          return;
-
-        case 'FAILED_TO_CREATE':
-          await ctx.reply(
-            `❌ Failed to register channel: ${result.message || 'Unknown error'}\n\n` +
-            `Please try again or contact support.`
-          );
-          return;
-
-        default:
-          await ctx.reply(
-            `❌ An error occurred: ${result.message || 'Unknown error'}`
-          );
-          return;
-      }
-    }
-
-    if (result.channel && result.channelInfo) {
-      const channelName = result.channel.title ||
-                         result.channel.username ||
-                         `Channel #${result.channel.id}`;
-
-      await ctx.reply(
-        `✅ Channel registered successfully!\n\n` +
-        `Channel: ${channelName}\n` +
-        `ID: ${result.channel.id}\n\n` +
-        `Next steps:\n` +
-        `• Set pricing using /set_price_${result.channel.id} <format> <amount>\n` +
-        `• Or use the button below:`,
-        Markup.inlineKeyboard([
-          [Markup.button.callback('💰 Set Pricing', `set_pricing_menu_${result.channel.id}`)]
-        ])
-      );
-    }
-  }
+  //
+  // /**
+  //  * Check bot admin status and register channel
+  //  */
+  // static async checkBotAdmin(ctx: Context, channelId?: number) {
+  //   if (!channelId) {
+  //     await ctx.reply(
+  //       `Please provide channel ID:\n\n` +
+  //       `/register_channel -1001234567890\n\n` +
+  //       `Or use the button below:`,
+  //       Markup.inlineKeyboard([
+  //         [Markup.button.callback('✅ Check Bot Admin Status', 'check_bot_admin_new')]
+  //       ])
+  //     );
+  //     return;
+  //   }
+  //
+  //   const result = await ChannelService.registerChannel(ctx.from!.id, channelId);
+  //
+  //   if (!result.success) {
+  //     switch (result.error) {
+  //       case 'USER_NOT_FOUND':
+  //         await ctx.reply(result.message || 'Please use /start first');
+  //         return;
+  //
+  //       case 'BOT_NOT_ADMIN':
+  //         await ctx.reply(
+  //           `❌ Bot is not admin of channel ${channelId}\n\n` +
+  //           `Please add @${result.botUsername || 'the bot'} as admin to your channel and try again.`
+  //         );
+  //         return;
+  //
+  //       case 'CHANNEL_ALREADY_EXISTS':
+  //         const channelName = result.channelInfo?.title ||
+  //                           result.channelInfo?.username ||
+  //                           `Channel #${channelId}`;
+  //         await ctx.reply(
+  //           `✅ Channel already registered!\n\n` +
+  //           `Channel: ${channelName}\n` +
+  //           `Use /mychannels to manage.`
+  //         );
+  //         return;
+  //
+  //       case 'FAILED_TO_CREATE':
+  //         await ctx.reply(
+  //           `❌ Failed to register channel: ${result.message || 'Unknown error'}\n\n` +
+  //           `Please try again or contact support.`
+  //         );
+  //         return;
+  //
+  //       default:
+  //         await ctx.reply(
+  //           `❌ An error occurred: ${result.message || 'Unknown error'}`
+  //         );
+  //         return;
+  //     }
+  //   }
+  //
+  //   if (result.channel && result.channelInfo) {
+  //     const channelName = result.channel.title ||
+  //                        result.channel.username ||
+  //                        `Channel #${result.channel.id}`;
+  //
+  //     await ctx.reply(
+  //       `✅ Channel registered successfully!\n\n` +
+  //       `Channel: ${channelName}\n` +
+  //       `ID: ${result.channel.id}\n\n` +
+  //       `Next steps:\n` +
+  //       `• Set pricing using /set_price_${result.channel.id} <format> <amount>\n` +
+  //       `• Or use the button below:`,
+  //       Markup.inlineKeyboard([
+  //         [Markup.button.callback('💰 Set Pricing', `set_pricing_menu_${result.channel.id}`)]
+  //       ])
+  //     );
+  //   }
+  // }
 
   /**
    * Handle verify admins

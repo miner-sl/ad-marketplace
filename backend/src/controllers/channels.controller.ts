@@ -19,6 +19,7 @@ export class ChannelsController {
         min_price?: number;
         max_price?: number;
         ad_format?: string;
+        topic_id?: number;
         search?: string;
         ownerTelegramId?: boolean;
         status?: 'active' | 'inactive' | 'moderation';
@@ -32,6 +33,7 @@ export class ChannelsController {
         min_price: query.min_price,
         max_price: query.max_price,
         ad_format: query.ad_format,
+        topic_id: query.topic_id,
         search: query.search,
         ownerId: query.ownerTelegramId
           ? request.user?.id
@@ -336,7 +338,7 @@ export class ChannelsController {
 
       // Throttle validation requests (5 seconds per user per channel)
       const isAllowed = await throttleChannelValidate(request.user.id, channelName, 5);
-      
+
       if (!isAllowed) {
         return reply.code(429).send({
           error: 'Too Many Requests',

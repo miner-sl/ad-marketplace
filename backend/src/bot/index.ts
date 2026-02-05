@@ -36,7 +36,7 @@ bot.command('register_channel', async (ctx) => {
   if (args.length > 1) {
     const channelId = parseInt(args[1]);
     if (channelId) {
-      await BotController.checkBotAdmin(ctx, channelId);
+      // await BotController.checkBotAdmin(ctx, channelId);
       return;
     }
   }
@@ -88,7 +88,7 @@ bot.on('callback_query', async (ctx) => {
   if (data.startsWith('check_bot_admin_')) {
     const channelIdStr = data.split('_').pop();
     const channelId = channelIdStr === 'new' ? undefined : parseInt(channelIdStr || '0');
-    await BotController.checkBotAdmin(ctx, channelId);
+    // await BotController.checkBotAdmin(ctx, channelId);
     return;
   }
 

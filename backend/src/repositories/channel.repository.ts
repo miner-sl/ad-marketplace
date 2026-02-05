@@ -20,6 +20,7 @@ export interface ChannelListFilters {
   max_subscribers?: number;
   min_price?: number;
   max_price?: number;
+  topic_id?: number;
   ad_format?: string;
   search?: string;
   ownerId?: number;
@@ -117,6 +118,7 @@ export class ChannelRepository {
       max_subscribers,
       min_price,
       max_price,
+      topic_id,
       ad_format, // TODO support multiple formats selected ad_formats: AdFormat[]
       search,
       ownerId,
@@ -140,9 +142,12 @@ export class ChannelRepository {
     const params: any[] = [];
     let paramCount = 1;
 
-    console.log({status, ownerId});
     if (ownerId === undefined && status === undefined) {
       query += ` AND c.is_active = TRUE`;
+    }
+    if (topic_id) {
+      query += ` AND c.topic_id = $${paramCount++}`;
+      params.push(topic_id);
     }
 
     if (min_subscribers !== undefined) {

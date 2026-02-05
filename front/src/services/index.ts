@@ -236,7 +236,6 @@ export const MarketplaceService = {
       })
       queryParams = params.toString() ? '?' + params.toString() : ''
     }
-    console.log(`/deals${queryParams}`)
     return await apiRequest<Deal[]>(`/deals${queryParams}`)
   },
 

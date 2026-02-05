@@ -408,7 +408,7 @@ export const DealDetailsPage = () => {
                     Price:
                   </Text>
                   <Text type="text" color="accent">
-                    {deal?.price_ton?.toFixed?.(2) || '-'} USDT
+                    {deal?.price_ton !== undefined ? deal?.price_ton + ' USDT' : '-'}
                   </Text>
                 </BlockNew>
               }

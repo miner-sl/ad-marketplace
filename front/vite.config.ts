@@ -22,9 +22,16 @@ export default defineConfig({
             if (id.includes('@tma.js')) {
               return 'tma-sdk-react';
             }
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+            if (id.includes('@tonconnect')) {
+              return 'tonconnect-vendor';
+            }
+            if (id.includes('lottie')) {
+              return 'lottie-vendor';
+            }
+            if (id.includes('/react/') || id.includes('/react-dom') || id.includes('react-router-dom')) {
               return 'react-vendor';
             }
+            return 'vendor';
           }
         },
       },

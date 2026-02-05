@@ -1,7 +1,7 @@
-import sneezeLottie from '@assets/sneeze.json'
+// import sneezeLottie from '@assets/sneeze.json'
 import {
   Block,
-  StickerPlayer,
+  // StickerPlayer,
   TelegramBackButton,
   TelegramMainButton,
   Text,
@@ -21,7 +21,7 @@ export const NotFound = () => {
       <PageLayout center>
         <TelegramBackButton />
         <TelegramMainButton text="Close" onClick={handleCloseApp} />
-        <StickerPlayer lottie={sneezeLottie} />
+        {/*<StickerPlayer lottie={sneezeLottie} />*/}
         <Block margin="top" marginValue={16}>
           <Text type="title" align="center" weight="bold">
             Something Went Wrong

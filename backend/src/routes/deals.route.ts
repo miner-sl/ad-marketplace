@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { validateBody, validateQuery } from '../middleware/validation';
 import { authMiddleware } from '../middleware/auth';
-import { createDealSchema, confirmPaymentSchema, submitCreativeSchema, listDealsQuerySchema, dealRequestsQuerySchema } from '../utils/validation';
+import { createDealSchema, confirmPaymentSchema, submitCreativeSchema, listDealsQuerySchema, dealRequestsQuerySchema, declineDealSchema } from '../utils/validation';
 import { DealsController } from '../controllers/deals.controller';
 
 const dealsRouter: FastifyPluginAsync = async (fastify) => {
@@ -45,16 +45,9 @@ const dealsRouter: FastifyPluginAsync = async (fastify) => {
     preHandler: [authMiddleware],
   }, DealsController.updateDealMessage);
 
-  fastify.post('/:id/reject', {
-    preHandler: [authMiddleware],
-    schema: {
-      body: false, // No body required
-    },
+  fastify.post('/:id/decline', {
+    preHandler: [authMiddleware, validateBody(declineDealSchema)],
   }, DealsController.declineDeal);
-
-  fastify.post('/:id/cancel', {
-    preHandler: [authMiddleware],
-  }, DealsController.cancelDeal);
 };
 
 export default dealsRouter;

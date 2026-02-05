@@ -83,7 +83,7 @@ export const env: EnvConfig = {
   TON_API_KEY: getEnvVar('TON_API_KEY', false),
   TON_WALLET_MNEMONIC: getEnvVar('TON_WALLET_MNEMONIC', false),
   
-  DEAL_TIMEOUT_HOURS: getNumberEnvVar('DEAL_TIMEOUT_HOURS', false, 72),
+  DEAL_TIMEOUT_HOURS: getNumberEnvVar('DEAL_TIMEOUT_HOURS', false, 240), // 10 days default (240 hours)
   MIN_POST_DURATION_HOURS: getNumberEnvVar('MIN_POST_DURATION_HOURS', false, 24),
   VERIFIED_TIMEOUT_HOURS: getNumberEnvVar('VERIFIED_TIMEOUT_HOURS', false, 168), // 7 days default
   

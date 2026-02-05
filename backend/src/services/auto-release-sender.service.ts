@@ -19,8 +19,6 @@ export interface AutoReleaseResult {
  * Handles the actual fund release logic and error classification
  */
 export class AutoReleaseSenderService {
-  private readonly logger = logger;
-
   /**
    * Auto-release funds for a verified deal where buyer didn't confirm
    *
@@ -37,7 +35,7 @@ export class AutoReleaseSenderService {
    */
   async releaseFundsFromEscrowToChannelOwner(deal: Deal): Promise<AutoReleaseResult> {
     try {
-      this.logger.debug(`Auto-releasing funds for Deal #${deal.id}`, {
+      logger.debug(`Auto-releasing funds for Deal #${deal.id}`, {
         dealId: deal.id,
         status: deal.status,
       });
@@ -66,14 +64,14 @@ export class AutoReleaseSenderService {
               );
 
               if (dealCheck.rows.length === 0) {
-                this.logger.debug(`Deal #${deal.id} not found`, { dealId: deal.id });
+                logger.debug(`Deal #${deal.id} not found`, { dealId: deal.id });
                 return;
               }
 
               const currentDeal = dealCheck.rows[0];
 
               if (currentDeal.status === 'completed' && currentDeal.payment_tx_hash) {
-                this.logger.debug(`Deal #${deal.id} already has funds released`, {
+                logger.debug(`Deal #${deal.id} already has funds released`, {
                   dealId: deal.id,
                   existingTxHash: currentDeal.payment_tx_hash,
                 });
@@ -82,7 +80,7 @@ export class AutoReleaseSenderService {
               }
 
               if (currentDeal.status !== 'verified') {
-                this.logger.debug(`Deal #${deal.id} not in verified status`, {
+                logger.debug(`Deal #${deal.id} not in verified status`, {
                   dealId: deal.id,
                   status: currentDeal.status,
                 });
@@ -92,7 +90,7 @@ export class AutoReleaseSenderService {
               // Release funds BEFORE updating status
               // This ensures if release fails, status stays verified
               if (!currentDeal.channel_owner_wallet_address) {
-                this.logger.warn(`Deal #${deal.id}: Missing channel owner wallet address`, { dealId: deal.id });
+                logger.warn(`Deal #${deal.id}: Missing channel owner wallet address`, { dealId: deal.id });
                 return;
               }
 
@@ -122,7 +120,7 @@ export class AutoReleaseSenderService {
                 );
                 if (recheck.rows.length > 0 && recheck.rows[0].status === 'completed' && recheck.rows[0].payment_tx_hash) {
                   txHash = recheck.rows[0].payment_tx_hash;
-                  this.logger.warn(`Funds were released by another process for Deal #${deal.id}`, {
+                  logger.warn(`Funds were released by another process for Deal #${deal.id}`, {
                     dealId: deal.id,
                     existingTxHash: txHash,
                   });
@@ -137,7 +135,7 @@ export class AutoReleaseSenderService {
       } catch (lockError: any) {
         // If lock acquisition failed, another instance is processing this deal
         if (lockError.message?.includes('Failed to acquire distributed lock')) {
-          this.logger.debug(`Deal #${deal.id} auto-release skipped (locked by another instance)`, {
+          logger.debug(`Deal #${deal.id} auto-release skipped (locked by another instance)`, {
             dealId: deal.id,
           });
           return {
@@ -175,14 +173,14 @@ export class AutoReleaseSenderService {
           }
         );
       } catch (notifError: any) {
-        this.logger.warn(`Failed to send notification for Deal #${deal.id}`, {
+        logger.warn(`Failed to send notification for Deal #${deal.id}`, {
           dealId: deal.id,
           error: notifError.message,
         });
         // Don't fail the whole operation if notification fails
       }
 
-      this.logger.info(`Successfully auto-released funds for Deal #${deal.id}`, {
+      logger.info(`Successfully auto-released funds for Deal #${deal.id}`, {
         dealId: deal.id,
         txHash,
         reason: 'Buyer did not confirm within timeout period',
@@ -193,7 +191,7 @@ export class AutoReleaseSenderService {
         txHash,
       };
     } catch (error: any) {
-      this.logger.error(`Error auto-releasing funds for Deal #${deal.id}`, {
+      logger.error(`Error auto-releasing funds for Deal #${deal.id}`, {
         dealId: deal.id,
         error: error.message,
         stack: error.stack,

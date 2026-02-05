@@ -239,9 +239,10 @@ export const MarketplaceService = {
     })
   },
 
-  rejectDeal: async (id: number): Promise<ApiResponse<Deal>> => {
-    return await apiRequest<Deal>(`/deals/${id}/reject`, {
+  declineDeal: async (id: number, reason?: string): Promise<ApiResponse<Deal>> => {
+    return await apiRequest<Deal>(`/deals/${id}/decline`, {
       method: 'POST',
+      body: JSON.stringify({ dealId: id, reason }),
     })
   },
 
@@ -292,13 +293,6 @@ export const MarketplaceService = {
     return await apiRequest<Deal>(`/deals/${dealId}/schedule`, {
       method: 'POST',
       body: JSON.stringify({ scheduled_post_time }),
-    })
-  },
-
-  cancelDeal: async (id: number, reason?: string): Promise<ApiResponse<Deal>> => {
-    return await apiRequest<Deal>(`/deals/${id}/cancel`, {
-      method: 'POST',
-      body: JSON.stringify({ reason }),
     })
   },
 

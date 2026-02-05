@@ -109,3 +109,8 @@ export const setChannelPricingSchema = z.object({
 export const updateChannelStatusSchema = z.object({
   is_active: z.boolean(),
 });
+
+export const declineDealSchema = z.object({
+  dealId: z.number().int().positive(),
+  reason: z.string().optional(),
+});

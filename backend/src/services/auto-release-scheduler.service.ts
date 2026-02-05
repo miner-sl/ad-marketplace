@@ -14,6 +14,7 @@ export class AutoReleaseSchedulerService {
   private isProcessing = false;
   private readonly batchSize = 100;
   private job: cron.ScheduledTask | null = null;
+  private readonly autoReleaseSenderService = new AutoReleaseSenderService();
 
   /**
    * Initialize the scheduler service
@@ -85,7 +86,6 @@ export class AutoReleaseSchedulerService {
       });
       const usersMap = await UserModel.findByIds(Array.from(userIds));
 
-      const autoReleaseSenderService = new AutoReleaseSenderService();
 
       for (const deal of deals) {
         try {
@@ -103,7 +103,7 @@ export class AutoReleaseSchedulerService {
             continue;
           }
 
-          const result = await autoReleaseSenderService.releaseFundsFromEscrowToChannelOwner(deal);
+          const result = await this.autoReleaseSenderService.releaseFundsFromEscrowToChannelOwner(deal);
 
           if (result.success) {
             this.logger.info(`Successfully auto-released funds for Deal #${deal.id}`, {

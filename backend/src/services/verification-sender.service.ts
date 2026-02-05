@@ -2,6 +2,9 @@ import logger from '../utils/logger';
 import { DealModel } from '../repositories/deal-model.repository';
 import { TelegramService } from './telegram.service';
 import { TelegramNotificationService } from './telegram-notification.service';
+import { DealRepository } from '../repositories/deal.repository';
+import { levenshteinDistance } from '../utils/strings/levenshtein-distance';
+import { compareDate } from '../utils/dateCompare';
 
 export interface VerificationResult {
   success: boolean;
@@ -42,7 +45,6 @@ export class VerificationSenderService {
         telegramChannelId: deal.telegram_channel_id,
       });
 
-      // Validate required fields
       if (!deal.post_message_id || !deal.channel_id) {
         return {
           success: false,
@@ -73,35 +75,27 @@ export class VerificationSenderService {
         };
       }
 
-      const verificationUntil = new Date(deal.post_verification_until);
-      const now = new Date();
-
-      // Check if verification period has passed
-      if (verificationUntil > now) {
-        const remainingMs = verificationUntil.getTime() - now.getTime();
-        const remainingHours = Math.ceil(remainingMs / (1000 * 60 * 60));
+      const dateCompare = compareDate(deal.post_verification_until);
+      if (!dateCompare.hasPassed) {
         this.logger.debug(`Deal #${deal.id}: Verification period not yet complete`, {
           dealId: deal.id,
-          remainingHours,
+          remainingHours: dateCompare.remainingHours,
         });
         return {
           success: false,
           error: {
             reason: 'VerificationPeriodNotComplete',
-            message: `Deal #${deal.id}: Verification period not yet complete (${remainingHours} hours remaining)`,
+            message: `Deal #${deal.id}: Verification period not yet complete (${dateCompare.remainingHours} hours remaining)`,
           },
         };
       }
 
-      // Verify post exists and bot has access
-      const postExists = await this.checkPostExists(deal);
+      const postExistsAndBotAccess = await this.checkPostExistsAndBotAccess(deal);
 
-      if (!postExists) {
-        // Post not found - refund
+      if (!postExistsAndBotAccess) {
         await DealModel.updateStatus(deal.id, 'refunded');
         this.logger.warn(`Deal #${deal.id}: Post not found, marked for refund`, { dealId: deal.id });
 
-        // Send notifications
         try {
           await TelegramNotificationService.notifyVerificationFailed(deal.id, deal.advertiser_id, deal.channel_owner_id);
         } catch (notifError: any) {
@@ -118,6 +112,7 @@ export class VerificationSenderService {
       }
 
       // Post exists - check if duration requirement is met
+      const now = new Date();
       const minPublicationDurationDays = deal.min_publication_duration_days || 7;
       let publicationDurationMet = false;
       let daysSinceFirstPublication = 0;
@@ -159,7 +154,6 @@ export class VerificationSenderService {
         };
       }
 
-      // Post verified and duration requirement met - mark as verified
       await DealModel.markVerified(deal.id);
 
       this.logger.info(`Deal #${deal.id} marked as verified - waiting for advertiser confirmation`, {
@@ -168,7 +162,6 @@ export class VerificationSenderService {
         minPublicationDurationDays,
       });
 
-      // Send notifications
       try {
         await TelegramNotificationService.notifyDealVerified(
           deal.id,
@@ -209,9 +202,10 @@ export class VerificationSenderService {
 
   /**
    * Check if post exists and bot has access to channel
+   * Also verifies post content matches the requested deal text
    * @private
    */
-  private async checkPostExists(deal: any): Promise<boolean> {
+  private async checkPostExistsAndBotAccess(deal: any): Promise<boolean> {
     try {
       const channelId = deal.telegram_channel_id;
       const now = new Date();
@@ -227,6 +221,16 @@ export class VerificationSenderService {
           botStatus: member.status,
         });
         return false;
+      }
+
+      if (deal.post_message_id) {
+        const contentMatches = await this.verifyPostContent(deal);
+        if (!contentMatches) {
+          this.logger.warn(`Deal #${deal.id}: Post content does not match requested text`, {
+            dealId: deal.id,
+          });
+          return false;
+        }
       }
 
       // Bot has access - check if post meets minimum publication duration
@@ -252,7 +256,7 @@ export class VerificationSenderService {
         }
       } else {
         // No actual_post_time recorded, but verification period passed
-        // Assume post exists if bot has access
+        // Assume post exists if bot has access and content matches
         this.logger.info(`Deal #${deal.id}: Post verified (verification period passed, bot has access)`, {
           dealId: deal.id,
           minPublicationDurationDays,
@@ -267,6 +271,119 @@ export class VerificationSenderService {
       return false;
     }
   }
+
+  private normalizeText(text: string): string {
+    return text.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  };
+
+  /**
+   * Verify post content matches the requested deal text
+   * Compares stored post_text with requested text from deal_messages
+   * @private
+   */
+  private async verifyPostContent(deal: any): Promise<boolean> {
+    try {
+      if (!deal.post_message_id || !deal.telegram_channel_id) {
+        this.logger.warn(`Deal #${deal.id}: Missing post_message_id or telegram_channel_id for content verification`, {
+          dealId: deal.id,
+        });
+        return true;
+      }
+
+      const postTextOnTelegram = await TelegramService.getMessageText(deal.username, deal.post_message_id);
+      if (!postTextOnTelegram) {
+        this.logger.warn(`Deal #${deal.id}: No post text found on Telegram`, {
+          dealId: deal.id,
+        });
+        return true;
+      }
+
+      const storedPostText = await DealRepository.getBrief(deal.id);
+      if (!storedPostText) {
+        this.logger.warn(`Deal #${deal.id}: No stored post text found (post may have been published before this feature)`, {
+          dealId: deal.id,
+        });
+        const verificationResult = await TelegramService.verifyPost(
+          deal.telegram_channel_id,
+          deal.post_message_id
+        );
+        return verificationResult.exists;
+      }
+
+      const normalizedRequested = this.normalizeText(postTextOnTelegram);
+      const normalizedStored = this.normalizeText(storedPostText);
+      const differencePercent = this.calculateTextSimilarity(normalizedRequested, normalizedStored);
+      const thresholdPercent = 10; // 10% difference threshold
+      const similarity = 100 - differencePercent;
+
+      if (differencePercent > thresholdPercent) {
+        this.logger.warn(`Deal #${deal.id}: Post content difference exceeds threshold`, {
+          dealId: deal.id,
+          similarity: similarity.toFixed(2) + '%',
+          differencePercent: differencePercent.toFixed(2) + '%',
+          thresholdPercent: thresholdPercent + '%',
+          requestedPreview: normalizedRequested.substring(0, 100),
+          storedPreview: normalizedStored.substring(0, 100),
+        });
+        // TODO: send notification to advertiser, and channel owner
+        return false;
+      }
+
+      this.logger.debug(`Deal #${deal.id}: Post content similarity check passed`, {
+        dealId: deal.id,
+        similarity: similarity.toFixed(2) + '%',
+        differencePercent: differencePercent.toFixed(2) + '%',
+      });
+
+      const verificationResult = await TelegramService.verifyPost(
+        deal.telegram_channel_id,
+        deal.post_message_id
+      );
+
+      if (!verificationResult.exists) {
+        this.logger.warn(`Deal #${deal.id}: Post message not found in channel`, {
+          dealId: deal.id,
+          messageId: deal.post_message_id,
+        });
+        return false;
+      }
+
+      this.logger.info(`Deal #${deal.id}: Post content verified (matches requested text and exists in channel)`, {
+        dealId: deal.id,
+      });
+      return true;
+    } catch (error: any) {
+      this.logger.warn(`Deal #${deal.id}: Error verifying post content`, {
+        dealId: deal.id,
+        error: error.message,
+      });
+      // Don't fail verification if content check fails
+      return true;
+    }
+  }
+
+  /**
+   * Calculate text difference percentage between two strings
+   * Uses Levenshtein distance algorithm to calculate difference percentage
+   * @private
+   */
+  private calculateTextSimilarity(text1: string, text2: string): number {
+    if (text1 === text2) {
+      return 0.0; // 0% difference
+    }
+
+    if (text1.length === 0 || text2.length === 0) {
+      return 100.0; // 100% difference
+    }
+
+    const dist = levenshteinDistance(text1, text2);
+    const maxLength = Math.max(text1.length, text2.length);
+    const similarity = 1 - (dist / maxLength);
+    const differencePercent = (1 - similarity) * 100;
+
+    return differencePercent;
+  }
+
 
   /**
    * Classify error into specific category

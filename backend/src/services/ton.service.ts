@@ -792,6 +792,10 @@ export class TONService {
     }
   }
 
+  static async refundFunds(dealId: number) {
+    // TODO scheduler for redun moneys if status=declined
+  }
+
   /**
    * Release funds from escrow wallet to recipient
    * @param dealId Deal ID to get escrow wallet
@@ -809,7 +813,6 @@ export class TONService {
     checkIdempotency: boolean = true
   ): Promise<string> {
     try {
-      // Idempotency check: verify funds haven't already been released
       if (checkIdempotency) {
         const dealCheck = await db.query(
           `SELECT payment_tx_hash, status FROM deals WHERE id = $1`,
@@ -838,13 +841,11 @@ export class TONService {
         }
       }
 
-      // Get escrow wallet for the deal
       const escrowWallet = await this.getEscrowWallet(dealId);
       if (!escrowWallet) {
         throw new Error(`Escrow wallet not found for Deal #${dealId}`);
       }
 
-      // Validate recipient address
       if (!this.isValidAddress(recipientAddress)) {
         throw new Error(`Invalid recipient address: ${recipientAddress}`);
       }
@@ -856,7 +857,6 @@ export class TONService {
         amount,
       });
 
-      // Use transferTon function with the escrow wallet's mnemonic
       const txHash = await this.transferTon(
         escrowWallet.address,
         recipientAddress,

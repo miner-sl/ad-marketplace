@@ -26,6 +26,7 @@ export interface Deal {
   ad_format: string;
   price_ton: number;
   status: DealStatus;
+  decline_reason?: string;
   escrow_address?: string;
   channel_owner_wallet_address?: string;
   payment_tx_hash?: string;
@@ -36,7 +37,6 @@ export interface Deal {
   post_verification_until?: Date;
   first_publication_time?: Date;
   min_publication_duration_days?: number;
-  timeout_at?: Date;
   created_at: Date;
   updated_at: Date;
 }

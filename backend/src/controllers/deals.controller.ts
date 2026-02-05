@@ -291,18 +291,22 @@ export class DealsController {
     try {
       const { id } = request.params as { id: string };
       const userId = request.user?.id as number;
+      const { dealId, reason } = request.body as any;
 
       if (!userId) {
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const deal = await DealFlowService.declineDeal(parseInt(id), userId);
+      if (dealId !== Number(id)) {
+        return reply.code(400).send({ error: 'Deal ID in body does not match URL parameter' });
+      }
 
-      // Send notification to advertiser
+      const deal = await DealFlowService.declineDeal(Number(id), userId, reason);
+
       try {
-        const channelInfo = await DealFlowService.getChannelInfoForDeal(parseInt(id));
-        await TelegramNotificationService.notifyDealDeclined(parseInt(id), deal.advertiser_id, {
-          dealId: parseInt(id),
+        const channelInfo = await DealFlowService.getChannelInfoForDeal(Number(id));
+        await TelegramNotificationService.notifyDealDeclined(Number(id), deal.advertiser_id, {
+          dealId: Number(id),
           channelId: channelInfo.channelId,
           channelName: channelInfo.channelName,
           priceTon: deal.price_ton,
@@ -319,21 +323,6 @@ export class DealsController {
       return deal;
     } catch (error: any) {
       logger.error('Failed to decline deal', {
-        error: error.message,
-        stack: error.stack,
-        dealId: (request.params as { id: string }).id,
-      });
-      reply.code(500).send({ error: error.message });
-    }
-  }
-
-  static async cancelDeal(request: FastifyRequest, reply: FastifyReply) {
-    try {
-      const { id } = request.params as { id: string };
-      const deal = await DealModel.cancel(parseInt(id));
-      return deal;
-    } catch (error: any) {
-      logger.error('Failed to cancel deal', {
         error: error.message,
         stack: error.stack,
         dealId: (request.params as { id: string }).id,

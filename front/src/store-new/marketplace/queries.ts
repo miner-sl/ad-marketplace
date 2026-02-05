@@ -369,11 +369,11 @@ export const useAcceptDealMutation = () => {
   })
 }
 
-export const useRejectDealMutation = () => {
+export const useDeclineDealMutation = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => dealsAPI.rejectDeal(id),
-    onSuccess: (_, id) => {
+    mutationFn: ({ id, reason }: { id: number; reason?: string }) => dealsAPI.declineDeal(id, reason),
+    onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.DEAL(id) })
       queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.DEALS })
     },
@@ -476,19 +476,6 @@ export const useSchedulePostMutation = () => {
   })
 }
 
-export const useCancelDealMutation = () => {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, reason }: { id: number; reason?: string }) =>
-      dealsAPI.cancelDeal(id, reason),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: TANSTACK_KEYS.DEAL(variables.id),
-      })
-      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.DEALS })
-    },
-  })
-}
 
 export const useDealCreativeQuery = (dealId: number) => {
   return useQuery({

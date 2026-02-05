@@ -210,10 +210,10 @@ export const dealsAPI = {
     return data
   },
 
-  rejectDeal: async (id: number): Promise<Deal> => {
-    const { data, ok, error } = await MarketplaceService.rejectDeal(id)
+  declineDeal: async (id: number, reason?: string): Promise<Deal> => {
+    const { data, ok, error } = await MarketplaceService.declineDeal(id, reason)
     if (!ok || !data) {
-      throw new Error(error || 'Failed to reject deal')
+      throw new Error(error || 'Failed to decline deal')
     }
     return data
   },
@@ -281,14 +281,6 @@ export const dealsAPI = {
     )
     if (!ok || !data) {
       throw new Error(error || 'Failed to schedule post')
-    }
-    return data
-  },
-
-  cancelDeal: async (id: number, reason?: string): Promise<Deal> => {
-    const { data, ok, error } = await MarketplaceService.cancelDeal(id, reason)
-    if (!ok || !data) {
-      throw new Error(error || 'Failed to cancel deal')
     }
     return data
   },

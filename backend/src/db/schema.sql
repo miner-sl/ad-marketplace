@@ -152,6 +152,7 @@ CREATE TABLE IF NOT EXISTS deals (
     ad_format VARCHAR(50) NOT NULL,
     price_ton DECIMAL(20, 9) NOT NULL,
     status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'negotiating', 'approved', 'payment_pending', 'paid', 'creative_submitted', 'creative_approved', 'scheduled', 'posted', 'verified', 'completed', 'declined', 'refunded'
+    decline_reason TEXT, -- Reason for deal decline/cancellation
     channel_owner_wallet_address VARCHAR(255), -- Channel owner's wallet address for receiving payments
     escrow_address VARCHAR(255), -- TON wallet address for this deal
     payment_tx_hash VARCHAR(255),
@@ -160,7 +161,6 @@ CREATE TABLE IF NOT EXISTS deals (
     actual_post_time TIMESTAMP,
     post_message_id BIGINT,
     post_verification_until TIMESTAMP,
-    timeout_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -207,7 +207,6 @@ CREATE INDEX IF NOT EXISTS idx_channels_telegram_id ON channels(telegram_channel
 CREATE INDEX IF NOT EXISTS idx_deals_channel_id ON deals(channel_id);
 CREATE INDEX IF NOT EXISTS idx_deals_advertiser_id ON deals(advertiser_id);
 CREATE INDEX IF NOT EXISTS idx_deals_status ON deals(status);
-CREATE INDEX IF NOT EXISTS idx_deals_timeout_at ON deals(timeout_at);
 CREATE INDEX IF NOT EXISTS idx_deals_scheduled_post_time ON deals(scheduled_post_time);
 CREATE INDEX IF NOT EXISTS idx_campaigns_advertiser_id ON campaigns(advertiser_id);
 CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(status);

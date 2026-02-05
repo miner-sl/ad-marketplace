@@ -1,10 +1,12 @@
 import {useParams} from 'react-router-dom'
+import {useState} from 'react'
 import {openTelegramLink} from '@tma.js/sdk-react'
 import {
   Block,
   BlockNew,
   ChannelLink,
   DealStatusBadge,
+  DeclineDealModal,
   Group,
   Icon,
   Image,
@@ -21,7 +23,7 @@ import {
   type EnhancedDeal,
   useAcceptDealMutation,
   useDealQuery,
-  useRejectDealMutation,
+  useDeclineDealMutation,
   useRequestCreativeRevisionMutation,
   useUpdateDealMessageMutation,
 } from '@store-new'
@@ -83,7 +85,7 @@ export const DealDetailsPage = () => {
   const {data: deal, isLoading} = useDealQuery(dealId, user?.telegramId);
   // const { data: creative } = useDealCreativeQuery(dealId)
   const acceptDealMutation = useAcceptDealMutation()
-  const rejectDealMutation = useRejectDealMutation()
+  const declineDealMutation = useDeclineDealMutation()
   // const approveCreativeMutation = useApproveCreativeMutation()
   const requestRevisionMutation = useRequestCreativeRevisionMutation()
   const updateDealMessageMutation = useUpdateDealMessageMutation()
@@ -94,6 +96,7 @@ export const DealDetailsPage = () => {
   const {copy} = useClipboard()
   const {showToast} = useToast()
   const {transferTon, isConnected} = useTonTransfer()
+  const [showDeclineModal, setShowDeclineModal] = useState(false)
   if (isLoading || !deal) {
     return (
       <Page back>
@@ -142,20 +145,25 @@ export const DealDetailsPage = () => {
     }
   }
 
-  const handleRejectDeal = async () => {
+  const handleDeclineDeal = () => {
+    setShowDeclineModal(true)
+  }
+
+  const handleConfirmDecline = async (reason?: string) => {
     try {
-      if (rejectDealMutation.isPending) {
+      if (declineDealMutation.isPending) {
         return
       }
-      await rejectDealMutation.mutateAsync(dealId);
-      showToast({message: 'Success decline', type: 'success' });
+      setShowDeclineModal(false)
+      await declineDealMutation.mutateAsync({ id: dealId, reason });
+      showToast({message: 'Deal declined successfully', type: 'success' });
 
     } catch (error) {
       showToast({
-        message: error instanceof Error ? error.message : 'Decline failed',
+        message: error instanceof Error ? error.message : 'Failed to decline deal',
         type: 'warning',
       });
-      console.error('Failed to reject deal:', error)
+      console.error('Failed to decline deal:', error)
     }
   }
 
@@ -544,8 +552,8 @@ export const DealDetailsPage = () => {
                 {/*      before={*/}
                 {/*        <Icon name="cross" size={28} color="danger" />*/}
                 {/*      }*/}
-                {/*      onClick={handleRejectDeal}*/}
-                {/*      disabled={rejectDealMutation.isPending}*/}
+                {/*      onClick={handleDeclineDeal}*/}
+                {/*      disabled={declineDealMutation.isPending}*/}
                 {/*    />*/}
                 {/*  </Block>*/}
                 {/*)}*/}
@@ -574,8 +582,8 @@ export const DealDetailsPage = () => {
                       before={
                         <Icon name="cross" size={28} color="danger" />
                       }
-                      onClick={handleRejectDeal}
-                      disabled={rejectDealMutation.isPending}
+                      onClick={handleDeclineDeal}
+                      disabled={declineDealMutation.isPending}
                     />
                     <ListItem
                       padding="6px 16px"
@@ -610,6 +618,12 @@ export const DealDetailsPage = () => {
           isVisible={true}
         />
       )}
+
+      <DeclineDealModal
+        active={showDeclineModal}
+        onConfirm={handleConfirmDecline}
+        onClose={() => setShowDeclineModal(false)}
+      />
     </Page>
   )
 }

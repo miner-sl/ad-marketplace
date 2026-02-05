@@ -127,7 +127,7 @@ export interface Deal {
   post_verification_until?: string
   first_publication_time?: string
   min_publication_duration_days?: number
-  timeout_at?: string
+  decline_reason?: string
   created_at: string
   updated_at: string
   channel?: Channel

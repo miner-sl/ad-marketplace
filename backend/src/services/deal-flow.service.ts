@@ -26,7 +26,6 @@ export class DealFlowService {
     advertiser_id: number;
     ad_format: string;
     price_ton: number;
-    timeout_hours?: number;
     publish_date?: Date;
     postText?: string;
   }): Promise<any> {
@@ -45,7 +44,6 @@ export class DealFlowService {
         throw new Error(`Channel owner mismatch. Channel ${data.channel_id} is owned by user ${channel.owner_id}, not ${data.channel_owner_id}`);
       }
 
-      // Get user from database by telegram_id (advertiser_id is telegram_id)
       const userResult = await client.query(
         'SELECT * FROM users WHERE telegram_id = $1',
         [data.advertiser_id]
@@ -57,15 +55,10 @@ export class DealFlowService {
 
       const advertiserDbId = userResult.rows[0].id;
 
-      const timeoutHours = data.timeout_hours || 72;
-      const timeoutAt = new Date();
-      timeoutAt.setUTCHours(timeoutAt.getUTCHours() + timeoutHours);
-      const utcTimeoutAt = new Date(timeoutAt.toISOString());
-
       const dealResult = await client.query(
         `INSERT INTO deals (
           deal_type, listing_id, campaign_id, channel_id, channel_owner_id,
-          advertiser_id, ad_format, price_ton, timeout_at, scheduled_post_time
+          advertiser_id, ad_format, price_ton, scheduled_post_time
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *`,
         [
@@ -77,7 +70,6 @@ export class DealFlowService {
           advertiserDbId,
           data.ad_format,
           data.price_ton,
-          utcTimeoutAt,
           data.publish_date || null,
         ]
       );
@@ -417,20 +409,14 @@ export class DealFlowService {
     advertiser_id: number;
     ad_format: string;
     price_ton: number;
-    timeout_hours?: number;
     briefText: string;
   }): Promise<any> {
     return await withTx(async (client) => {
-      const timeoutHours = data.timeout_hours || 72;
-      const timeoutAt = new Date();
-      timeoutAt.setUTCHours(timeoutAt.getUTCHours() + timeoutHours);
-      const utcTimeoutAt = new Date(timeoutAt.toISOString());
-
       const dealResult = await client.query(
         `INSERT INTO deals (
           deal_type, listing_id, campaign_id, channel_id, channel_owner_id,
-          advertiser_id, ad_format, price_ton, timeout_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          advertiser_id, ad_format, price_ton
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *`,
         [
           data.deal_type,
@@ -441,7 +427,6 @@ export class DealFlowService {
           data.advertiser_id,
           data.ad_format,
           data.price_ton,
-          utcTimeoutAt,
         ]
       );
 
@@ -583,7 +568,7 @@ export class DealFlowService {
   /**
    * Decline deal
    */
-  static async declineDeal(dealId: number, channelOwnerId: number): Promise<any> {
+  static async declineDeal(dealId: number, channelOwnerId: number, reason?: string): Promise<any> {
     return await withTx(async (client) => {
       const dealResult = await client.query(
         `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
@@ -597,16 +582,20 @@ export class DealFlowService {
 
       await client.query(
         `UPDATE deals 
-         SET status = 'declined', updated_at = CURRENT_TIMESTAMP
+         SET status = 'declined', decline_reason = $2, updated_at = CURRENT_TIMESTAMP
          WHERE id = $1 AND status = 'pending'
          RETURNING *`,
-        [dealId]
+        [dealId, reason || null]
       );
+
+      const messageText = reason 
+        ? `Deal declined by channel owner: ${reason}`
+        : 'Deal declined by channel owner';
 
       await client.query(
         `INSERT INTO deal_messages (deal_id, sender_id, message_text)
          VALUES ($1, $2, $3)`,
-        [dealId, channelOwnerId, 'Deal declined by channel owner']
+        [dealId, channelOwnerId, messageText]
       );
 
       return dealResult.rows[0];

@@ -101,7 +101,6 @@ export class UserModel {
       updateValues.push(data.telegram_id);
 
       if (updateFields.length === 1) {
-        // Only updated_at
         const result = await client.query(
           `UPDATE users SET updated_at = CURRENT_TIMESTAMP
            WHERE telegram_id = $1
@@ -140,7 +139,6 @@ export class UserModel {
       );
       
       if (existing.rows.length > 0) {
-        // Update user info if changed
         const result = await client.query(
           `UPDATE users 
            SET username = $1, first_name = $2, last_name = $3, updated_at = CURRENT_TIMESTAMP
@@ -197,7 +195,6 @@ export class UserModel {
     is_advertiser?: boolean;
   }): Promise<User> {
     return await withTx(async (client) => {
-      // Lock or check for existing user atomically
       const existing = await client.query(
         `SELECT * FROM users WHERE telegram_id = $1 FOR UPDATE`,
         [data.telegram_id]
@@ -206,7 +203,6 @@ export class UserModel {
       let user: User;
       
       if (existing.rows.length > 0) {
-        // Update user info and roles
         const updateFields: string[] = [];
         const updateValues: any[] = [];
         let paramCount = 1;
@@ -236,7 +232,6 @@ export class UserModel {
         updateValues.push(data.telegram_id);
 
         if (updateFields.length === 1) {
-          // Only updated_at, no other fields to update
           const result = await client.query(
             `UPDATE users 
              SET updated_at = CURRENT_TIMESTAMP
@@ -256,7 +251,6 @@ export class UserModel {
           user = result.rows[0];
         }
       } else {
-        // Create new user with roles
         const result = await client.query(
           `INSERT INTO users (telegram_id, username, first_name, last_name, is_channel_owner, is_advertiser)
            VALUES ($1, $2, $3, $4, $5, $6)

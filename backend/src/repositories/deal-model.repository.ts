@@ -13,21 +13,13 @@ export class DealModel {
     ad_format: string;
     price_ton: number;
     escrow_address?: string;
-    timeout_hours?: number;
   }): Promise<Deal> {
     return await withTx(async (client) => {
-      const timeoutHours = data.timeout_hours || 72;
-      // Create date in UTC
-      const timeoutAt = new Date();
-      timeoutAt.setUTCHours(timeoutAt.getUTCHours() + timeoutHours);
-      // Convert to ISO string to ensure UTC format
-      const utcTimeoutAt = new Date(timeoutAt.toISOString());
-
       const result = await client.query(
         `INSERT INTO deals (
           deal_type, listing_id, campaign_id, channel_id, channel_owner_id,
-          advertiser_id, ad_format, price_ton, escrow_address, timeout_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          advertiser_id, ad_format, price_ton, escrow_address
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *`,
         [
           data.deal_type,
@@ -39,7 +31,6 @@ export class DealModel {
           data.ad_format,
           data.price_ton,
           data.escrow_address,
-          utcTimeoutAt,
         ]
       );
       return result.rows[0];
@@ -155,7 +146,6 @@ export class DealModel {
 
   static async confirmPayment(id: number, txHash: string): Promise<Deal> {
     return await withTx(async (client) => {
-      // Lock deal row to prevent race conditions
       const dealCheck = await client.query(
         `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
         [id]
@@ -178,7 +168,6 @@ export class DealModel {
         return deal;
       }
 
-      // Check status atomically
       if (deal.status !== 'payment_pending') {
         throw new Error(`Cannot confirm payment in status: ${deal.status}`);
       }
@@ -215,7 +204,6 @@ export class DealModel {
 
   static async schedulePost(id: number, postTime: Date): Promise<Deal> {
     return await withTx(async (client) => {
-      // Lock deal row to prevent race conditions
       const dealCheck = await client.query(
         `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
         [id]
@@ -227,7 +215,6 @@ export class DealModel {
 
       const deal = dealCheck.rows[0];
 
-      // Check status atomically
       if (deal.status !== 'paid' && deal.status !== 'scheduled') {
         throw new Error(`Cannot schedule post in status: ${deal.status}`);
       }
@@ -235,7 +222,6 @@ export class DealModel {
       // Ensure date is in UTC (convert to ISO string and back to ensure UTC)
       const utcDate = new Date(postTime.toISOString());
 
-      // Atomic update with status check
       const result = await client.query(
         `UPDATE deals 
          SET status = 'scheduled', scheduled_post_time = $1, updated_at = CURRENT_TIMESTAMP
@@ -254,7 +240,6 @@ export class DealModel {
 
   static async recordPost(id: number, messageId: number, verificationUntil: Date): Promise<Deal> {
     return await withTx(async (client) => {
-      // Lock deal row to prevent race conditions
       const dealCheck = await client.query(
         `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
         [id]
@@ -320,7 +305,7 @@ export class DealModel {
     });
   }
 
-  static async cancel(id: number, reason?: string): Promise<Deal> {
+  static async decline(id: number, reason?: string): Promise<Deal> {
     return await withTx(async (client) => {
       const dealCheck = await client.query(
         `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
@@ -341,10 +326,10 @@ export class DealModel {
 
       const result = await client.query(
         `UPDATE deals 
-         SET status = 'declined', updated_at = CURRENT_TIMESTAMP
+         SET status = 'declined', decline_reason = $2, updated_at = CURRENT_TIMESTAMP
          WHERE id = $1 AND status IN ('pending', 'negotiating', 'payment_pending')
          RETURNING *`,
-        [id]
+        [id, reason || null]
       );
 
       if (result.rows.length === 0) {
@@ -355,12 +340,14 @@ export class DealModel {
     });
   }
 
-  static async findExpiredDeals(): Promise<Deal[]> {
+  static async findWithoutActivity(limit: number = 50): Promise<Deal[]> {
     const result = await db.query(
       `SELECT * FROM deals 
-       WHERE timeout_at < CURRENT_TIMESTAMP 
+       WHERE updated_at < CURRENT_TIMESTAMP - INTERVAL '10 days'
        AND status IN ('pending', 'negotiating', 'payment_pending')
-       ORDER BY timeout_at ASC`
+       ORDER BY updated_at ASC
+       LIMIT $1`,
+      [limit]
     );
     return result.rows;
   }

@@ -247,4 +247,213 @@ export class AutoReleaseSenderService {
 
     return 'UnknownError';
   }
+
+  /**
+   * Refund funds for a declined deal back to advertiser
+   *
+   * Handles the refund process, including:
+   * - Acquiring distributed lock to prevent concurrent refunds
+   * - Verifying deal status and idempotency
+   * - Refunding funds via TONService
+   * - Validating transaction exists
+   * - Updating deal status to refunded atomically
+   * - Sending notifications
+   * - Error handling and classification
+   *
+   * @param deal - The deal entity to refund funds for
+   * @param advertiserWalletAddress - Advertiser's wallet address to refund to
+   * @returns Result object containing success status, txHash, or error details
+   */
+  async refundFundsFromEscrowToAdvertiser(
+    deal: Deal,
+    advertiserWalletAddress: string
+  ): Promise<AutoReleaseResult> {
+    try {
+      logger.debug(`Refunding funds for Deal #${deal.id}`, {
+        dealId: deal.id,
+        status: deal.status,
+        advertiserWalletAddress,
+      });
+
+      if (!deal.escrow_address || !advertiserWalletAddress) {
+        return {
+          success: false,
+          error: {
+            reason: 'MissingAddresses',
+            message: `Deal #${deal.id}: Missing escrow or advertiser wallet address`,
+          },
+        };
+      }
+
+      let txHash: string | null = null;
+
+      try {
+        await distributedLock.withLock(
+          deal.id,
+          'refund',
+          async () => {
+            await withTx(async (client) => {
+              const dealCheck = await client.query(
+                `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
+                [deal.id]
+              );
+
+              if (dealCheck.rows.length === 0) {
+                logger.debug(`Deal #${deal.id} not found`, { dealId: deal.id });
+                return;
+              }
+
+              const currentDeal = dealCheck.rows[0];
+
+              // Check if already refunded
+              if (currentDeal.status === 'refunded' && currentDeal.refund_tx_hash) {
+                logger.debug(`Deal #${deal.id} already refunded`, {
+                  dealId: deal.id,
+                  existingTxHash: currentDeal.refund_tx_hash,
+                });
+                txHash = currentDeal.refund_tx_hash;
+                return;
+              }
+
+              if (currentDeal.status !== 'declined') {
+                logger.debug(`Deal #${deal.id} not in declined status`, {
+                  dealId: deal.id,
+                  status: currentDeal.status,
+                });
+                return;
+              }
+
+              // Refund funds BEFORE updating status
+              // This ensures if refund fails, status stays declined
+              txHash = await TONService.releaseFunds(
+                deal.id,
+                advertiserWalletAddress,
+                currentDeal.price_ton.toString(),
+                `Refund: Deal declined (Deal #${deal.id})`,
+                false // Already checked idempotency above
+              );
+
+              // Validate transaction exists
+              if (txHash) {
+                try {
+                  // Verify transaction exists on blockchain
+                  const txExists = await TONService.verifyTransaction(txHash, currentDeal.escrow_address);
+                  if (!txExists) {
+                    throw new Error(`Transaction ${txHash} not found on blockchain`);
+                  }
+                } catch (verifyError: any) {
+                  logger.error(`Failed to verify transaction ${txHash} for Deal #${deal.id}`, {
+                    dealId: deal.id,
+                    txHash,
+                    error: verifyError.message,
+                  });
+                  throw new Error(`Transaction verification failed: ${verifyError.message}`);
+                }
+              }
+
+              // Update status and record refund tx hash atomically
+              const updateResult = await client.query(
+                `UPDATE deals 
+                 SET status = 'refunded', refund_tx_hash = $1, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $2 AND status = 'declined'
+                 RETURNING *`,
+                [txHash, deal.id]
+              );
+
+              if (updateResult.rows.length === 0) {
+                // Another process refunded funds between our check and update
+                // Re-query to get the existing tx hash
+                const recheck = await client.query(
+                  `SELECT refund_tx_hash, status FROM deals WHERE id = $1`,
+                  [deal.id]
+                );
+                if (recheck.rows.length > 0 && recheck.rows[0].status === 'refunded' && recheck.rows[0].refund_tx_hash) {
+                  txHash = recheck.rows[0].refund_tx_hash;
+                  logger.warn(`Funds were refunded by another process for Deal #${deal.id}`, {
+                    dealId: deal.id,
+                    existingTxHash: txHash,
+                  });
+                } else {
+                  throw new Error(`Failed to update deal status for Deal #${deal.id}`);
+                }
+              }
+            });
+          },
+          { ttl: 60000 } // 60 seconds in milliseconds (refund takes longer)
+        );
+      } catch (lockError: any) {
+        // If lock acquisition failed, another instance is processing this deal
+        if (lockError.message?.includes('Failed to acquire distributed lock')) {
+          logger.debug(`Deal #${deal.id} refund skipped (locked by another instance)`, {
+            dealId: deal.id,
+          });
+          return {
+            success: false,
+            error: {
+              reason: 'ConcurrentProcessing',
+              message: `Deal #${deal.id} is being processed by another instance`,
+            },
+          };
+        }
+        throw lockError;
+      }
+
+      if (!txHash) {
+        return {
+          success: false,
+          error: {
+            reason: 'NoRefundNeeded',
+            message: `Deal #${deal.id} does not require refund (status changed or already refunded)`,
+          },
+        };
+      }
+
+      try {
+        // Notify advertiser about refund
+        await TelegramNotificationService.notifyDealRefunded(
+          deal.id,
+          deal.advertiser_id,
+          {
+            dealId: deal.id,
+            priceTon: deal.price_ton,
+            txHash: txHash,
+            advertiserWalletAddress: advertiserWalletAddress,
+          }
+        );
+      } catch (notifError: any) {
+        logger.warn(`Failed to send notification for Deal #${deal.id}`, {
+          dealId: deal.id,
+          error: notifError.message,
+        });
+        // Don't fail the whole operation if notification fails
+      }
+
+      logger.info(`Successfully refunded funds for Deal #${deal.id}`, {
+        dealId: deal.id,
+        txHash,
+        reason: 'Deal declined',
+      });
+
+      return {
+        success: true,
+        txHash,
+      };
+    } catch (error: any) {
+      logger.error(`Error refunding funds for Deal #${deal.id}`, {
+        dealId: deal.id,
+        error: error.message,
+        stack: error.stack,
+      });
+
+      const errorReason = this.classifyError(error);
+
+      return {
+        success: false,
+        error: {
+          reason: errorReason,
+          message: error instanceof Error ? error.message : 'Unknown error',
+        },
+      };
+    }
+  }
 }

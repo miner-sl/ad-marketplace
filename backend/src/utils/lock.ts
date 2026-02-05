@@ -8,7 +8,8 @@ export type LockOperation =
   | 'publish_post'
   | 'auto_release'
   | 'accept_deal'
-  | 'cancel_deal';
+  | 'cancel_deal'
+  | 'refund';
 
 export interface LockOptions {
   ttl?: number;

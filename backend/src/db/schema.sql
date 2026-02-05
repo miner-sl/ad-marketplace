@@ -156,6 +156,7 @@ CREATE TABLE IF NOT EXISTS deals (
     channel_owner_wallet_address VARCHAR(255), -- Channel owner's wallet address for receiving payments
     escrow_address VARCHAR(255), -- TON wallet address for this deal
     payment_tx_hash VARCHAR(255),
+    refund_tx_hash VARCHAR(255), -- Transaction hash for refund to advertiser
     payment_confirmed_at TIMESTAMP,
     scheduled_post_time TIMESTAMP,
     actual_post_time TIMESTAMP,

@@ -377,4 +377,21 @@ export class DealModel {
     );
     return result.rows;
   }
+
+  /**
+   * Find declined deals that need refund to advertiser
+   * Returns deals with declined status that haven't been refunded yet
+   */
+  static async findDeclinedDealsForRefund(limit: number = 100): Promise<Deal[]> {
+    const result = await db.query(
+      `SELECT * FROM deals 
+       WHERE status = 'declined' 
+       AND escrow_address IS NOT NULL
+       AND (refund_tx_hash IS NULL OR refund_tx_hash = '')
+       ORDER BY updated_at ASC
+       LIMIT $1`,
+      [limit]
+    );
+    return result.rows;
+  }
 }

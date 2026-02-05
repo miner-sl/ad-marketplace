@@ -627,4 +627,44 @@ export class TelegramNotificationService {
       throw error;
     }
   }
+
+  /**
+   * Notify advertiser about deal refund
+   */
+  static async notifyDealRefunded(
+    dealId: number,
+    advertiserId: number,
+    data: {
+      dealId: number;
+      priceTon: number;
+      txHash: string;
+      advertiserWalletAddress: string;
+    }
+  ): Promise<void> {
+    try {
+      const advertiser = await UserModel.findById(advertiserId);
+      if (!advertiser) {
+        logger.warn(`Advertiser #${advertiserId} not found for refund notification`);
+        return;
+      }
+
+      const message = `💰 Refund Processed for Deal #${dealId}\n\n` +
+        `Amount: ${data.priceTon} TON\n` +
+        `Transaction: ${data.txHash}\n` +
+        `Wallet: ${data.advertiserWalletAddress}\n\n` +
+        `Your funds have been refunded to your wallet.`;
+
+      await TelegramNotificationQueueService.queueTelegramMessage(
+        advertiser.telegram_id,
+        message
+      );
+    } catch (error: any) {
+      logger.error(`Error sending refund notification`, {
+        dealId,
+        advertiserId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
 }

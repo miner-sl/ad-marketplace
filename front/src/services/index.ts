@@ -6,6 +6,7 @@ import type {
   CampaignFilters,
   Deal,
   DealFilters,
+  CreateChannelRequest,
   CreateChannelListingRequest,
   CreateCampaignRequest,
   CreateDealRequest,
@@ -98,6 +99,24 @@ export const MarketplaceService = {
     request: SetChannelPricingRequest
   ): Promise<ApiResponse<ChannelPricing>> => {
     return await apiRequest<ChannelPricing>(`/channels/${request.channel_id}/pricing`, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    })
+  },
+
+  validateChannel: async (
+    channelName: string
+  ): Promise<ApiResponse<{ isAdmin: boolean }>> => {
+    return await apiRequest<{ isAdmin: boolean }>('/channels/validate', {
+      method: 'POST',
+      body: JSON.stringify({ channelName }),
+    })
+  },
+
+  createChannel: async (
+    request: CreateChannelRequest
+  ): Promise<ApiResponse<Channel>> => {
+    return await apiRequest<Channel>('/channels', {
       method: 'POST',
       body: JSON.stringify(request),
     })

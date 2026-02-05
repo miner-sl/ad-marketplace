@@ -793,6 +793,67 @@ export class BotController {
   }
 
   /**
+   * Handle check channel admin status button click
+   * Validates if bot is admin of the channel
+   */
+  static async handleCheckChannelAdmin(ctx: Context, channelId: number, channelName: string) {
+    try {
+      await ctx.answerCbQuery('Checking admin status...');
+
+      // Validate channel admin status
+      const isAdmin = await ChannelService.validateChannelAdmin(channelName);
+
+      if (isAdmin) {
+        await ctx.reply(
+          `✅ Bot Admin Status: Verified\n\n` +
+          `The bot is successfully added as admin to your channel.\n` +
+          `Channel: ${channelName}\n\n` +
+          `Your channel is ready to receive deals!`
+        );
+      } else {
+        const botInfo = await TelegramService.bot.getMe();
+        const botUsername = botInfo.username;
+        const channelParam = channelName.startsWith('@') ? channelName.replace('@', '') : channelName;
+        const addBotLink = `https://t.me/${botUsername}?startchannel=${channelParam}&admin=post_stories+post_messages`;
+
+        await ctx.reply(
+          `❌ Bot Admin Status: Not Admin\n\n` +
+          `The bot is not yet added as admin to your channel.\n` +
+          `Channel: ${channelName}\n\n` +
+          `Please add the bot as admin with the following permissions:\n` +
+          `• Post messages\n` +
+          `• Post stories\n\n` +
+          `Click the button below to add the bot:`,
+          Markup.inlineKeyboard([
+            [
+              {
+                text: '➕ Add Bot as Admin',
+                url: addBotLink
+              }
+            ],
+            [
+              {
+                text: '✅ Check Again',
+                callback_data: `check_channel_admin_${channelId}_${channelName}`
+              }
+            ]
+          ])
+        );
+      }
+    } catch (error: any) {
+      logger.error('Error checking channel admin status', {
+        error: error.message,
+        channelId,
+        channelName,
+      });
+      await ctx.reply(
+        `❌ Error checking admin status: ${error.message}\n\n` +
+        `Please try again later.`
+      );
+    }
+  }
+
+  /**
    * Check bot admin status and register channel
    */
   static async checkBotAdmin(ctx: Context, channelId?: number) {

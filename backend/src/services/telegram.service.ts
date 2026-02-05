@@ -17,10 +17,7 @@ export interface ChannelStats {
 }
 
 export class TelegramService {
-  /**
-   * Get channel information
-   */
-  static async getChannelInfo(channelId: number): Promise<{
+  static async getChannelInfoByChannelId(channelId: number): Promise<{
     id: number;
     title?: string;
     username?: string;
@@ -40,7 +37,35 @@ export class TelegramService {
   }
 
   /**
-   * Check if bot is admin of channel
+   * Get channel information by username (e.g., @channelname)
+   * Telegram Bot API supports getting chat info by username
+   */
+  static async getChannelInfoByUsername(username: string): Promise<{
+    id: number;
+    title?: string;
+    username?: string;
+    description?: string;
+  }> {
+    try {
+      // Ensure username starts with @
+      const formattedUsername = username.startsWith('@') ? username : `@${username}`;
+
+      // Telegram Bot API getChat accepts username with @ prefix
+      const chat = await bot.getChat(formattedUsername);
+
+      return {
+        id: chat.id as number,
+        title: (chat as any).title,
+        username: (chat as any).username,
+        description: (chat as any).description,
+      };
+    } catch (error: any) {
+      throw new Error(`Failed to get channel info by username ${username}: ${error.message || error}`);
+    }
+  }
+
+  /**
+   * Check if bot is admin of channel by channel ID
    */
   static async isBotAdmin(channelId: number): Promise<boolean> {
     try {
@@ -48,6 +73,24 @@ export class TelegramService {
       const botInfo = await bot.getMe();
       const member = await bot.getChatMember(channelId, botInfo.id);
       return member.status === 'administrator' || member.status === 'creator';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Check if bot is admin of channel by username
+   */
+  static async isBotAdminByUsername(username: string): Promise<boolean> {
+    try {
+      // Ensure username starts with @
+      const formattedUsername = username.startsWith('@') ? username : `@${username}`;
+
+      // Get channel info first to get the channel ID
+      const channelInfo = await this.getChannelInfoByUsername(formattedUsername);
+
+      // Then check if bot is admin
+      return await this.isBotAdmin(channelInfo.id);
     } catch (error) {
       return false;
     }

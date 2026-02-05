@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
 export const createChannelSchema = z.object({
-  telegram_channel_id: z.number(),
-  username: z.string().optional(),
+  username: z.string().min(1).refine((val) => val.startsWith('@') || !val.includes(' '), {
+    message: 'Username must start with @ or be a valid Telegram username',
+  }),
+  price_ton: z.number().positive(),
   topic_id: z.number().int().positive().optional(),
 });
 
@@ -113,4 +115,8 @@ export const updateChannelStatusSchema = z.object({
 export const declineDealSchema = z.object({
   dealId: z.number().int().positive(),
   reason: z.string().optional(),
+});
+
+export const validateChannelSchema = z.object({
+  channelName: z.string().min(1),
 });

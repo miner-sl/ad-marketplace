@@ -9,6 +9,7 @@ import type {
   CampaignFilters,
   Deal,
   DealFilters,
+  CreateChannelRequest,
   CreateChannelListingRequest,
   CreateCampaignRequest,
   CreateDealRequest,
@@ -109,6 +110,22 @@ export const useChannelStatsQuery = (id: number) => {
     enabled: !!id,
     gcTime: TANSTACK_GC_TIME,
     staleTime: TANSTACK_TTL.CHANNEL_STATS || 300000, // 5 minutes default
+  })
+}
+
+export const useValidateChannelMutation = () => {
+  return useMutation({
+    mutationFn: (channelName: string) => channelsAPI.validateChannel(channelName),
+  })
+}
+
+export const useCreateChannelMutation = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: CreateChannelRequest) => channelsAPI.createChannel(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.CHANNELS })
+    },
   })
 }
 

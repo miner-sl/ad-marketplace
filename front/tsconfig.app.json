@@ -22,6 +22,7 @@
     "paths": {
       "@components": ["./src/components"],
       "@utils": ["./src/common/utils"],
+      "@common": ["./src/common"],
       "@types": ["./src/types"],
       "@pages": ["./src/pages"],
       "@store": ["./src/store"],

@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { validateBody, validateQuery } from '../middleware/validation';
 import { authMiddleware } from '../middleware/auth';
-import { createChannelSchema, listChannelsQuerySchema, setChannelPricingSchema, updateChannelStatusSchema } from '../utils/validation';
+import { createChannelSchema, listChannelsQuerySchema, setChannelPricingSchema, updateChannelStatusSchema, validateChannelSchema } from '../utils/validation';
 import { ChannelsController } from '../controllers/channels.controller';
 
 const channelsRouter: FastifyPluginAsync = async (fastify) => {
@@ -22,6 +22,10 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
   fastify.patch('/:id/status', {
     preHandler: [authMiddleware, validateBody(updateChannelStatusSchema)],
   }, ChannelsController.updateChannelStatus);
+
+  fastify.post('/validate', {
+    preHandler: [authMiddleware, validateBody(validateChannelSchema)],
+  }, ChannelsController.validateChannelAdmin);
 
   fastify.get('/topics', ChannelsController.getAllTopics);
 };

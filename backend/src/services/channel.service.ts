@@ -2,6 +2,7 @@ import { ChannelModel } from '../repositories/channel-model.repository';
 import { Channel } from '../models/channel.types';
 import { UserModel } from '../repositories/user.repository';
 import { TelegramService } from './telegram.service';
+import { TelegramNotificationService } from './telegram-notification.service';
 import { topicsService } from './topics.service';
 import { withTx } from '../utils/transaction';
 import logger from '../utils/logger';
@@ -35,7 +36,8 @@ export class ChannelService {
    */
   static async registerChannel(
     telegramUserId: number,
-    telegramChannelId: number,
+    username: string,
+    priceTon: number,
     topicId?: number
   ): Promise<ChannelRegistrationResult> {
     try {
@@ -48,12 +50,19 @@ export class ChannelService {
         };
       }
 
+      // Ensure username starts with @
+      const formattedUsername = username.startsWith('@') ? username : `@${username}`;
+
+      // Fetch channel info from Telegram using username
+      const channelInfo = await TelegramService.getChannelInfoByUsername(formattedUsername);
+      const telegramChannelId = channelInfo.id;
+
       const botInfo = await TelegramService.bot.getMe();
       const botId = botInfo.id;
 
+      // Check if channel already exists
       const existing = await ChannelModel.findByTelegramId(telegramChannelId);
       if (existing) {
-        const channelInfo = await TelegramService.getChannelInfo(telegramChannelId);
         return {
           success: false,
           channel: existing,
@@ -79,8 +88,6 @@ export class ChannelService {
         };
       }
 
-      const channelInfo = await TelegramService.getChannelInfo(telegramChannelId);
-
       // Validate topic if provided (using cached topics service)
       if (topicId !== undefined) {
         const topic = topicsService.getTopicById(topicId);
@@ -93,23 +100,63 @@ export class ChannelService {
         }
       }
 
-      const channel = await ChannelModel.create({
-        owner_id: user.id,
-        telegram_channel_id: telegramChannelId,
-        username: channelInfo.username,
-        title: channelInfo.title,
-        description: channelInfo.description,
-        topic_id: topicId,
-      });
+      // Create channel and pricing in a transaction
+      const channel = await withTx(async (client) => {
+        // Create channel
+        const channelResult = await client.query(
+          `INSERT INTO channels (owner_id, telegram_channel_id, username, title, description, topic_id, bot_admin_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING *`,
+          [
+            user.id,
+            telegramChannelId,
+            channelInfo.username,
+            channelInfo.title,
+            channelInfo.description,
+            topicId || null,
+            botId,
+          ]
+        );
 
-      await ChannelModel.updateBotAdmin(channel.id, botId);
+        const newChannel = channelResult.rows[0];
+
+        // Create default pricing for 'post' format
+        await ChannelModel.setPricingWithClient(
+          client,
+          newChannel.id,
+          'post',
+          priceTon,
+          true
+        );
+
+        return newChannel;
+      });
 
       logger.info('Channel registered successfully', {
         channelId: channel.id,
         telegramChannelId,
+        username: formattedUsername,
+        priceTon,
         ownerId: user.id,
         telegramUserId,
       });
+
+      try {
+        await TelegramNotificationService.notifyChannelAddBot(
+          telegramUserId,
+          channelInfo.title || formattedUsername,
+          channelInfo.username,
+          botInfo.username!,
+          channel.id
+        );
+      } catch (notifError: any) {
+        // Log but don't fail channel creation if notification fails
+        logger.warn('Failed to send channel registration notification', {
+          error: notifError.message,
+          telegramUserId,
+          channelId: channel.id,
+        });
+      }
 
       return {
         success: true,
@@ -127,7 +174,8 @@ export class ChannelService {
         error: error.message,
         stack: error.stack,
         telegramUserId,
-        telegramChannelId,
+        username,
+        priceTon,
       });
 
       return {
@@ -217,6 +265,33 @@ export class ChannelService {
         message: error.message || 'Failed to update channel status',
         statusCode: error.statusCode || 500,
       };
+    }
+  }
+
+  /**
+   * Validate if bot is admin of a channel by channel name/username
+   * @param channelName - Channel username (with or without @)
+   * @returns true if bot is admin, false otherwise
+   */
+  static async validateChannelAdmin(channelName: string): Promise<boolean> {
+    try {
+      // Ensure username starts with @
+      const formattedUsername = channelName.startsWith('@') ? channelName : `@${channelName}`;
+
+      // Get channel info from Telegram
+      const channelInfo = await TelegramService.getChannelInfoByUsername(formattedUsername);
+      const telegramChannelId = channelInfo.id;
+
+      // Check if bot is admin
+      const isAdmin = await TelegramService.isBotAdmin(telegramChannelId);
+      
+      return isAdmin;
+    } catch (error: any) {
+      logger.error('Failed to validate channel admin status', {
+        error: error.message,
+        channelName,
+      });
+      return false;
     }
   }
 }

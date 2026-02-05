@@ -667,4 +667,79 @@ export class TelegramNotificationService {
       throw error;
     }
   }
+
+  /**
+   * Notify user about successful channel registration
+   */
+  static async notifyChannelAddBot(
+    telegramUserId: number,
+    channelName: string,
+    channelUsername: string | undefined,
+    botUsername: string,
+    channelId: number
+  ): Promise<void> {
+    try {
+      const user = await UserModel.findByTelegramId(telegramUserId);
+      if (!user) {
+        logger.warn(`User #${telegramUserId} not found for channel registration notification`);
+        return;
+      }
+
+      // Build bot admin link
+      // Format: https://t.me/botusername?startchannel=channelusername&admin=post_stories+post_messages
+      // If channel has username, include it; otherwise use empty string (Telegram will prompt)
+      const channelParam = channelUsername ? channelUsername.replace('@', '') : '';
+      const addBotLink = channelParam
+        ? `https://t.me/${botUsername}?startchannel=${channelParam}&admin=post_stories+post_messages`
+        : `https://t.me/${botUsername}?startchannel=&admin=post_stories+post_messages`;
+
+      const message =
+        `✅ Channel Registered Successfully!\n\n` +
+        `📺 Channel: ${channelName}\n` +
+        (channelUsername ? `🔗 Username: ${channelUsername}\n` : '') +
+        `💰 Default Price: Set for 'post' format\n\n` +
+        `⚠️ Important: Please add the bot as admin to your channel with the following permissions:\n` +
+        `• Post messages\n` +
+        `• Post stories\n\n` +
+        `Click the button below to add the bot as admin:`;
+
+      const notificationButtons = {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: '➕ Add Bot as Admin',
+                url: addBotLink
+              }
+            ],
+            [
+              {
+                text: '✅ Check Admin Status',
+                callback_data: `check_channel_admin_${channelId}_${channelUsername || channelName}`
+              }
+            ],
+            [
+              {
+                text: '📋 View Channel',
+                callback_data: `channel_details_${channelId}`
+              }
+            ]
+          ]
+        }
+      };
+
+      await TelegramNotificationQueueService.queueTelegramMessage(
+        user.telegram_id,
+        message,
+        notificationButtons
+      );
+    } catch (error: any) {
+      logger.error(`Error sending channel registration notification`, {
+        telegramUserId,
+        channelId,
+        error: error.message,
+      });
+      // Don't throw - notification failure shouldn't break channel creation
+    }
+  }
 }

@@ -67,6 +67,7 @@ export default defineConfig({
     alias: {
       '@components': path.resolve(__dirname, './src/components'),
       '@utils': path.resolve(__dirname, './src/common/utils'),
+      '@common': path.resolve(__dirname, './src/common'),
       '@types': path.resolve(__dirname, './src/types'),
       '@store': path.resolve(__dirname, './src/store'),
       '@store-new': path.resolve(__dirname, './src/store-new'),

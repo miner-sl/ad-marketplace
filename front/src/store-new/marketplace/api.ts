@@ -7,6 +7,7 @@ import type {
   CampaignFilters,
   Deal,
   DealFilters,
+  CreateChannelRequest,
   CreateChannelListingRequest,
   CreateCampaignRequest,
   CreateDealRequest,
@@ -49,6 +50,22 @@ export const channelsAPI = {
       await MarketplaceService.setChannelPricing(request)
     if (!ok || !data) {
       throw new Error(error || 'Failed to set channel pricing')
+    }
+    return data
+  },
+
+  validateChannel: async (channelName: string): Promise<{ isAdmin: boolean }> => {
+    const { data, ok, error } = await MarketplaceService.validateChannel(channelName)
+    if (!ok || !data) {
+      throw new Error(error || 'Failed to validate channel')
+    }
+    return data
+  },
+
+  createChannel: async (request: CreateChannelRequest): Promise<Channel> => {
+    const { data, ok, error } = await MarketplaceService.createChannel(request)
+    if (!ok || !data) {
+      throw new Error(error || 'Failed to create channel')
     }
     return data
   },

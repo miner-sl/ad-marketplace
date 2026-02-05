@@ -92,6 +92,20 @@ bot.on('callback_query', async (ctx) => {
     return;
   }
 
+  // Handle check channel admin status button
+  // Format: check_channel_admin_<channelId>_<channelName>
+  if (data.startsWith('check_channel_admin_')) {
+    const parts = data.split('_');
+    if (parts.length >= 5) {
+      const channelId = parseInt(parts[3]);
+      const channelName = parts.slice(4).join('_'); // Handle channel names with underscores
+      if (channelId && channelName) {
+        await BotController.handleCheckChannelAdmin(ctx, channelId, channelName);
+        return;
+      }
+    }
+  }
+
   // Handle set pricing buttons: set_price_<channelId>_<format>
   if (data.startsWith('set_price_')) {
     const parts = data.split('_');

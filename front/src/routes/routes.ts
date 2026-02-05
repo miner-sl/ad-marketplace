@@ -19,6 +19,7 @@ export const ROUTES_NAME = {
   MARKETPLACE_MY_CAMPAIGNS: '/mycampaigns',
   MARKETPLACE_BROWSE_CHANNELS: '/browse_channels',
   MARKETPLACE_REQUESTS: '/requests',
+  MARKETPLACE_CHANNEL_OWNER_ADD_CHANNEL: '/marketplace/channel-owner/add-channel',
   MARKETPLACE_CHANNEL_OWNER_CREATE_LISTING: '/marketplace/channel-owner/create-listing',
   MARKETPLACE_CHANNEL_OWNER_MY_LISTINGS: '/marketplace/channel-owner/my-listings',
   MARKETPLACE_CHANNEL_OWNER_MY_DEALS: '/marketplace/channel-owner/my-deals',

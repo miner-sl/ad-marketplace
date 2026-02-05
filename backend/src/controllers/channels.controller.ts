@@ -6,7 +6,8 @@ import { UserModel } from '../repositories/user.repository';
 import { TelegramService } from '../services/telegram.service';
 import { ChannelService } from '../services/channel.service';
 import { topicsService } from '../services/topics.service';
-import { setChannelPricingSchema, updateChannelStatusSchema } from '../utils/validation';
+import { setChannelPricingSchema, updateChannelStatusSchema, validateChannelSchema } from '../utils/validation';
+import { throttleChannelValidate } from '../utils/throttle';
 import logger from '../utils/logger';
 
 export class ChannelsController {
@@ -76,12 +77,20 @@ export class ChannelsController {
         });
       }
 
-      const { telegram_channel_id } = request.body as any;
+      const { username, price_ton } = request.body as any;
       const topic_id = (request.body as any)?.topic_id ? parseInt((request.body as any).topic_id) : undefined;
+
+      if (!username || !price_ton) {
+        return reply.code(400).send({
+          error: 'Missing required fields',
+          message: 'username and price_ton are required',
+        });
+      }
 
       const result = await ChannelService.registerChannel(
         request.user.telegramId,
-        telegram_channel_id,
+        username,
+        price_ton,
         topic_id
       );
 
@@ -120,8 +129,9 @@ export class ChannelsController {
         }
       }
 
-      if (result.channel) {
-        const stats = await TelegramService.fetchChannelStats(telegram_channel_id);
+      if (result.channel && result.channelInfo) {
+        // Fetch channel stats using the telegram_channel_id from the created channel
+        const stats = await TelegramService.fetchChannelStats(result.channel.telegram_channel_id);
         await ChannelModel.saveStats(result.channel.id, stats);
 
         if (request.user.telegramId) {
@@ -232,6 +242,51 @@ export class ChannelsController {
     } catch (error: any) {
       logger.error('Failed to get topics', { error: error.message });
       reply.code(500).send({ error: error.message });
+    }
+  }
+
+  static async validateChannelAdmin(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      if (!request.user?.id) {
+        return reply.code(401).send({
+          error: 'Unauthorized',
+          message: 'User ID not found in token',
+        });
+      }
+
+      const { channelName } = request.body as z.infer<typeof validateChannelSchema>;
+
+      if (!channelName) {
+        return reply.code(400).send({
+          error: 'Missing required field',
+          message: 'channelName is required',
+        });
+      }
+
+      // Throttle validation requests (5 seconds per user per channel)
+      const isAllowed = await throttleChannelValidate(request.user.id, channelName, 5);
+      
+      if (!isAllowed) {
+        return reply.code(429).send({
+          error: 'Too Many Requests',
+          message: 'Please wait a few seconds before checking again',
+        });
+      }
+
+      // Validate channel admin status
+      const isAdmin = await ChannelService.validateChannelAdmin(channelName);
+
+      return {
+        isAdmin,
+      };
+    } catch (error: any) {
+      logger.error('Channel validation endpoint error', {
+        error: error.message,
+        stack: error.stack,
+        userId: request.user?.id,
+        channelName: (request.body as any)?.channelName,
+      });
+      return reply.code(500).send({ error: error.message });
     }
   }
 }

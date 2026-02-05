@@ -6,6 +6,7 @@ import {
   MyListingsPage,
   MyDealsPage as ChannelOwnerMyDealsPage,
   MyChannelsPage,
+  AddChannelPage,
   CreateCampaignPage,
   AdvertiserMyDealsPage,
   MyCampaignsPage,
@@ -15,7 +16,7 @@ import {
   RequestsPage,
   RequestPostPage,
 } from '../pages/marketplace';
-import { AddBotToChatPage, ProfilePage } from '../pages';
+import { AddBotToChatPage, ProfilePage } from '@pages';
 import { OnboardingPage} from '../pages/onboarding';
 
 import {ROUTES_NAME} from './routes';
@@ -28,14 +29,18 @@ export default function AppRouter() {
        path={ROUTES_NAME.MARKETPLACE_HOME}
        element={<MarketplaceHomePage />}
      />
-     <Route
-       path={ROUTES_NAME.MARKETPLACE_CHANNEL_OWNER_CREATE_LISTING}
-       element={<CreateListingPage />}
-     />
-     <Route
-       path={ROUTES_NAME.MARKETPLACE_CHANNEL_OWNER_MY_LISTINGS}
-       element={<MyListingsPage />}
-     />
+    <Route
+      path={ROUTES_NAME.MARKETPLACE_CHANNEL_OWNER_ADD_CHANNEL}
+      element={<AddChannelPage />}
+    />
+    <Route
+      path={ROUTES_NAME.MARKETPLACE_CHANNEL_OWNER_CREATE_LISTING}
+      element={<CreateListingPage />}
+    />
+    <Route
+      path={ROUTES_NAME.MARKETPLACE_CHANNEL_OWNER_MY_LISTINGS}
+      element={<MyListingsPage />}
+    />
      <Route
        path={ROUTES_NAME.MARKETPLACE_CHANNEL_OWNER_MY_DEALS}
        element={<ChannelOwnerMyDealsPage />}

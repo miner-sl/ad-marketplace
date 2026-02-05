@@ -1,5 +1,6 @@
 import TelegramBot from 'node-telegram-bot-api';
 import * as dotenv from 'dotenv';
+import { JSDOM } from 'jsdom';
 
 dotenv.config();
 
@@ -211,6 +212,35 @@ export class TelegramService {
       return null; // Placeholder - would need custom implementation
     } catch (error) {
       return null;
+    }
+  }
+
+  /**
+   * Get message text from channel using message ID
+   * Uses forwardMessage workaround to retrieve message content
+   */
+  static async getMessageText(channelUsername: string, messageId: number): Promise<string | undefined> {
+    try {
+      const url = `https://t.me/${channelUsername}/${messageId}?embed=1&mode=tme`;
+
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0"
+        }
+      });
+
+      const html = await res.text();
+
+      const dom = new JSDOM(html);
+      const document = dom.window.document;
+
+      const el = document.querySelector(
+        ".tgme_widget_message_text.js-message_text"
+      );
+
+      return el?.textContent?.trim() ?? undefined;
+    } catch (e) {
+      return undefined;
     }
   }
 }

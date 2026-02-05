@@ -49,7 +49,7 @@ export const listDealsQuerySchema = z.object({
     'posted',
     'verified',
     'completed',
-    'cancelled',
+    'declined',
     'refunded',
   ]).optional(),
   deal_type: z.enum(['listing', 'campaign']).optional(),

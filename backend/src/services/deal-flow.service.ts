@@ -4,6 +4,7 @@ import { UserModel } from '../repositories/user.repository';
 import { TONService } from './ton.service';
 import { CreativeService } from './creative.service';
 import { PostService } from './post.service';
+import { TelegramNotificationQueueService } from './telegram-notification-queue.service';
 import { withTx } from '../utils/transaction';
 import db from '../db/connection';
 import { DealRepository } from '../repositories/deal.repository';
@@ -90,6 +91,13 @@ export class DealFlowService {
            VALUES ($1, $2, $3)`,
           [dealId, advertiserDbId, data.postText]
         );
+
+        await CreativeService.createWithClient(client, {
+          deal_id: dealId,
+          submitted_by: advertiserDbId,
+          content_type: 'text',
+          content_data: { text: data.postText }
+        });
       }
 
       return deal;
@@ -345,6 +353,9 @@ export class DealFlowService {
 
   /**
    * Request revision of creative
+   * @param dealId - Deal ID
+   * @param requestedBy - Telegram ID of the user requesting revision
+   * @param notes - Revision notes
    */
   static async requestRevision(dealId: number, requestedBy: number, notes: string): Promise<any> {
     return await withTx(async (client) => {
@@ -358,7 +369,19 @@ export class DealFlowService {
         throw new Error('Deal not found');
       }
 
-      await CreativeService.requestRevision(dealId, notes);
+      // Convert Telegram ID to database user ID
+      const userResult = await client.query(
+        'SELECT * FROM users WHERE id = $1',
+        [requestedBy]
+      );
+
+      if (!userResult.rows || userResult.rows.length === 0) {
+        throw new Error(`User with id ${requestedBy} not found. Please register first.`);
+      }
+
+      const requestedByDbId = userResult.rows[0].id;
+
+      await CreativeService.requestRevisionWithClient(client, dealId, notes);
 
       const updateResult = await client.query(
         `UPDATE deals 
@@ -375,7 +398,7 @@ export class DealFlowService {
       await client.query(
         `INSERT INTO deal_messages (deal_id, sender_id, message_text)
          VALUES ($1, $2, $3)`,
-        [dealId, requestedBy, `Revision requested: ${notes}`]
+        [dealId, requestedByDbId, `Revision requested: ${notes}`]
       );
 
       return updateResult.rows[0];
@@ -574,7 +597,7 @@ export class DealFlowService {
 
       await client.query(
         `UPDATE deals 
-         SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+         SET status = 'declined', updated_at = CURRENT_TIMESTAMP
          WHERE id = $1 AND status = 'pending'
          RETURNING *`,
         [dealId]
@@ -645,6 +668,85 @@ export class DealFlowService {
        VALUES ($1, $2, $3)`,
       [dealId, senderId, messageText]
     );
+  }
+
+  /**
+   * Update the most recent deal message sent by the user
+   */
+  static async updateDealMessage(dealId: number, senderId: number, messageText: string): Promise<any> {
+    const deal = await DealModel.findById(dealId);
+    if (!deal) {
+      throw new Error('Deal not found');
+    }
+
+    if (deal.channel_owner_id !== senderId && deal.advertiser_id !== senderId) {
+      throw new Error('Unauthorized');
+    }
+
+    // Find the most recent message sent by this user
+    const messageResult = await db.query(
+      `SELECT id FROM deal_messages 
+       WHERE deal_id = $1 AND sender_id = $2 
+       ORDER BY created_at DESC 
+       LIMIT 1`,
+      [dealId, senderId]
+    );
+
+    if (!messageResult.rows || messageResult.rows.length === 0) {
+      // If no message exists, create a new one
+      await db.query(
+        `INSERT INTO deal_messages (deal_id, sender_id, message_text)
+         VALUES ($1, $2, $3)`,
+        [dealId, senderId, messageText]
+      );
+      return { message: 'Message created' };
+    }
+
+    // Update the most recent message
+    const updateResult = await db.query(
+      `UPDATE deal_messages 
+       SET message_text = $1 
+       WHERE id = $2 AND deal_id = $3 AND sender_id = $4
+       RETURNING *`,
+      [messageText, messageResult.rows[0].id, dealId, senderId]
+    );
+
+    if (updateResult.rows.length === 0) {
+      throw new Error('Failed to update message');
+    }
+
+    await db.query(
+      `UPDATE deals 
+       SET status = 'pending', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [dealId]
+    );
+
+    // Determine recipient (the other party in the deal)
+    const recipientId = deal.channel_owner_id === senderId
+      ? deal.advertiser_id
+      : deal.channel_owner_id;
+
+    // Send notification to the other party about the message update
+    try {
+      const recipient = await UserModel.findById(recipientId);
+      if (recipient) {
+        await TelegramNotificationQueueService.queueTelegramMessage(
+          recipient.telegram_id,
+          `✏️ Message updated in Deal #${dealId}:\n\n${messageText}\n\nUse /deal ${dealId} to view.`
+        );
+      }
+    } catch (error: any) {
+      // Log error but don't fail the update if notification fails
+      logger.warn('Failed to send notification for updated deal message', {
+        dealId,
+        senderId,
+        recipientId,
+        error: error.message,
+      });
+    }
+
+    return updateResult.rows[0];
   }
 
   /**

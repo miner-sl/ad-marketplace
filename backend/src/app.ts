@@ -23,24 +23,27 @@ export async function buildApp() {
     bodyLimit: 10 * 1024 * 1024, // 10MB
   });
 
-  // Register request ID plugin
   await app.register(requestIdPlugin);
 
-  // Register CORS
   await app.register(require('@fastify/cors'), {
     origin: isProd
       ? process.env.ALLOWED_ORIGINS?.split(',') || false
       : true,
   });
 
-  // Register Helmet for security
   await app.register(require('@fastify/helmet'), {
     contentSecurityPolicy: isProd ? undefined : false,
   });
 
-  // Rate limiting will be registered for /api routes only
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+    try {
+      const json = body === '' ? {} : JSON.parse(body as string);
+      done(null, json);
+    } catch (err) {
+      done(err as Error, undefined);
+    }
+  });
 
-  // Request logging hook
   app.addHook('onRequest', async (request) => {
     logger.debug('Incoming request', {
       method: request.method,
@@ -80,7 +83,6 @@ export async function buildApp() {
     }
   });
 
-  // Liveness check
   app.get('/live', async (request) => {
     return {
       status: 'alive',
@@ -89,7 +91,6 @@ export async function buildApp() {
     };
   });
 
-  // Swagger documentation
   const swaggerDocument = YAML.load(path.join(__dirname, '../swagger.yaml')) as any;
   await app.register(require('@fastify/swagger'), {
     openapi: {

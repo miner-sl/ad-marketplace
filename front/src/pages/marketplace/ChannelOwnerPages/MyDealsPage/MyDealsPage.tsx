@@ -13,7 +13,7 @@ import {
 import { useDealsQuery } from '@store-new'
 import { useTelegramUser } from '@hooks'
 import { ROUTES_NAME } from '@routes'
-import { pluralize, hapticFeedback, separateNumber } from '@utils'
+import { pluralize, hapticFeedback } from '@utils'
 import styles from './MyDealsPage.module.scss'
 
 export const MyDealsPage = () => {
@@ -47,7 +47,7 @@ export const MyDealsPage = () => {
                 {myDeals.map((deal) => {
                   const channelName = deal.channel?.title || `@${deal.channel?.username || 'channel'}`
                   const subscribersCount = deal.channel?.stats?.subscribers_count || 0
-                  
+
                   return (
                     <GroupItem
                       key={deal.id}
@@ -78,7 +78,7 @@ export const MyDealsPage = () => {
                             </>
                           )}
                           <Text type="caption2" color="tertiary">
-                            • {deal.price_ton?.toFixed?.(2) || '0.00'} TON
+                            • {deal.price_ton?.toFixed?.(2) || '-'} TON
                           </Text>
                         </BlockNew>
                       }

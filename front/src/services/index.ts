@@ -275,6 +275,16 @@ export const MarketplaceService = {
     })
   },
 
+  updateDealMessage: async (
+    dealId: number,
+    message_text: string
+  ): Promise<ApiResponse<Deal>> => {
+    return await apiRequest<Deal>(`/deals/${dealId}/update-message`, {
+      method: 'POST',
+      body: JSON.stringify({ message_text }),
+    })
+  },
+
   schedulePost: async (
     dealId: number,
     scheduled_post_time: string

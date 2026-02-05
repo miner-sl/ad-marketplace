@@ -18,6 +18,7 @@ import type {
   ChannelPricing,
 } from '@types'
 import { PREDEFINED_TOPICS } from '../../common/constants/topics'
+import { collapseAddress, separateNumber, createMembersCount } from '@utils'
 
 import {
   channelsAPI,
@@ -33,6 +34,16 @@ export interface EnhancedChannel extends Omit<Channel, 'topic'> {
   subscribersCount: number
   postPricing: ChannelPricing | undefined
   isOwner: boolean
+}
+
+export interface EnhancedDeal extends Deal {
+  formattedScheduledPostTime?: string
+  formattedEscrowAddress?: string
+  advertiserDisplayName?: string
+  formattedSubscribersCount?: string
+  formattedAverageViews?: string
+  formattedAverageReach?: string
+  formattedMembersCount?: string
 }
 
 // Channels
@@ -267,9 +278,57 @@ export const useDealsQuery = (filters?: DealFilters) => {
 }
 
 export const useDealQuery = (id: number, userId?: number) => {
-  return useQuery<Deal>({
+  return useQuery<Deal, Error, EnhancedDeal>({
     queryKey: [...TANSTACK_KEYS.DEAL(id), userId],
     queryFn: () => dealsAPI.getDeal(id, userId),
+    select: (deal) => {
+      const formattedScheduledPostTime = deal.scheduled_post_time
+        ? new Date(deal.scheduled_post_time).toLocaleString()
+        : undefined
+
+      const formattedEscrowAddress = deal.escrow_address
+        ? collapseAddress(deal.escrow_address, 4)
+        : undefined
+
+      const advertiserDisplayName =
+        typeof deal.advertiser === 'object' && deal.advertiser !== null
+          ? deal.advertiser.username
+            ? `@${deal.advertiser.username}`
+            : deal.advertiser.first_name || `User #${deal.advertiser.telegram_id}`
+          : undefined
+
+      const channelStats = deal.channel?.stats
+      const subscribersCount = channelStats?.subscribers_count || 0
+      const averageViews = channelStats?.average_views
+      const averageReach = channelStats?.average_reach
+
+      const formattedSubscribersCount = subscribersCount > 0
+        ? separateNumber(subscribersCount)
+        : undefined
+
+      const formattedAverageViews = averageViews
+        ? separateNumber(averageViews)
+        : undefined
+
+      const formattedAverageReach = averageReach
+        ? separateNumber(averageReach)
+        : undefined
+
+      const formattedMembersCount = subscribersCount > 0
+        ? createMembersCount(subscribersCount)
+        : undefined
+
+      return {
+        ...deal,
+        formattedScheduledPostTime,
+        formattedEscrowAddress,
+        advertiserDisplayName,
+        formattedSubscribersCount,
+        formattedAverageViews,
+        formattedAverageReach,
+        formattedMembersCount,
+      } as EnhancedDeal
+    },
     enabled: !!id,
     gcTime: TANSTACK_GC_TIME,
     staleTime: TANSTACK_TTL.DEAL || 30000,
@@ -370,6 +429,25 @@ export const useRequestCreativeRevisionMutation = () => {
       dealId: number
       revision_notes: string
     }) => dealsAPI.requestCreativeRevision(dealId, revision_notes),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: TANSTACK_KEYS.DEAL(variables.dealId),
+      })
+      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.DEALS })
+    },
+  })
+}
+
+export const useUpdateDealMessageMutation = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      dealId,
+      message_text,
+    }: {
+      dealId: number
+      message_text: string
+    }) => dealsAPI.updateDealMessage(dealId, message_text),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: TANSTACK_KEYS.DEAL(variables.dealId),

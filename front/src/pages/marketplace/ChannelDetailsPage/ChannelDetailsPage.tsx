@@ -166,7 +166,6 @@ export const ChannelDetailsPage = () => {
     ? channel.pricing
     : channel.pricing?.filter((p) => p.is_active)
 
-  // Find active post pricing for "Request Post" button
   const postPricing = channel.pricing?.find((p) => p.ad_format === 'post' && p.is_active)
 
   const handleRequestPostClick = () => {
@@ -504,7 +503,7 @@ export const ChannelDetailsPage = () => {
                               </Text>
                             </div>
                             <Text type="text" color={isEnabled ? 'accent' : 'secondary'}>
-                              {pricing?.price_ton?.toFixed?.(2) || '0.00'} TON
+                              {pricing?.price_ton?.toFixed?.(2) || '-'} TON
                             </Text>
                           </>
                         )}

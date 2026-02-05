@@ -41,6 +41,17 @@ const dealsRouter: FastifyPluginAsync = async (fastify) => {
     preHandler: [authMiddleware],
   }, DealsController.requestRevision);
 
+  fastify.post('/:id/update-message', {
+    preHandler: [authMiddleware],
+  }, DealsController.updateDealMessage);
+
+  fastify.post('/:id/reject', {
+    preHandler: [authMiddleware],
+    schema: {
+      body: false, // No body required
+    },
+  }, DealsController.declineDeal);
+
   fastify.post('/:id/cancel', {
     preHandler: [authMiddleware],
   }, DealsController.cancelDeal);

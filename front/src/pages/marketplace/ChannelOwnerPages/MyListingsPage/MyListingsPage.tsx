@@ -13,12 +13,13 @@ import {
   useChannelListingsQuery,
   useDeleteChannelListingMutation,
 } from '@store-new'
-import { useUser } from '@store'
+import {useAuth} from "@context";
+
 import styles from './MyListingsPage.module.scss'
 
 export const MyListingsPage = () => {
   const navigate = useNavigate()
-  const { user } = useUser()
+  const { user } = useAuth()
   const { data: listings, isLoading } = useChannelListingsQuery({
     is_active: true,
   })

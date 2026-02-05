@@ -6,12 +6,12 @@
 }
 
 .status-completed {
-  background: rgba(76, 175, 80, 0.1);
+  background: color-mix(in srgb, var(--color-state-success) 20%, transparent);
 }
 
-.status-cancelled,
+.status-declined,
 .status-refunded {
-  background: rgba(244, 67, 54, 0.1);
+  background: color-mix(in srgb, var(--color-state-destructive) 20%, transparent);
 }
 
 .status-approved,
@@ -20,5 +20,5 @@
 .status-scheduled,
 .status-posted,
 .status-verified {
-  background: rgba(33, 150, 243, 0.1);
+  background: color-mix(in srgb, var(--color-accent-primary) 20%, transparent);
 }

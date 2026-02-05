@@ -61,7 +61,7 @@ export const RequestsPage = () => {
                 {incomingRequests.map((deal) => {
                   const channelName = deal.channel?.title || `@${deal.channel?.username || 'channel'}`
                   const subscribersCount = deal.channel?.stats?.subscribers_count || 0
-                  
+
                   return (
                     <GroupItem
                       key={deal.id}
@@ -92,7 +92,7 @@ export const RequestsPage = () => {
                             </>
                           )}
                           <Text type="caption2" color="tertiary">
-                            • {deal.price_ton} TON
+                            • {deal.price_ton?.toFixed?.(2) || '-'} TON
                           </Text>
                         </BlockNew>
                       }

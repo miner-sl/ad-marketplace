@@ -259,6 +259,18 @@ export const dealsAPI = {
     return data
   },
 
+  updateDealMessage: async (
+    dealId: number,
+    message_text: string
+  ): Promise<Deal> => {
+    const { data, ok, error } =
+      await MarketplaceService.updateDealMessage(dealId, message_text)
+    if (!ok || !data) {
+      throw new Error(error || 'Failed to update deal message')
+    }
+    return data
+  },
+
   schedulePost: async (
     dealId: number,
     scheduled_post_time: string

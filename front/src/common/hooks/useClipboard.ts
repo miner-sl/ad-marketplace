@@ -1,9 +1,8 @@
 import { useToast } from '@components'
+import {hapticFeedback} from "@utils";
 
 export function useClipboard() {
   const { showToast } = useToast()
-
-  const webApp = window.Telegram?.WebApp
 
   const fallbackCopy = (text: string): boolean => {
     try {
@@ -25,8 +24,8 @@ export function useClipboard() {
 
   return {
     copy: (text: string, message: string) => {
-      webApp?.HapticFeedback.notificationOccurred('success')
-      
+      hapticFeedback('success')
+
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard
           .writeText(text.toString())

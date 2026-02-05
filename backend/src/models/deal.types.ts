@@ -10,7 +10,7 @@ export type DealStatus =
   | 'posted'
   | 'verified'
   | 'completed'
-  | 'cancelled'
+  | 'declined'
   | 'refunded';
 
 export type DealType = 'listing' | 'campaign';

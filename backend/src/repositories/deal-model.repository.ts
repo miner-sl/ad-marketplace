@@ -341,7 +341,7 @@ export class DealModel {
 
       const result = await client.query(
         `UPDATE deals 
-         SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+         SET status = 'declined', updated_at = CURRENT_TIMESTAMP
          WHERE id = $1 AND status IN ('pending', 'negotiating', 'payment_pending')
          RETURNING *`,
         [id]

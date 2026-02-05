@@ -27,7 +27,7 @@ export const OnboardingGuard = ({ children }: OnboardingGuardProps) => {
     }
 
     const storedTelegramUserId = getStoredTelegramUserId()
-    
+
     // If stored user ID exists and doesn't match current, reset everything
     if (storedTelegramUserId !== null && storedTelegramUserId !== telegramUser.id) {
       console.warn('Telegram user ID mismatch detected in OnboardingGuard. Resetting user data.')
@@ -36,7 +36,7 @@ export const OnboardingGuard = ({ children }: OnboardingGuardProps) => {
       // Clear all React Query cache
       queryClient.clear()
       // Redirect to onboarding
-      navigate(ROUTES_NAME.ONBOARDING, { replace: true })
+      // navigate(ROUTES_NAME.ONBOARDING, { replace: true })
       return
     }
   }, [telegramUser?.id, navigate, queryClient])

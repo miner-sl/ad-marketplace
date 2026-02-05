@@ -396,7 +396,7 @@ export class BotController {
       'posted': '📤 Posted',
       'verified': '✅ Verified',
       'completed': '✅ Completed',
-      'cancelled': '❌ Cancelled',
+      'declined': '❌ Declined',
       'refunded': '💰 Refunded'
     };
     return statusMap[status] || status;

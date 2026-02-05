@@ -11,6 +11,18 @@ export class CreativeService {
     return await CreativeRepository.create(data);
   }
 
+  /**
+   * Create a creative within an existing transaction
+   */
+  static async createWithClient(client: any, data: {
+    deal_id: number;
+    submitted_by: number;
+    content_type: string;
+    content_data: Record<string, any>;
+  }): Promise<Creative> {
+    return await CreativeRepository.createWithClient(client, data);
+  }
+
   static async findByDeal(dealId: number): Promise<Creative | null> {
     return await CreativeRepository.findByDeal(dealId);
   }
@@ -28,6 +40,18 @@ export class CreativeService {
   }
 
   static async requestRevision(dealId: number, notes: string): Promise<Creative> {
-    return this.reject(dealId, notes);
+    // Check if creative exists before requesting revision
+    const creative = await this.findByDeal(dealId);
+    if (!creative) {
+      throw new Error(`Cannot request revision: Creative for Deal #${dealId} not found. Please submit a creative first.`);
+    }
+    return await CreativeRepository.reject(dealId, notes);
+  }
+
+  /**
+   * Request revision within an existing transaction
+   */
+  static async requestRevisionWithClient(client: any, dealId: number, notes: string): Promise<Creative> {
+    return await CreativeRepository.requestRevisionWithClient(client, dealId, notes);
   }
 }

@@ -13,7 +13,7 @@ const statusConfig: Record<
   { label: string; color: 'primary' | 'secondary' | 'accent' | 'danger' }
 > = {
   pending: { label: 'Pending', color: 'secondary' },
-  negotiating: { label: 'Negotiating', color: 'secondary' },
+  negotiating: { label: 'Negotiating', color: 'accent' },
   approved: { label: 'Approved', color: 'accent' },
   payment_pending: { label: 'Payment Pending', color: 'secondary' },
   paid: { label: 'Paid', color: 'accent' },
@@ -23,8 +23,8 @@ const statusConfig: Record<
   posted: { label: 'Posted', color: 'accent' },
   verified: { label: 'Verified', color: 'accent' },
   completed: { label: 'Completed', color: 'primary' },
-  cancelled: { label: 'Cancelled', color: 'danger' },
   refunded: { label: 'Refunded', color: 'danger' },
+  declined: { label: 'Declined', color: 'danger' },
 }
 
 export const DealStatusBadge = ({

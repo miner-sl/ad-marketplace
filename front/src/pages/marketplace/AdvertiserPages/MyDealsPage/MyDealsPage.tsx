@@ -16,10 +16,11 @@ import {
   DealStatusBadge,
 } from '@components'
 import { useDealsQuery } from '@store-new'
-import { useUser } from '@store'
 import { ROUTES_NAME } from '@routes'
 import { pluralize, hapticFeedback } from '@utils'
 import type { DealStatus } from '@types'
+import {useAuth} from "@context";
+
 import styles from './MyDealsPage.module.scss'
 
 const STATUS_OPTIONS: Array<DealStatus | 'all'> = [
@@ -32,7 +33,7 @@ const STATUS_OPTIONS: Array<DealStatus | 'all'> = [
   'scheduled',
   'posted',
   'completed',
-  'cancelled',
+  'declined',
 ]
 
 const formatStatusLabel = (status: DealStatus | 'all'): string => {
@@ -42,7 +43,7 @@ const formatStatusLabel = (status: DealStatus | 'all'): string => {
 
 export const MyDealsPage = () => {
   const navigate = useNavigate()
-  const { user } = useUser()
+  const { user } = useAuth();
   const [selectedStatus, setSelectedStatus] = useState<DealStatus | 'all'>('all')
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const buttonRef = useRef<HTMLDivElement>(null)
@@ -65,7 +66,7 @@ export const MyDealsPage = () => {
   // const myDeals =
   // deals?.filter((deal) => deal.advertiser_id === user?.id) || []
 
-  // const filteredDeals = 
+  // const filteredDeals =
   //   selectedStatus === 'all'
   //     ? myDeals
   //     : myDeals.filter((deal) => deal.status === selectedStatus)
@@ -114,7 +115,7 @@ export const MyDealsPage = () => {
                 {filteredDeals.map((deal) => {
                   const channelName = deal.channel?.title || `@${deal.channel?.username || 'channel'}`
                   const subscribersCount = deal.channel?.stats?.subscribers_count || 0
-                  
+
                   return (
                     <GroupItem
                       key={deal.id}
@@ -145,7 +146,7 @@ export const MyDealsPage = () => {
                             </>
                           )}
                           <Text type="caption2" color="tertiary">
-                            • {deal.price_ton} TON
+                            • {deal.price_ton?.toFixed?.(2) || '-'} TON
                           </Text>
                         </BlockNew>
                       }

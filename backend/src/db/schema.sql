@@ -151,7 +151,7 @@ CREATE TABLE IF NOT EXISTS deals (
     advertiser_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     ad_format VARCHAR(50) NOT NULL,
     price_ton DECIMAL(20, 9) NOT NULL,
-    status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'negotiating', 'approved', 'payment_pending', 'paid', 'creative_submitted', 'creative_approved', 'scheduled', 'posted', 'verified', 'completed', 'cancelled', 'refunded'
+    status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'negotiating', 'approved', 'payment_pending', 'paid', 'creative_submitted', 'creative_approved', 'scheduled', 'posted', 'verified', 'completed', 'declined', 'refunded'
     channel_owner_wallet_address VARCHAR(255), -- Channel owner's wallet address for receiving payments
     escrow_address VARCHAR(255), -- TON wallet address for this deal
     payment_tx_hash VARCHAR(255),

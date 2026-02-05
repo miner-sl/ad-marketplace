@@ -15,6 +15,7 @@ import {
   Icon,
   useToast,
   Spinner,
+  ChannelLink,
 } from '@components'
 import {
   useAcceptDealMutation,
@@ -22,53 +23,56 @@ import {
   useDealQuery,
   useRejectDealMutation,
   useRequestCreativeRevisionMutation,
+  useUpdateDealMessageMutation,
+  type EnhancedDeal,
 } from '@store-new'
 import styles from './DealDetailsPage.module.scss'
-import {separateNumber, collapseAddress, createMembersCount} from "@utils"
-import {useTelegramUser, useClipboard} from "@hooks"
+import {useClipboard, useTonTransfer} from "@hooks"
 import config from '@config'
-import type {Deal, ChannelStats, Creative} from '@types'
+import type {Creative} from '@types'
+import {useAuth} from "@context";
 
 interface DealHeaderProps {
-  deal: Deal
-  stats?: ChannelStats
+  deal: EnhancedDeal
 }
 
-const DealHeader = ({ deal, stats }: DealHeaderProps) => {
-  const subscribersCount = stats?.subscribers_count || deal.channel?.stats?.subscribers_count || 0
+const DealHeader = ({ deal }: DealHeaderProps) => {
+  if (!deal) {
+    return null
+  }
 
   return (
-    <>
-      <Block align="center">
+    <BlockNew align='center'>
+      <BlockNew align="center">
         <Image
           size={112}
           src={null}
           borderRadius={50}
           fallback={deal.channel?.title || `Deal #${deal.id}`}
         />
-      </Block>
-      <Block margin="top" marginValue={12} row justify="center" align="center" gap={4}>
+      </BlockNew>
+      <BlockNew margin="top" marginValue={12} row justify="center" align="center" gap={4}>
         <Text type="title" align="center" weight="bold">
           Deal #{deal.id}
         </Text>
         <DealStatusBadge status={deal.status} />
-      </Block>
-      {deal.channel?.title && (
-        <Block margin="top" marginValue={8}>
-          <Text type="text" align="center" color="tertiary">
-            {deal.channel.title}
-          </Text>
-        </Block>
-      )}
-      {subscribersCount > 0 && (
-        <Block margin="top" marginValue={8}>
+      </BlockNew>
+      {deal.formattedMembersCount && (
+        <BlockNew margin="top" marginValue={8}>
           <Text type="caption2" color="tertiary" align="center">
-            {createMembersCount(subscribersCount)}
+            {deal.formattedMembersCount}
           </Text>
-        </Block>
+        </BlockNew>
       )}
-    </>
+    </BlockNew>
   )
+}
+
+const getTONScanUrl = (address: string): string => {
+  const baseUrl = config.isDev
+    ? 'https://testnet.tonscan.org'
+    : 'https://tonscan.org';
+  return `${baseUrl}/address/${address}`;
 }
 
 export const DealDetailsPage = () => {
@@ -76,21 +80,22 @@ export const DealDetailsPage = () => {
   // const navigate = useNavigate()
   // const { user } = useUser()
   const dealId = id ? parseInt(id) : 0
-  const user = useTelegramUser()
+  const {user} = useAuth();
 
-  const {data: deal, isLoading} = useDealQuery(dealId, user?.id);
+  const {data: deal, isLoading} = useDealQuery(dealId, user?.telegramId);
   // const { data: creative } = useDealCreativeQuery(dealId)
   const acceptDealMutation = useAcceptDealMutation()
   const rejectDealMutation = useRejectDealMutation()
   const approveCreativeMutation = useApproveCreativeMutation()
   const requestRevisionMutation = useRequestCreativeRevisionMutation()
+  const updateDealMessageMutation = useUpdateDealMessageMutation()
   // TODO: Uncomment when useDealCreativeQuery is implemented
   // const { data: creative } = useDealCreativeQuery(dealId)
-  const creative: Creative | null = null
+  // const creative: Creative | null = deal?.creative;
   // const submitCreativeMutation = useSubmitCreativeMutation()
   const {copy} = useClipboard()
   const {showToast} = useToast()
-  // const {transferTon, isConnected} = useTonTransfer()
+  const {transferTon, isConnected} = useTonTransfer()
   if (isLoading || !deal) {
     return (
       <Page back>
@@ -105,6 +110,7 @@ export const DealDetailsPage = () => {
   const isChannelOwner = deal.channel_owner_id === user?.id
   const isAdvertiser = deal.advertiser_id === user?.id
   const canInteract = isChannelOwner || isAdvertiser
+  const canEditMessage = isAdvertiser && deal.status === 'negotiating'
 
   const handleAdvertiserClick = () => {
     const advertiser = typeof deal.advertiser === 'object' && deal.advertiser !== null ? deal.advertiser : null
@@ -118,13 +124,6 @@ export const DealDetailsPage = () => {
     }
   }
 
-
-  const getTONScanUrl = (address: string): string => {
-    const baseUrl = config.isDev
-      ? 'https://testnet.tonscan.org'
-      : 'https://tonscan.org';
-    return `${baseUrl}/address/${address}`;
-  }
 
   const handleEscrowAddressClick = () => {
     if (deal.escrow_address) {
@@ -147,8 +146,14 @@ export const DealDetailsPage = () => {
 
   const handleRejectDeal = async () => {
     try {
-      await rejectDealMutation.mutateAsync(dealId)
+      if (rejectDealMutation.isPending) {
+        return
+      }
+      await rejectDealMutation.mutateAsync(dealId);
+      showToast({message: 'Success decline', type: 'success' });
+
     } catch (error) {
+      showToast({message: error.message || 'Failed decline', type: 'warning' });
       console.error('Failed to reject deal:', error)
     }
   }
@@ -177,11 +182,25 @@ export const DealDetailsPage = () => {
 
   const handleRequestChanges = async () => {
     const notes = prompt('Please provide your requested changes:')
-    if (notes) {
-      // TODO: Implement API call to send message/request changes
-      // For now, this is a placeholder
-      console.log('Request changes:', notes)
-      showToast({ type: 'error', message: 'Request changes functionality will be implemented soon' })
+    if (!notes || !notes.trim()) {
+      return
+    }
+
+    try {
+      await requestRevisionMutation.mutateAsync({
+        dealId: deal.id,
+        revision_notes: notes.trim(),
+      })
+      showToast({
+        type: 'success',
+        message: 'Revision request sent successfully',
+      })
+    } catch (error: any) {
+      console.error('Failed to request revision:', error)
+      showToast({
+        type: 'error',
+        message: error?.message || 'Failed to request revision',
+      })
     }
   }
 
@@ -191,20 +210,20 @@ export const DealDetailsPage = () => {
       return
     }
 
-    // if (!isConnected) {
-    //   showToast({
-    //     type: 'error',
-    //     message: 'Please connect your TON wallet first'
-    //   })
-    //   return
-    // }
+    if (!isConnected) {
+      showToast({
+        type: 'error',
+        message: 'Please connect your TON wallet first'
+      })
+      return
+    }
 
     try {
-      // await transferTon(
-      //   deal.escrow_address,
-      //   deal.price_ton,
-      //   `Payment for Deal #${deal.id}`
-      // )
+      await transferTon(
+        deal.escrow_address,
+        deal.price_ton,
+        `Payment for Deal #${deal.id}`
+      )
       showToast({
         type: 'success',
         message: 'Transaction sent successfully. Waiting for confirmation...',
@@ -212,6 +231,42 @@ export const DealDetailsPage = () => {
     } catch (error) {
       // Error handling is done in the hook
       console.error('Payment failed:', error)
+    }
+  }
+
+  const handleEditMessage = async () => {
+    const currentMessage = deal.messages && deal.messages.length > 0
+      ? deal.messages[0].message_text
+      : ''
+    const newMessage = prompt('Edit post message:', currentMessage)
+
+    if (newMessage === null) {
+      return // User cancelled
+    }
+
+    if (!newMessage.trim()) {
+      showToast({
+        type: 'error',
+        message: 'Message cannot be empty',
+      })
+      return
+    }
+
+    try {
+      await updateDealMessageMutation.mutateAsync({
+        dealId: dealId,
+        message_text: newMessage.trim(),
+      })
+      showToast({
+        type: 'success',
+        message: 'Message updated successfully',
+      })
+    } catch (error: any) {
+      console.error('Failed to update message:', error)
+      showToast({
+        type: 'error',
+        message: error?.message || 'Failed to update message',
+      })
     }
   }
 
@@ -227,10 +282,8 @@ export const DealDetailsPage = () => {
       <PageLayout>
         <TelegramBackButton/>
 
-        {/* Deal Header */}
-        <DealHeader deal={deal} stats={channelStats} />
+        <DealHeader deal={deal} />
 
-        {/* Statistics Section */}
         {channelStats && (
           <Block margin="bottom" marginValue={24}>
             <Block paddingValue={16}>
@@ -240,7 +293,7 @@ export const DealDetailsPage = () => {
                     padding="6px 16px"
                     text={
                       <Text type="text">
-                        👥 {separateNumber(channelStats.subscribers_count)} subscribers
+                        👥 {deal.formattedSubscribersCount} subscribers
                       </Text>
                     }
                   />
@@ -250,7 +303,7 @@ export const DealDetailsPage = () => {
                     padding="6px 16px"
                     text={
                       <Text type="text">
-                        👁️ {separateNumber(channelStats.average_views)} average views
+                        👁️ {deal.formattedAverageViews} average views
                       </Text>
                     }
                   />
@@ -260,7 +313,7 @@ export const DealDetailsPage = () => {
                     padding="6px 16px"
                     text={
                       <Text type="text">
-                        📊 {separateNumber(channelStats.average_reach)} average reach
+                        📊 {deal.formattedAverageReach} average reach
                       </Text>
                     }
                   />
@@ -270,76 +323,180 @@ export const DealDetailsPage = () => {
           </Block>
         )}
 
-        <Block margin="top" marginValue={24}>
-          <Block margin="bottom" marginValue={44}>
-            <Group header="DEAL INFORMATION">
+        {/*{creative && (*/}
+        {/*  <Block margin="bottom" marginValue={24}>*/}
+        {/*    <Group header="CREATIVE">*/}
+        {/*      <ListItem*/}
+        {/*        padding="6px 16px"*/}
+        {/*        text={*/}
+        {/*          <BlockNew row align="center" gap={8}>*/}
+        {/*            <Text type="text" weight="medium">*/}
+        {/*              Status:*/}
+        {/*            </Text>*/}
+        {/*            <Text type="text" color="accent">*/}
+        {/*              {creative.status}*/}
+        {/*            </Text>*/}
+        {/*          </BlockNew>*/}
+        {/*        }*/}
+        {/*      />*/}
+        {/*      {creative.revision_notes && (*/}
+        {/*        <ListItem*/}
+        {/*          padding="6px 16px"*/}
+        {/*          text={*/}
+        {/*            <BlockNew gap={4}>*/}
+        {/*              <Text type="text" weight="medium">*/}
+        {/*                Revision Notes:*/}
+        {/*              </Text>*/}
+        {/*              <Text type="text" color="danger">*/}
+        {/*                {creative.revision_notes}*/}
+        {/*              </Text>*/}
+        {/*            </BlockNew>*/}
+        {/*          }*/}
+        {/*        />*/}
+        {/*      )}*/}
+        {/*      {isAdvertiser && creative.status === 'pending' && (*/}
+        {/*        <BlockNew row gap={8} paddingValue={16}>*/}
+        {/*          <Button*/}
+        {/*            type="primary"*/}
+        {/*            onClick={handleApproveCreative}*/}
+        {/*            disabled={approveCrceativeMutation.isPending}*/}
+        {/*          >*/}
+        {/*            Approve*/}
+        {/*          </Button>*/}
+        {/*          <Button*/}
+        {/*            type="secondary"*/}
+        {/*            onClick={handleRequestRevision}*/}
+        {/*            disabled={requestRevisionMutation.isPending}*/}
+        {/*          >*/}
+        {/*            Request Revision*/}
+        {/*          </Button>*/}
+        {/*        </BlockNew>*/}
+        {/*      )}*/}
+        {/*    </Group>*/}
+        {/*  </Block>*/}
+        {/*)}*/}
+
+        <Block>
+          <Group header="DEAL INFORMATION">
+            <ListItem
+              padding="6px 16px"
+              text={
+                <BlockNew row align="center" gap={8}>
+                  <Text type="text" weight="medium">
+                    Ad Format:
+                  </Text>
+                  <Text type="text" color="accent">
+                    {deal.ad_format}
+                  </Text>
+                </BlockNew>
+              }
+            />
+            <ListItem
+              padding="6px 16px"
+              text={
+                <BlockNew row align="center" gap={8}>
+                  <Text type="text" weight="medium">
+                    Price:
+                  </Text>
+                  <Text type="text" color="accent">
+                    {deal?.price_ton?.toFixed?.(2) || '-'} TON
+                  </Text>
+                </BlockNew>
+              }
+            />
+            {deal.channel?.title && (
               <ListItem
                 padding="6px 16px"
                 text={
                   <BlockNew row align="center" gap={8}>
                     <Text type="text" weight="medium">
-                      Ad Format:
+                      Channel:
                     </Text>
-                    <Text type="text" color="accent">
-                      {deal.ad_format}
-                    </Text>
+                    <ChannelLink channel={deal.channel} showLabel={false} textType="text" />
                   </BlockNew>
                 }
               />
+            )}
+            {typeof deal.advertiser === 'object' && deal.advertiser !== null && (
               <ListItem
                 padding="6px 16px"
                 text={
                   <BlockNew row align="center" gap={8}>
                     <Text type="text" weight="medium">
-                      Price:
+                      Advertiser:
                     </Text>
-                    <Text type="text" color="accent">
-                      {deal.price_ton?.toFixed?.(2)} TON
-                    </Text>
+                    <div onClick={handleAdvertiserClick} className={styles.clickable}>
+                      <Text
+                        type="text"
+                        color="accent"
+                      >
+                        {deal.advertiserDisplayName}
+                      </Text>
+                    </div>
                   </BlockNew>
                 }
               />
-              {typeof deal.advertiser === 'object' && deal.advertiser !== null && (
-                <ListItem
-                  padding="6px 16px"
-                  text={
-                    <BlockNew row align="center" gap={8}>
-                      <Text type="text" weight="medium">
-                        Advertiser:
+            )}
+            {deal.escrow_address && (
+              <ListItem
+                padding="6px 16px"
+                text={
+                  <BlockNew row align="center" gap={8} className={styles.flexRow}>
+                    <Text type="text" weight="medium">
+                      Escrow Address:
+                    </Text>
+                    <div onClick={handleEscrowAddressClick} className={styles.clickable}>
+                      <Text
+                        type="text"
+                        color="accent"
+                      >
+                        {deal.formattedEscrowAddress}
                       </Text>
-                      <div onClick={handleAdvertiserClick} className={styles.clickable}>
-                        <Text
-                          type="text"
-                          color="accent"
-                        >
-                          {deal.advertiser.username
-                            ? `@${deal.advertiser.username}`
-                            : deal.advertiser.first_name || `User #${deal.advertiser.telegram_id}`}
-                        </Text>
-                      </div>
-                    </BlockNew>
-                  }
-                />
-              )}
-              {deal.escrow_address && (
-                <ListItem
-                  padding="6px 16px"
-                  text={
-                    <BlockNew row align="center" gap={8} className={styles.flexRow}>
-                      <Text type="text" weight="medium">
-                        Escrow Address:
-                      </Text>
-                      <div onClick={handleEscrowAddressClick} className={styles.clickable}>
-                        <Text
-                          type="text"
-                          color="accent"
-                        >
-                          {collapseAddress(deal.escrow_address, 4)}
-                        </Text>
-                      </div>
-                    </BlockNew>
-                  }
-                  after={
+                    </div>
+                  </BlockNew>
+                }
+                after={
+                  <Icon
+                    name="share"
+                    size={20}
+                    color="accent"
+                    className={styles.clickable}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      copy(deal.escrow_address!, 'Escrow address copied')
+                    }}
+                  />
+                }
+              />
+            )}
+            {deal.scheduled_post_time && (
+              <ListItem
+                padding="6px 16px"
+                text={
+                  <Text type="text">
+                    <Text type="text" weight="medium">
+                      Scheduled Post Time:
+                    </Text>
+                    {deal.formattedScheduledPostTime}
+                  </Text>
+                }
+              />
+            )}
+            {deal.messages && deal.messages.length > 0 && deal.messages[0]?.message_text && (
+              <ListItem
+                padding="6px 16px"
+                text={
+                  <BlockNew gap={8}>
+                    <Text type="text" weight="medium">
+                      Message:
+                    </Text>
+                    <Text type="text">
+                      {deal.messages[0].message_text}
+                    </Text>
+                  </BlockNew>
+                }
+                after={
+                  canEditMessage ? (
                     <Icon
                       name="share"
                       size={20}
@@ -347,120 +504,51 @@ export const DealDetailsPage = () => {
                       className={styles.clickable}
                       onClick={(e) => {
                         e.stopPropagation()
-                        copy(deal.escrow_address!, 'Escrow address copied')
+                        handleEditMessage()
                       }}
                     />
-                  }
-                />
-              )}
-              {deal.scheduled_post_time && (
-                <ListItem
-                  padding="6px 16px"
-                  text={
-                    <Text type="text">
-                      Scheduled Post Time: {new Date(deal.scheduled_post_time).toLocaleString()}
-                    </Text>
-                  }
-                />
-              )}
-              {deal.messages && deal.messages.length > 0 && deal.messages[0]?.message_text && (
-                <ListItem
-                  padding="6px 16px"
-                  text={
-                    <Text type="text">
-                      Message: {deal.messages[0].message_text}
-                    </Text>
-                  }
-                />
-              )}
-            </Group>
-          </Block>
+                  ) : undefined
+                }
+              />
+            )}
+          </Group>
         </Block>
 
-        {/* Creative Section */}
-        {/* TODO: Uncomment when useDealCreativeQuery is implemented
-        {creative && (
-          <Block margin="top" marginValue={24}>
-            <Block margin="bottom" marginValue={44}>
-              <Group header="CREATIVE">
-                <ListItem
-                  padding="6px 16px"
-                  text={
-                    <Text type="text">
-                      Status: {creative.status}
-                    </Text>
-                  }
-                />
-                {creative.revision_notes && (
-                  <ListItem
-                    padding="6px 16px"
-                    text={
-                      <Text type="text" color="danger">
-                        Revision Notes: {creative.revision_notes}
-                      </Text>
-                    }
-                  />
-                )}
-                {isAdvertiser && creative.status === 'pending' && (
-                  <BlockNew row gap={8} paddingValue={16}>
-                    <Button
-                      type="primary"
-                      onClick={handleApproveCreative}
-                      disabled={approveCreativeMutation.isPending}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      type="secondary"
-                      onClick={handleRequestRevision}
-                      disabled={requestRevisionMutation.isPending}
-                    >
-                      Request Revision
-                    </Button>
-                  </BlockNew>
-                )}
-              </Group>
-            </Block>
-          </Block>
-        )}
-        */}
-
-        {/* Actions Section */}
         {(canInteract && deal.status === 'pending') || (deal.owner && deal.status === 'pending') ? (
-          <Block margin="top" marginValue={24}>
-            <Block margin="bottom" marginValue={44}>
-              <Group header="ACTIONS">
-                {isChannelOwner && deal.status === 'pending' && (
-                  <>
-                    <ListItem
-                      padding="6px 16px"
-                      text={
-                        <Text type="text" color="accent">
-                          Accept Deal
-                        </Text>
-                      }
-                      before={
-                        <Icon name="checkmark" size={28} color="accent" />
-                      }
-                      onClick={handleAcceptDeal}
-                      disabled={acceptDealMutation.isPending}
-                    />
-                    <ListItem
-                      padding="6px 16px"
-                      text={
-                        <Text type="text" color="danger">
-                          Reject Deal
-                        </Text>
-                      }
-                      before={
-                        <Icon name="cross" size={28} color="danger" />
-                      }
-                      onClick={handleRejectDeal}
-                      disabled={rejectDealMutation.isPending}
-                    />
-                  </>
-                )}
-                {deal.owner && deal.status === 'pending' && (
+          <BlockNew margin="top" marginValue={24}>
+            <Group header="ACTIONS">
+              <BlockNew gap={4}>
+                {/*{isChannelOwner && deal.status === 'pending' && (*/}
+                {/*  <Block row justify="between">*/}
+                {/*    <ListItem*/}
+                {/*      padding="6px 16px"*/}
+                {/*      text={*/}
+                {/*        <Text type="text" color="accent">*/}
+                {/*          Accept Deal*/}
+                {/*        </Text>*/}
+                {/*      }*/}
+                {/*      before={*/}
+                {/*        <Icon name="checkmark" size={28} color="accent" />*/}
+                {/*      }*/}
+                {/*      onClick={handleAcceptDeal}*/}
+                {/*      disabled={acceptDealMutation.isPending}*/}
+                {/*    />*/}
+                {/*    <ListItem*/}
+                {/*      padding="6px 16px"*/}
+                {/*      text={*/}
+                {/*        <Text type="text" color="danger">*/}
+                {/*          Reject Deal*/}
+                {/*        </Text>*/}
+                {/*      }*/}
+                {/*      before={*/}
+                {/*        <Icon name="cross" size={28} color="danger" />*/}
+                {/*      }*/}
+                {/*      onClick={handleRejectDeal}*/}
+                {/*      disabled={rejectDealMutation.isPending}*/}
+                {/*    />*/}
+                {/*  </Block>*/}
+                {/*)}*/}
+                {isChannelOwner && deal.owner && deal.status === 'pending' && (
                   <>
                     <ListItem
                       padding="6px 16px"
@@ -502,12 +590,11 @@ export const DealDetailsPage = () => {
                     />
                   </>
                 )}
-              </Group>
-            </Block>
-          </Block>
+              </BlockNew>
+            </Group>
+          </BlockNew>
         ) : null}
 
-        {/* Footer */}
         <Block margin="top" marginValue="auto">
           <Text type="caption" align="center" color="tertiary">
             Deal #{deal.id} • Status: {deal.status}

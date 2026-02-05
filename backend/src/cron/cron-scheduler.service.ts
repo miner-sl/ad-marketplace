@@ -125,7 +125,7 @@ export class CronJobsSchedulerService {
           try {
             await DealModel.cancel(deal.id, 'Deal expired (timeout)');
 
-            logger.info(`Cancelled expired Deal #${deal.id}`, { dealId: deal.id });
+            logger.info(`Decline expired Deal #${deal.id}`, { dealId: deal.id });
 
             const advertiser = usersMap.get(deal.advertiser_id);
             const channelOwner = usersMap.get(deal.channel_owner_id);

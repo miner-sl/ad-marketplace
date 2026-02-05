@@ -5,6 +5,7 @@ import { CreativeRepository } from '../repositories/creative.repository';
 import { DealFlowService } from '../services/deal-flow.service';
 import { UserModel } from '../repositories/user.repository';
 import { ChannelModel } from '../repositories/channel-model.repository';
+import { TelegramNotificationService } from '../services/telegram-notification.service';
 import logger from '../utils/logger';
 
 export class DealsController {
@@ -14,8 +15,7 @@ export class DealsController {
       let deals;
 
       if (user_id) {
-        const telegramId = user_id as string;
-        const user = await UserModel.findByTelegramId(Number(telegramId));
+        const user = await UserModel.findById(Number(user_id));
         if (!user) {
           return reply.code(404).send({ error: 'User not found' });
         }
@@ -220,15 +220,46 @@ export class DealsController {
   static async requestRevision(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
-      const { advertiser_id, notes } = request.body as any;
+      const userId = request.user?.id as number;
+      const { notes } = request.body as any;
       const deal = await DealFlowService.requestRevision(
         parseInt(id),
-        advertiser_id,
+        userId,
         notes
       );
       return deal;
     } catch (error: any) {
       logger.error('Failed to request revision', {
+        error: error.message,
+        stack: error.stack,
+        dealId: (request.params as { id: string }).id,
+      });
+      reply.code(500).send({ error: error.message });
+    }
+  }
+
+  static async updateDealMessage(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = request.params as { id: string };
+      const userId = request.user?.id as number;
+      const { message_text } = request.body as any;
+
+      if (!userId) {
+        return reply.code(401).send({ error: 'Unauthorized' });
+      }
+
+      if (!message_text) {
+        return reply.code(400).send({ error: 'message_text is required' });
+      }
+
+      const result = await DealFlowService.updateDealMessage(
+        parseInt(id),
+        userId,
+        message_text
+      );
+      return result;
+    } catch (error: any) {
+      logger.error('Failed to update deal message', {
         error: error.message,
         stack: error.stack,
         dealId: (request.params as { id: string }).id,
@@ -248,6 +279,46 @@ export class DealsController {
       return deal;
     } catch (error: any) {
       logger.error('Failed to schedule post', {
+        error: error.message,
+        stack: error.stack,
+        dealId: (request.params as { id: string }).id,
+      });
+      reply.code(500).send({ error: error.message });
+    }
+  }
+
+  static async declineDeal(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = request.params as { id: string };
+      const userId = request.user?.id as number;
+
+      if (!userId) {
+        return reply.code(401).send({ error: 'Unauthorized' });
+      }
+
+      const deal = await DealFlowService.declineDeal(parseInt(id), userId);
+
+      // Send notification to advertiser
+      try {
+        const channelInfo = await DealFlowService.getChannelInfoForDeal(parseInt(id));
+        await TelegramNotificationService.notifyDealDeclined(parseInt(id), deal.advertiser_id, {
+          dealId: parseInt(id),
+          channelId: channelInfo.channelId,
+          channelName: channelInfo.channelName,
+          priceTon: deal.price_ton,
+          adFormat: deal.ad_format,
+        });
+      } catch (notifError: any) {
+        // Log but don't fail if notification fails
+        logger.warn('Failed to send decline notification', {
+          error: notifError.message,
+          dealId: id,
+        });
+      }
+
+      return deal;
+    } catch (error: any) {
+      logger.error('Failed to decline deal', {
         error: error.message,
         stack: error.stack,
         dealId: (request.params as { id: string }).id,

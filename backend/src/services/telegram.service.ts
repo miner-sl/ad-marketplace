@@ -1,6 +1,7 @@
 import TelegramBot from 'node-telegram-bot-api';
 import * as dotenv from 'dotenv';
 import { JSDOM } from 'jsdom';
+import { getRandomUserAgent } from '../utils/network/useragent';
 
 dotenv.config();
 
@@ -217,7 +218,6 @@ export class TelegramService {
 
   /**
    * Get message text from channel using message ID
-   * Uses forwardMessage workaround to retrieve message content
    */
   static async getMessageText(channelUsername: string, messageId: number): Promise<string | undefined> {
     try {
@@ -225,7 +225,7 @@ export class TelegramService {
 
       const res = await fetch(url, {
         headers: {
-          "User-Agent": "Mozilla/5.0"
+          "User-Agent": getRandomUserAgent(),
         }
       });
 

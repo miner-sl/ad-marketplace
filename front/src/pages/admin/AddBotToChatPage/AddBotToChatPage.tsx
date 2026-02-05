@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import sandwatchLottie from '@assets/sandwatch.json'
+// import sandwatchLottie from '@assets/sandwatch.json'
 import {
   Block,
   Icon,
   PageLayout,
   Page,
-  StickerPlayer,
+  // StickerPlayer,
   TelegramBackButton,
   TelegramMainButton,
   Text,
@@ -144,7 +144,7 @@ export const AddBotToChatPage = () => {
       (isCheckingChatPermissions && 'Checking Bot Permissions')
     Component = (
       <>
-        <StickerPlayer lottie={sandwatchLottie} />
+        {/*<StickerPlayer lottie={sandwatchLottie} />*/}
         <Block margin="top" marginValue={16}>
           <Text type="title" align="center" weight="bold">
             {title}

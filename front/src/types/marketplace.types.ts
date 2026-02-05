@@ -227,6 +227,12 @@ export interface SetChannelPricingRequest {
   is_active?: boolean
 }
 
+export interface UpdateChannelRequest {
+  active?: boolean
+  price?: number
+  topic?: number | null
+}
+
 export interface CreateChannelRequest {
   username: string
   price_ton: number

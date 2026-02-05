@@ -15,6 +15,7 @@ import type {
   CreateDealRequest,
   SubmitCreativeRequest,
   SetChannelPricingRequest,
+  UpdateChannelRequest,
   AdFormat,
   ChannelPricing,
 } from '@types'
@@ -148,6 +149,20 @@ export const useUpdateChannelStatusMutation = () => {
   return useMutation({
     mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) =>
       channelsAPI.updateChannelStatus(id, is_active),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: TANSTACK_KEYS.CHANNEL(variables.id),
+      })
+      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.CHANNELS })
+    },
+  })
+}
+
+export const useUpdateChannelMutation = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: UpdateChannelRequest }) =>
+      channelsAPI.updateChannel(id, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: TANSTACK_KEYS.CHANNEL(variables.id),

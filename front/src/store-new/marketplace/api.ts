@@ -8,6 +8,7 @@ import type {
   Deal,
   DealFilters,
   CreateChannelRequest,
+  UpdateChannelRequest,
   CreateChannelListingRequest,
   CreateCampaignRequest,
   CreateDealRequest,
@@ -77,6 +78,17 @@ export const channelsAPI = {
     const { data, ok, error } = await MarketplaceService.updateChannelStatus(id, is_active)
     if (!ok || !data) {
       throw new Error(error || 'Failed to update channel status')
+    }
+    return data
+  },
+
+  updateChannel: async (
+    id: number,
+    request: UpdateChannelRequest
+  ): Promise<{ id: number; is_active: boolean; topic_id?: number | null }> => {
+    const { data, ok, error } = await MarketplaceService.updateChannel(id, request)
+    if (!ok || !data) {
+      throw new Error(error || 'Failed to update channel')
     }
     return data
   },

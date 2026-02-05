@@ -2,6 +2,7 @@ import {useNavigate, useParams} from 'react-router-dom'
 import {useEffect, useState} from 'react'
 import {openTelegramLink} from '@tma.js/sdk-react'
 import {
+  AppSelect,
   Block,
   BlockNew,
   Button,
@@ -19,11 +20,12 @@ import {
   Text,
   useToast,
 } from '@components'
-import {useChannelQuery, useSetChannelPricingMutation, useUpdateChannelStatusMutation} from '@store-new'
+import {useChannelQuery, useSetChannelPricingMutation, useUpdateChannelMutation} from '@store-new'
 import {useClipboard, useTelegramUser} from '@hooks'
 import {useAuth} from '@context'
 import {ROUTES_NAME} from '@routes'
 import type {AdFormat, Channel, ChannelStats} from '@types'
+import {PREDEFINED_TOPICS} from '@common/constants/topics'
 import styles from './ChannelDetailsPage.module.scss'
 import {checkIsMobile, createMembersCount, getChannelLink, hapticFeedback, separateNumber} from '@utils'
 
@@ -74,8 +76,8 @@ const ChannelHeader = ({ channel, stats }: ChannelHeaderProps) => {
 
 const AD_FORMATS: { value: AdFormat; label: string }[] = [
   { value: 'post', label: 'Post' },
-  { value: 'forward', label: 'Forward/Repost' },
-  { value: 'story', label: 'Story' },
+  // { value: 'forward', label: 'Forward/Repost' },
+  // { value: 'story', label: 'Story' },
 ]
 
 export const ChannelDetailsPage = () => {
@@ -90,7 +92,8 @@ export const ChannelDetailsPage = () => {
   const userId = telegramUser?.id
   const {user} = useAuth()
   const setPricingMutation = useSetChannelPricingMutation()
-  const updateChannelStatusMutation = useUpdateChannelStatusMutation()
+  // const updateChannelStatusMutation = useUpdateChannelStatusMutation()
+  const updateChannelMutation = useUpdateChannelMutation()
   const {copy} = useClipboard()
 
   // Check if current user is the channel owner
@@ -98,6 +101,16 @@ export const ChannelDetailsPage = () => {
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
+
+  // Topic selection state
+  const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null)
+
+  // Initialize topic from channel data
+  useEffect(() => {
+    if (channel?.topic_id !== undefined) {
+      setSelectedTopicId(channel.topic_id)
+    }
+  }, [channel?.topic_id])
 
   // Local state for editing prices (only for channel owner)
   const [editingPrices, setEditingPrices] = useState<Record<AdFormat, string>>({
@@ -111,39 +124,101 @@ export const ChannelDetailsPage = () => {
     story: false,
   })
 
-  // Initialize prices from channel data when entering edit mode
+  // Local state for editing channel active status
+  const [editingActiveStatus, setEditingActiveStatus] = useState<boolean>(false)
+
+  // Initialize prices and active status from channel data when entering edit mode
   useEffect(() => {
-    if (channel?.pricing && isEditing) {
-      const initialPrices: Record<AdFormat, string> = {
-        post: '',
-        forward: '',
-        story: '',
-      }
-      const initialEnabled: Record<AdFormat, boolean> = {
-        post: false,
-        forward: false,
-        story: false,
-      }
-
-      channel.pricing.forEach((pricing) => {
-        if (pricing.ad_format in initialPrices) {
-          const format = pricing.ad_format as AdFormat
-          initialPrices[format] = pricing.price_ton.toString()
-          initialEnabled[format] = pricing.is_active
+    if (channel && isEditing) {
+      // Initialize prices
+      if (channel.pricing) {
+        const initialPrices: Record<AdFormat, string> = {
+          post: '',
+          forward: '',
+          story: '',
         }
-      })
+        const initialEnabled: Record<AdFormat, boolean> = {
+          post: false,
+          forward: false,
+          story: false,
+        }
 
-      setEditingPrices(initialPrices)
-      setPriceEnabled(initialEnabled)
+        channel.pricing.forEach((pricing) => {
+          if (pricing.ad_format in initialPrices) {
+            const format = pricing.ad_format as AdFormat
+            initialPrices[format] = pricing.price_ton.toString()
+            initialEnabled[format] = pricing.is_active
+          }
+        })
+
+        setEditingPrices(initialPrices)
+        setPriceEnabled(initialEnabled)
+      }
+
+      // Initialize active status
+      setEditingActiveStatus(channel.is_active)
     }
-  }, [channel?.pricing, isEditing])
+  }, [channel, isEditing])
 
-  const handleEditToggle = () => {
+  const handleEditToggle = async () => {
     if (isEditing) {
-      setIsEditing(false)
+      try {
+        const updates: { active?: boolean; price?: number; topic?: number | null } = {}
+
+        const currentTopicId = channel?.topic_id ?? null
+        if (selectedTopicId !== currentTopicId) {
+          updates.topic = selectedTopicId
+        }
+
+        const postPrice = editingPrices.post.trim()
+        const currentPostPricing = channel?.pricing?.find((p) => p.ad_format === 'post')
+        const PRICE_THRESHOLD = 0.001 // Threshold for comparing floating point numbers
+
+        if (postPrice && !isNaN(parseFloat(postPrice)) && parseFloat(postPrice) > 0) {
+          const newPrice = parseFloat(postPrice)
+          const currentPrice = currentPostPricing?.price_ton ?? 0
+          const priceDiff = Math.abs(newPrice - currentPrice)
+
+          // Only update if the difference is significant (greater than threshold)
+          if (!currentPostPricing || priceDiff >= PRICE_THRESHOLD) {
+            updates.price = newPrice
+          }
+        }
+
+        if (channel && editingActiveStatus !== channel.is_active) {
+          updates.active = editingActiveStatus
+        }
+
+        // Only call API if there are actual changes
+        if (Object.keys(updates).length > 0) {
+          await updateChannelMutation.mutateAsync({
+            id: channel!.id,
+            data: updates,
+          })
+          showToast({ type: 'success', message: 'Channel updated successfully' })
+        }
+
+        setIsEditing(false)
+      } catch (error: any) {
+        showToast({
+          type: 'error',
+          message: error?.message || 'Failed to save changes',
+        })
+      }
     } else {
+      // Initialize topic when entering edit mode
+      if (channel?.topic_id !== undefined) {
+        setSelectedTopicId(channel.topic_id)
+      } else {
+        setSelectedTopicId(null)
+      }
       setIsEditing(true)
     }
+  }
+
+  const handleTopicChange = (topicId: string) => {
+    const id = topicId === '' ? null : parseInt(topicId)
+    setSelectedTopicId(id)
   }
 
   if (isLoading || !channel) {
@@ -224,7 +299,7 @@ export const ChannelDetailsPage = () => {
     // Get price value - use editing state if in edit mode, otherwise use current pricing
     const priceValue = isEditing
       ? editingPrices[format].trim()
-      : currentPricing?.price_ton.toString() || ''
+      : currentPricing?.price_ton?.toString?.() || ''
 
     // If enabling, require a valid price
     if (newEnabled) {
@@ -302,27 +377,10 @@ export const ChannelDetailsPage = () => {
     }
   }
 
-  const handleActiveOrDeactivateChannel = async (isEnabled: boolean) => {
-    try {
-      if (updateChannelStatusMutation.isPending) {
-        return;
-      }
-
-      await updateChannelStatusMutation.mutateAsync({
-        id: channelId,
-        is_active: isEnabled,
-      })
-      showToast({
-        type: 'success',
-        message: isEnabled
-          ? 'Channel activated successfully'
-          : 'Channel deactivated successfully',
-      })
-    } catch (error: any) {
-      showToast({
-        type: 'error',
-        message: error?.message || 'Failed to update channel status',
-      })
+  const handleActiveOrDeactivateChannel = (isEnabled: boolean) => {
+    // Only update local state in edit mode, actual save happens on "Done"
+    if (isEditing) {
+      setEditingActiveStatus(isEnabled)
     }
   };
 
@@ -411,28 +469,40 @@ export const ChannelDetailsPage = () => {
             <Group header="CHANNEL STATUS">
               <ListItem
                 padding="6px 16px"
-                disabled={updateChannelStatusMutation.isPending}
+                disabled={updateChannelMutation.isPending}
                 text={
-                  <Text type="text" color={channel.is_active ? 'accent' : 'secondary'}>
-                    {channel.is_active ? 'Channel Active' : 'Channel Inactive'}
+                  <Text type="text" color={isEditing ? (editingActiveStatus ? 'accent' : 'secondary') : (channel.is_active ? 'accent' : 'secondary')}>
+                    {isEditing
+                      ? (editingActiveStatus ? 'Channel Active' : 'Channel Inactive')
+                      : (channel.is_active ? 'Channel Active' : 'Channel Inactive')
+                    }
                   </Text>
                 }
                 description={
                   <Text type="caption" color="tertiary">
-                    {channel.is_active
-                      ? 'Channel is visible in the marketplace'
-                      : 'Channel is hidden from the marketplace'}
+                    {isEditing
+                      ? (editingActiveStatus
+                          ? 'Channel will be visible in the marketplace'
+                          : 'Channel will be hidden from the marketplace')
+                      : (channel.is_active
+                          ? 'Channel is visible in the marketplace'
+                          : 'Channel is hidden from the marketplace')
+                    }
                   </Text>
                 }
                 after={
-                  updateChannelStatusMutation.isPending ? (
+                  updateChannelMutation.isPending ? (
                     <Spinner size={16} />
-                  ) : (
+                  ) : isEditing ? (
                     <ListToggler
-                      isEnabled={channel.is_active}
+                      isEnabled={editingActiveStatus}
                       onChange={handleActiveOrDeactivateChannel}
-                      disabled={updateChannelStatusMutation.isPending}
+                      disabled={updateChannelMutation.isPending}
                     />
+                  ) : (
+                    <Text type="text" color="secondary">
+                      {channel.is_active ? 'Active' : 'Inactive'}
+                    </Text>
                   )
                 }
               />
@@ -443,7 +513,43 @@ export const ChannelDetailsPage = () => {
         <Block margin="top" marginValue={24}>
           <Block margin="bottom" marginValue={44}>
             <Group header="CONFIGURATION">
-              {AD_FORMATS.map((format) => {
+              {/* Topic - always visible */}
+              <ListItem
+                padding="6px 16px"
+                text={
+                  <BlockNew row align="center" justify="between" gap={8}>
+                    <Text type="text" weight="medium">
+                      Topic
+                    </Text>
+                    {isChannelOwner && isEditing ? (
+                      <AppSelect
+                        options={[
+                          { value: '', name: 'No topic' },
+                          ...PREDEFINED_TOPICS.map((topic) => ({
+                            value: topic.id.toString(),
+                            name: topic.name,
+                          })),
+                        ]}
+                        value={selectedTopicId?.toString() || ''}
+                        onChange={handleTopicChange}
+                        placeholder="Select topic"
+                        disabled={updateChannelMutation.isPending}
+                      />
+                    ) : (
+                      <Text type="text" color={channel.topic_id ? 'primary' : 'secondary'}>
+                        {channel.topic_id
+                          ? PREDEFINED_TOPICS.find((t) => t.id === channel.topic_id)?.name || 'Unknown'
+                          : 'No topic'}
+                      </Text>
+                    )}
+                  </BlockNew>
+                }
+              />
+              {(() => {
+                // Only show post format
+                const format = AD_FORMATS.find((f) => f.value === 'post')
+                if (!format) return null
+
                 const pricing = channel.pricing?.find((p) => p.ad_format === format.value)
                 const isEnabled = isChannelOwner && isEditing
                   ? priceEnabled[format.value]
@@ -502,7 +608,7 @@ export const ChannelDetailsPage = () => {
                               </Text>
                             </div>
                             <Text type="text" color={isEnabled ? 'accent' : 'secondary'}>
-                              {pricing?.price_ton?.toFixed?.(2) || '-'} TON
+                              {postPricing?.price_ton !== undefined ? postPricing?.price_ton : '-'} TON
                             </Text>
                           </>
                         )}
@@ -535,13 +641,13 @@ export const ChannelDetailsPage = () => {
                     }
                   />
                 )
-              })}
-              {isChannelOwner && (
+              })()}
+              {/* {isChannelOwner && (
                 <ListItem
                   padding="6px 16px"
                   text={
                     <Text type="text">
-                      {isEditing ? 'Done Editing' : 'Edit Pricing'}
+                      {isEditing ? 'Done' : 'Edit'}
                     </Text>
                   }
                   before={
@@ -553,7 +659,7 @@ export const ChannelDetailsPage = () => {
                   }
                   onClick={handleEditToggle}
                 />
-              )}
+              )} */}
               {(!isChannelOwner || !isEditing) && (!visiblePricing || visiblePricing.length === 0) && (
                 <ListItem
                   padding="6px 16px"
@@ -569,19 +675,31 @@ export const ChannelDetailsPage = () => {
         </Block>
 
 
-        <Block margin="top" marginValue="auto">
-          <Text type="caption" align="center" color="tertiary">
-            To request a post from {channel.title || 'this channel'},
-            <br />
-            click the button below
-          </Text>
-        </Block>
+        {!isChannelOwner && (
+          <Block margin="top" marginValue="auto">
+            <Text type="caption" align="center" color="tertiary">
+              To request a post from {channel.title || 'this channel'},
+              <br />
+              click the button below
+            </Text>
+          </Block>
+        )}
 
-        {postPricing && userId && (
+        {!isChannelOwner && postPricing && userId && (
           <TelegramMainButton
             text="Request Post"
             onClick={handleRequestPostClick}
             isVisible={true}
+          />
+        )}
+
+        {isChannelOwner && (
+          <TelegramMainButton
+            text={isEditing ? (updateChannelMutation.isPending ? 'Saving...' : 'Done') : 'Edit'}
+            onClick={handleEditToggle}
+            isVisible={true}
+            disabled={updateChannelMutation.isPending}
+            loading={updateChannelMutation.isPending}
           />
         )}
       </PageLayout>

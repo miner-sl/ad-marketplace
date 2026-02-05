@@ -18,6 +18,7 @@ import type {
   User,
   LoginResponse,
   TelegramWidgetUser,
+  UpdateChannelRequest,
 } from '@types'
 import { isProd, getToken } from '@utils'
 
@@ -102,6 +103,19 @@ export const MarketplaceService = {
       method: 'POST',
       body: JSON.stringify(request),
     })
+  },
+
+  updateChannel: async (
+    channelId: number,
+    request: UpdateChannelRequest
+  ): Promise<ApiResponse<{ id: number; is_active: boolean; topic_id?: number | null }>> => {
+    return await apiRequest<{ id: number; is_active: boolean; topic_id?: number | null }>(
+      `/channels/${channelId}/update`,
+      {
+        method: 'POST',
+        body: JSON.stringify(request),
+      }
+    )
   },
 
   validateChannel: async (

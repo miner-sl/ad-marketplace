@@ -44,6 +44,14 @@ export class ChannelModel {
     return result.rows[0] || null;
   }
 
+  static async findById(channelId: number): Promise<Channel | null> {
+    const result = await db.query(
+      'SELECT * FROM channels WHERE id = $1',
+      [channelId]
+    );
+    return result.rows[0] || null;
+  }
+
   /**
    * Find channel by ID with FOR UPDATE lock (for use within transactions)
    * Returns channel data needed for status updates and ownership checks
@@ -213,6 +221,75 @@ export class ChannelModel {
   ): Promise<Channel> {
     return await withTx(async (client) => {
       return await this.updateActiveStatusWithClient(client, channelId, isActive);
+    });
+  }
+
+  /**
+   * Update channel info (active status, topic_id, and pricing)
+   */
+  static async updateChannel(
+    channelId: number,
+    updates: {
+      is_active?: boolean;
+      topic_id?: number | null;
+      price_ton?: number;
+    }
+  ): Promise<Channel> {
+    return await withTx(async (client) => {
+      const updateFields: string[] = [];
+      const updateValues: any[] = [];
+      let paramIndex = 1;
+
+      if (updates.is_active !== undefined) {
+        updateFields.push(`is_active = $${paramIndex++}`);
+        updateValues.push(updates.is_active);
+      }
+
+      if (updates.topic_id !== undefined) {
+        updateFields.push(`topic_id = $${paramIndex++}`);
+        updateValues.push(updates.topic_id);
+      }
+
+      updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+
+      if (updateFields.length === 1) {
+        // Only updated_at, no actual changes
+        const result = await client.query(
+          `SELECT * FROM channels WHERE id = $1`,
+          [channelId]
+        );
+        if (result.rows.length === 0) {
+          throw new Error(`Channel #${channelId} not found`);
+        }
+        return result.rows[0];
+      }
+
+      updateValues.push(channelId);
+
+      const result = await client.query(
+        `UPDATE channels 
+         SET ${updateFields.join(', ')}
+         WHERE id = $${paramIndex}
+         RETURNING *`,
+        updateValues
+      );
+
+      if (result.rows.length === 0) {
+        throw new Error(`Channel #${channelId} not found`);
+      }
+
+      // If price_ton is provided, update/create pricing for 'post' format
+      if (updates.price_ton !== undefined) {
+        await client.query(
+          `INSERT INTO channel_pricing (channel_id, ad_format, price_ton, is_active)
+           VALUES ($1, 'post', $2, true)
+           ON CONFLICT (channel_id, ad_format) 
+           DO UPDATE SET price_ton = $2, is_active = true, updated_at = CURRENT_TIMESTAMP`,
+          [channelId, updates.price_ton]
+        );
+      }
+
+      return result.rows[0];
     });
   }
 

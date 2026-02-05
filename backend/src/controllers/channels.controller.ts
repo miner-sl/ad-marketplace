@@ -6,7 +6,7 @@ import { UserModel } from '../repositories/user.repository';
 import { TelegramService } from '../services/telegram.service';
 import { ChannelService } from '../services/channel.service';
 import { topicsService } from '../services/topics.service';
-import { setChannelPricingSchema, updateChannelStatusSchema, validateChannelSchema } from '../utils/validation';
+import { setChannelPricingSchema, updateChannelStatusSchema, updateChannelSchema, validateChannelSchema } from '../utils/validation';
 import { throttleChannelValidate } from '../utils/throttle';
 import logger from '../utils/logger';
 
@@ -242,6 +242,77 @@ export class ChannelsController {
     } catch (error: any) {
       logger.error('Failed to get topics', { error: error.message });
       reply.code(500).send({ error: error.message });
+    }
+  }
+
+  static async updateChannel(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = request.params as { id: string };
+      const channelId = parseInt(id);
+      const body = request.body as z.infer<typeof updateChannelSchema>;
+
+      if (!request.user?.id) {
+        return reply.code(401).send({
+          error: 'Unauthorized',
+          message: 'User ID not found in token',
+        });
+      }
+
+      // Verify ownership
+      const channel = await ChannelModel.findById(channelId);
+      if (!channel) {
+        return reply.code(404).send({
+          error: 'Channel not found',
+        });
+      }
+
+      if (channel.owner_id !== request.user.id) {
+        return reply.code(403).send({
+          error: 'Forbidden',
+          message: 'You do not have permission to update this channel',
+        });
+      }
+
+      // Prepare updates
+      const updates: {
+        is_active?: boolean;
+        topic_id?: number | null;
+        price_ton?: number;
+      } = {};
+
+      if (body.active !== undefined) {
+        updates.is_active = body.active;
+      }
+
+      if (body.topic !== undefined) {
+        updates.topic_id = body.topic;
+      }
+
+      if (body.price !== undefined) {
+        updates.price_ton = body.price;
+      }
+
+      // Update channel
+      const updatedChannel = await ChannelModel.updateChannel(channelId, updates);
+
+      return {
+        id: updatedChannel.id,
+        is_active: updatedChannel.is_active,
+        topic_id: updatedChannel.topic_id,
+        message: 'Channel updated successfully',
+      };
+    } catch (error: any) {
+      logger.error('Failed to update channel', {
+        error: error.message,
+        stack: error.stack,
+        channelId: (request.params as { id: string }).id,
+        userId: request.user?.id,
+      });
+
+      reply.code(500).send({
+        error: 'Failed to update channel',
+        message: error.message,
+      });
     }
   }
 

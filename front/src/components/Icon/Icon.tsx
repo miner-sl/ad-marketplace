@@ -13,6 +13,7 @@ interface IconProps {
 }
 
 export const Icon = ({ name, size, color, className, onClick }: IconProps) => {
+  // TODO refactor for three shaking
   const IconName = getIcon(name)
 
   if (!IconName) return null

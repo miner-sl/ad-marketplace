@@ -409,7 +409,6 @@ export class AutoReleaseSenderService {
       }
 
       try {
-        // Notify advertiser about refund
         await TelegramNotificationService.notifyDealRefunded(
           deal.id,
           deal.advertiser_id,

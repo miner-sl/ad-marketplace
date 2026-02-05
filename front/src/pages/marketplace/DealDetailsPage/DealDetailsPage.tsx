@@ -3,33 +3,31 @@ import {openTelegramLink} from '@tma.js/sdk-react'
 import {
   Block,
   BlockNew,
+  ChannelLink,
   DealStatusBadge,
-  PageLayout,
+  Group,
+  Icon,
+  Image,
+  ListItem,
   Page,
+  PageLayout,
+  Spinner,
   TelegramBackButton,
   TelegramMainButton,
   Text,
-  Image,
-  ListItem,
-  Group,
-  Icon,
   useToast,
-  Spinner,
-  ChannelLink,
 } from '@components'
 import {
+  type EnhancedDeal,
   useAcceptDealMutation,
-  useApproveCreativeMutation,
   useDealQuery,
   useRejectDealMutation,
   useRequestCreativeRevisionMutation,
   useUpdateDealMessageMutation,
-  type EnhancedDeal,
 } from '@store-new'
 import styles from './DealDetailsPage.module.scss'
 import {useClipboard, useTonTransfer} from "@hooks"
 import config from '@config'
-import type {Creative} from '@types'
 import {useAuth} from "@context";
 
 interface DealHeaderProps {
@@ -86,7 +84,7 @@ export const DealDetailsPage = () => {
   // const { data: creative } = useDealCreativeQuery(dealId)
   const acceptDealMutation = useAcceptDealMutation()
   const rejectDealMutation = useRejectDealMutation()
-  const approveCreativeMutation = useApproveCreativeMutation()
+  // const approveCreativeMutation = useApproveCreativeMutation()
   const requestRevisionMutation = useRequestCreativeRevisionMutation()
   const updateDealMessageMutation = useUpdateDealMessageMutation()
   // TODO: Uncomment when useDealCreativeQuery is implemented
@@ -153,32 +151,35 @@ export const DealDetailsPage = () => {
       showToast({message: 'Success decline', type: 'success' });
 
     } catch (error) {
-      showToast({message: error.message || 'Failed decline', type: 'warning' });
+      showToast({
+        message: error instanceof Error ? error.message : 'Decline failed',
+        type: 'warning',
+      });
       console.error('Failed to reject deal:', error)
     }
   }
 
-  const handleApproveCreative = async () => {
-    try {
-      await approveCreativeMutation.mutateAsync(dealId)
-    } catch (error) {
-      console.error('Failed to approve creative:', error)
-    }
-  }
-
-  const handleRequestRevision = async () => {
-    const notes = prompt('Please provide revision notes:')
-    if (notes) {
-      try {
-        await requestRevisionMutation.mutateAsync({
-          dealId,
-          revision_notes: notes,
-        })
-      } catch (error) {
-        console.error('Failed to request revision:', error)
-      }
-    }
-  }
+  // const handleApproveCreative = async () => {
+  //   try {
+  //     await approveCreativeMutation.mutateAsync(dealId)
+  //   } catch (error) {
+  //     console.error('Failed to approve creative:', error)
+  //   }
+  // }
+  //
+  // const handleRequestRevision = async () => {
+  //   const notes = prompt('Please provide revision notes:')
+  //   if (notes) {
+  //     try {
+  //       await requestRevisionMutation.mutateAsync({
+  //         dealId,
+  //         revision_notes: notes,
+  //       })
+  //     } catch (error) {
+  //       console.error('Failed to request revision:', error)
+  //     }
+  //   }
+  // }
 
   const handleRequestChanges = async () => {
     const notes = prompt('Please provide your requested changes:')

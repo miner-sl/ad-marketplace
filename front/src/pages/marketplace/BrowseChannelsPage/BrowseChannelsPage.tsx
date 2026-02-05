@@ -1,43 +1,40 @@
-import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
-import cn from 'classnames'
+import {useEffect, useState} from 'react'
 import {
+  Block,
   BlockNew,
-  PageLayout,
+  Button,
+  ChannelListItem,
+  Group,
+  Icon,
+  ListInput,
   Page,
+  PageLayout,
   TelegramBackButton,
   Text,
-  Button,
-  ListInput,
-  Group,
-  Block,
-  Dropdown,
-  ChannelListItem,
-  Icon,
 } from '@components'
-import { useChannelsQuery, type EnhancedChannel } from '@store-new'
+import {type EnhancedChannel, useChannelsQuery} from '@store-new'
 import {useDebounce} from '@hooks'
-import type { ChannelFilters, AdFormat } from '@types'
+import type {ChannelFilters} from '@types'
 
 import styles from './BrowseChannelsPage.module.scss'
 
-const AD_FORMAT_OPTIONS: Array<AdFormat | ''> = ['', 'post', 'forward', 'story']
-
-const formatAdFormatLabel = (format: AdFormat | ''): string => {
-  if (format === '') return 'All formats'
-  return format.charAt(0).toUpperCase() + format.slice(1)
-}
+// const AD_FORMAT_OPTIONS: Array<AdFormat | ''> = ['', 'post', 'forward', 'story']
+//
+// const formatAdFormatLabel = (format: AdFormat | ''): string => {
+//   if (format === '') return 'All formats'
+//   return format.charAt(0).toUpperCase() + format.slice(1)
+// }
 
 export const BrowseChannelsPage = () => {
-  const navigate = useNavigate()
+  // const navigate = useNavigate()
   const [filters, setFilters] = useState<ChannelFilters>({
     limit: 14, // TODO calculate limit based on screen size
   })
   const [showFilters, setShowFilters] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebounce(searchInput, 500)
-  const [isFormatDropdownOpen, setIsFormatDropdownOpen] = useState(false)
-  const formatButtonRef = useRef<HTMLDivElement>(null)
+  // const [isFormatDropdownOpen, setIsFormatDropdownOpen] = useState(false)
+  // const formatButtonRef = useRef<HTMLDivElement>(null)
 
   // Update filters when debounced search value changes
   useEffect(() => {
@@ -81,21 +78,21 @@ export const BrowseChannelsPage = () => {
     }
   }
 
-  const handleFormatChange = (value: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      ad_format: value === '' ? undefined : (value as AdFormat),
-    }))
-  }
-
-  const handleToggleFormatDropdown = (value?: boolean) => {
-    setIsFormatDropdownOpen(value !== undefined ? value : !isFormatDropdownOpen)
-  }
-
-  const formatDropdownOptions = AD_FORMAT_OPTIONS.map((format) => ({
-    label: formatAdFormatLabel(format),
-    value: format,
-  }))
+  // const handleFormatChange = (value: string) => {
+  //   setFilters((prev) => ({
+  //     ...prev,
+  //     ad_format: value === '' ? undefined : (value as AdFormat),
+  //   }))
+  // }
+  //
+  // const handleToggleFormatDropdown = (value?: boolean) => {
+  //   setIsFormatDropdownOpen(value !== undefined ? value : !isFormatDropdownOpen)
+  // }
+  //
+  // const formatDropdownOptions = AD_FORMAT_OPTIONS.map((format) => ({
+  //   label: formatAdFormatLabel(format),
+  //   value: format,
+  // }))
 
   const resetFilters = () => {
     setSearchInput('')

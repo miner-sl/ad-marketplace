@@ -1,32 +1,31 @@
-import {useParams, useNavigate} from 'react-router-dom'
-import {useState, useEffect} from 'react'
+import {useNavigate, useParams} from 'react-router-dom'
+import {useEffect, useState} from 'react'
 import {openTelegramLink} from '@tma.js/sdk-react'
 import {
   Block,
   BlockNew,
-  PageLayout,
-  Page,
-  TelegramBackButton,
-  Text,
-  TelegramMainButton,
+  Button,
+  Group,
+  Icon,
   Image,
   ListInput,
   ListItem,
-  Group,
-  Icon,
-  Spinner,
-  useToast,
-  Button,
   ListToggler,
+  Page,
+  PageLayout,
+  Spinner,
+  TelegramBackButton,
+  TelegramMainButton,
+  Text,
+  useToast,
 } from '@components'
-import {useChannelQuery, useChannelStatsQuery, useSetChannelPricingMutation, useUpdateChannelStatusMutation} from '@store-new'
-import {useTelegramUser} from '@hooks'
+import {useChannelQuery, useSetChannelPricingMutation, useUpdateChannelStatusMutation} from '@store-new'
+import {useClipboard, useTelegramUser} from '@hooks'
 import {useAuth} from '@context'
 import {ROUTES_NAME} from '@routes'
 import type {AdFormat, Channel, ChannelStats} from '@types'
 import styles from './ChannelDetailsPage.module.scss'
-import {separateNumber, createMembersCount, getChannelLink, checkIsMobile, hapticFeedback} from '@utils'
-import {useClipboard} from '@hooks'
+import {checkIsMobile, createMembersCount, getChannelLink, hapticFeedback, separateNumber} from '@utils'
 
 interface ChannelHeaderProps {
   channel: Channel

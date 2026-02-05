@@ -21,6 +21,8 @@ export function useTonTransfer() {
     comment?: string
   ): Promise<void> => {
     try {
+      console.log('Sending TON...', comment);
+      // TODO implement with TON connect
       // Check if wallet is connected
       if (!tonConnectUI.account) {
         showToast({
@@ -40,7 +42,7 @@ export function useTonTransfer() {
           {
             address: toAddress,
             amount: amountNanotons,
-            // Note: Comments require base64-encoded payload, 
+            // Note: Comments require base64-encoded payload,
             // which is typically handled by smart contracts
             // For simple transfers, we omit payload
           },
@@ -58,7 +60,7 @@ export function useTonTransfer() {
       return Promise.resolve()
     } catch (error: any) {
       console.error('TON transfer error:', error)
-      
+
       // Handle user rejection
       if (error?.message?.includes('User rejected') || error?.code === 300) {
         showToast({
@@ -71,7 +73,7 @@ export function useTonTransfer() {
           message: error?.message || 'Failed to send transaction',
         })
       }
-      
+
       return Promise.reject(error)
     }
   }

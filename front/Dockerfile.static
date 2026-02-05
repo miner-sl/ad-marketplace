@@ -1,0 +1,31 @@
+# Frontend Dockerfile - Static files only (no nginx)
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+# Accept build argument for VITE_API_URL
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=$VITE_API_URL
+
+# Copy package.json only (not package-lock.json) to avoid npm optional deps bug
+COPY package.json ./
+
+# Install dependencies with workaround for npm optional deps bug
+RUN npm cache clean --force && \
+    rm -rf node_modules package-lock.json && \
+    npm install --no-audit --include=optional
+
+# Copy source code
+COPY . .
+
+# Build the application (VITE_API_URL will be embedded in the build)
+RUN npm run build
+
+# Output stage - run vite preview server on port 8000
+FROM node:20-slim
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+EXPOSE 8000
+CMD ["npx", "vite", "preview", "--host", "0.0.0.0", "--port", "8000", "--outDir", "dist"]

@@ -1,36 +1,32 @@
-import {useCallback, useState} from 'react'
+import {useCallback} from 'react'
 import {useNavigate} from 'react-router-dom'
 
 import {
   BlockNew,
   Button,
+  ChannelListItem,
+  Group,
   Page,
   PageLayout,
   Skeleton,
   TelegramMainButton,
   Text,
-  Group,
-  GroupItem,
-  Image,
-  Icon,
-  ChannelListItem,
 } from '@components'
 import {useCampaignsQuery, useChannelsQuery,} from '@store-new'
 import {ROUTES_NAME} from '@routes'
-import {pluralize, hapticFeedback} from '@utils'
 
 import styles from './MarketplaceHomePage.module.scss';
 
 export const MarketplaceHomePage = () => {
   const navigate = useNavigate()
-  const [activeTab, _] = useState<'channels' | 'campaigns'>('channels')
+  // const [_, _] = useState<'channels' | 'campaigns'>('channels')
   // const { user: currentUser } = useUser()
-
-  const tabs = [
-    { id: 1, label: 'Channels', value: 'channels' },
-    // { id: 2, label: 'Campaigns', value: 'campaigns' },
-  ]
   //
+  // const tabs = [
+  //   { id: 1, label: 'Channels', value: 'channels' },
+  //   // { id: 2, label: 'Campaigns', value: 'campaigns' },
+  // ]
+  // //
   // const handleChangeActiveTab = (value: string) => {
   //   setActiveTab(value as 'channels' | 'campaigns')
   // }

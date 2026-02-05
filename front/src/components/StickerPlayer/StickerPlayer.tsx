@@ -22,7 +22,7 @@ export const StickerPlayer = ({
   height = 112,
   width = 112,
 }: StickerPlayerProps) => {
-  const ref = useRef<LottieRefCurrentProps>(null)
+  const ref = useRef<LottieRefCurrentProps | unknown>(undefined)
 
   // Validate that lottie is a valid object
   if (!lottie || typeof lottie !== 'object') {

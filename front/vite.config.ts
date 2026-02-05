@@ -2,14 +2,40 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import svgr from 'vite-plugin-svgr'
 import mkcert from 'vite-plugin-mkcert';
+import { visualizer } from 'rollup-plugin-visualizer';
 import path from 'path'
 
-// https://vite.dev/config/
 export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
     allowedHosts: true,
+  },
+  build: {
+    chunkSizeWarningLimit: 400,
+    cssMinify: false, // Disable Vite's CSS minification, let PostCSS/cssnano handle it
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('@tma.js')) {
+              return 'tma-sdk-react';
+            }
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+              return 'react-vendor';
+            }
+          }
+        },
+      },
+      // onwarn(warning, warn) {
+      //   // Suppress eval warnings from third-party libraries (lottie-web)
+      //   if (warning.code === 'EVAL' && warning.id?.includes('lottie')) {
+      //     return;
+      //   }
+      //   warn(warning);
+      // },
+    },
   },
   plugins: [
     react({
@@ -18,7 +44,17 @@ export default defineConfig({
       },
     }),
     svgr(),
-    process.env.HTTPS && mkcert(),
+    ...(process.env.HTTPS ? [mkcert()] : []),
+    ...(process.env.ANALYZE === 'true' || process.env.npm_lifecycle_event === 'build:analyze'
+      ? [
+          visualizer({
+            open: true,
+            filename: 'dist/stats.html',
+            gzipSize: true,
+            brotliSize: true,
+          }),
+        ]
+      : []),
   ],
   resolve: {
     alias: {
@@ -40,6 +76,13 @@ export default defineConfig({
   css: {
     modules: {
       localsConvention: 'camelCase',
+    },
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      define: {
+        global: 'globalThis',
+      },
     },
   },
 })

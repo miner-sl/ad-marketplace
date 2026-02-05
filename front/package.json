@@ -7,12 +7,14 @@
     "dev": "vite",
     "dev:https": "cross-env HTTPS=true vite",
     "build": "tsc -b && vite build",
+    "build:analyze": "cross-env ANALYZE=true tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.20",
     "lottie-react": "^2.4.1",
+    "lottie-web": "^5.13.0",
     "react": "^19.2.0",
     "react-lottie": "^1.2.10",
     "react-router-dom": "^6.10.0",
@@ -24,6 +26,7 @@
     "@tonconnect/ui-react": "^2.1.0"
   },
   "devDependencies": {
+    "autoprefixer": "^10.4.21",
     "vite-plugin-mkcert": "^1.17.8",
     "postcss": "^8.5.3",
     "postcss-preset-env": "^10.1.5",
@@ -42,9 +45,15 @@
     "vite-plugin-svgr": "^4.3.0",
     "sass": "^1.97.3",
     "typescript-eslint": "^8.46.4",
-    "vite": "npm:rolldown-vite@7.2.5"
+    "vite": "npm:rolldown-vite@7.2.5",
+    "vite-plugin-compression": "^0.5.1",
+    "rollup-plugin-visualizer": "^5.12.0"
   },
   "overrides": {
-    "vite": "npm:rolldown-vite@7.2.5"
+    "vite": "npm:rolldown-vite@7.2.5",
+    "lottie-web": "^5.13.0"
+  },
+  "resolutions": {
+    "lottie-web": "^5.13.0"
   }
 }

@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react'
-import { miniApp, retrieveLaunchParams } from '@tma.js/sdk-react'
+import {miniApp} from '@tma.js/sdk-react'
 
 import { ThemeContext } from './ThemeContext'
 
 interface Props {
   children?: React.ReactNode
 }
+export const isDarkTheme = () => {
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+};
 
 export const ThemeProvider = ({ children }: Props) => {
-  const launchParams = retrieveLaunchParams()
-  const lightTgTheme = launchParams?.tgWebAppThemeParams?.colorScheme === 'light'
+  const lightTgTheme = isDarkTheme();
 
   const [darkTheme, setDarkTheme] = useState(lightTgTheme);
 
@@ -41,7 +43,7 @@ export const ThemeProvider = ({ children }: Props) => {
   }, [darkTheme])
 
   const toggleThemeHandler = () => {
-    setDarkTheme((prevState) => !prevState)
+    setDarkTheme((prevState: boolean) => !prevState)
   }
 
   return (

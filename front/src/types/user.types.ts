@@ -6,6 +6,7 @@ export type User = {
   telegramId?: number
   username?: string
   first_name?: string
+  is_registered?: boolean;
   firstName?: string
   last_name?: string
   lastName?: string

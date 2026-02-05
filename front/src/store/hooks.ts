@@ -17,10 +17,10 @@ async function fetchUser(telegramId: number | undefined): Promise<User | null> {
       console.error('Failed to fetch user:', error)
       return null
     }
-    if (!data) {
+    if (!data?.user) {
       return null
     }
-    return { ...data, is_registered: true }
+    return { ...data?.user, is_registered: true } as User
   } catch (error) {
     console.error('Failed to fetch user:', error)
     return null

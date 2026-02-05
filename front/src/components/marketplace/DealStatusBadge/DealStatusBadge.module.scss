@@ -6,12 +6,32 @@
 }
 
 .status-completed {
-  background: color-mix(in srgb, var(--color-state-success) 20%, transparent);
+  position: relative;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-color: var(--color-state-success);
+    opacity: 0.2;
+    border-radius: 6px;
+    z-index: 0;
+  }
 }
 
 .status-declined,
 .status-refunded {
-  background: color-mix(in srgb, var(--color-state-destructive) 20%, transparent);
+  position: relative;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-color: var(--color-state-destructive);
+    opacity: 0.2;
+    border-radius: 6px;
+    z-index: 0;
+  }
 }
 
 .status-approved,
@@ -20,5 +40,15 @@
 .status-scheduled,
 .status-posted,
 .status-verified {
-  background: color-mix(in srgb, var(--color-accent-primary) 20%, transparent);
+  position: relative;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-color: var(--color-accent-primary);
+    opacity: 0.2;
+    border-radius: 6px;
+    z-index: 0;
+  }
 }

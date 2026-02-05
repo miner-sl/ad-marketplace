@@ -10,7 +10,7 @@ interface StickerPlayerProps {
 
 // Get the default export - handle both ESM and CJS exports
 const Lottie = (LottieModule.default || LottieModule) as React.ComponentType<{
-  lottieRef?: React.RefObject<LottieRefCurrentProps>
+  lottieRef?: React.RefObject<LottieRefCurrentProps> | null
   loop?: boolean
   autoplay?: boolean
   animationData?: unknown
@@ -22,15 +22,15 @@ export const StickerPlayer = ({
   height = 112,
   width = 112,
 }: StickerPlayerProps) => {
-  const ref = useRef<LottieRefCurrentProps | unknown>(undefined)
+  const ref = useRef<LottieRefCurrentProps>(null)
 
-  // Validate that lottie is a valid object
   if (!lottie || typeof lottie !== 'object') {
     return null
   }
 
   return (
     <Lottie
+      // @ts-ignore
       lottieRef={ref}
       loop
       autoplay

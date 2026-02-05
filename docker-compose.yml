@@ -22,7 +22,7 @@ services:
 
   frontend:
     ports:
-      - "8000:8000"
+      - "8000:8000"∞
     build:
       context: ./front
       dockerfile: Dockerfile.static

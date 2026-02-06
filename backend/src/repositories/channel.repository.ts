@@ -127,7 +127,6 @@ export class ChannelRepository {
       offset = 0,
     } = filters;
 
-    // Query to get unique channels with stats
     let query = `
       SELECT DISTINCT c.*, cs.subscribers_count, cs.average_views
       FROM channels c
@@ -168,7 +167,6 @@ export class ChannelRepository {
       paramCount++;
     }
 
-    // Filter by owner's database ID
     if (ownerId !== undefined) {
       query += ` AND c.owner_id = $${paramCount++}`;
       params.push(ownerId);
@@ -189,12 +187,9 @@ export class ChannelRepository {
       }
     }
 
-    // Build pricing filter conditions with correct parameter numbers
     const pricingConditions: string[] = [];
-    // if (ad_format) {
-      pricingConditions.push(`cp_filter.ad_format = $${paramCount++}`);
-      params.push('post');
-    // }
+    pricingConditions.push(`cp_filter.ad_format = $${paramCount++}`);
+    params.push('post');
     if (min_price !== undefined) {
       pricingConditions.push(`cp_filter.price_ton >= $${paramCount++}`);
       params.push(min_price);
@@ -204,7 +199,6 @@ export class ChannelRepository {
       params.push(max_price);
     }
 
-    // Add pricing filter condition if any pricing filters exist
     if (pricingConditions.length > 0) {
       query += ` AND EXISTS (
         SELECT 1 FROM channel_pricing cp_filter 
@@ -224,7 +218,6 @@ export class ChannelRepository {
       return [];
     }
 
-    // Get all pricing for these channels
     const channelIds = channels.map((c: any) => c.id);
     const pricingQuery = `
       SELECT cp.*
@@ -236,7 +229,6 @@ export class ChannelRepository {
     const pricingResult = await db.query(pricingQuery, [channelIds]);
     const allPricing = pricingResult?.rows || [];
 
-    // Group pricing by channel_id
     const pricingMap = new Map<number, any[]>();
     for (const pricing of allPricing) {
       const channelId = pricing.channel_id;
@@ -255,7 +247,6 @@ export class ChannelRepository {
       });
     }
 
-    // Combine channels with their pricing
     return channels.map((channel: any) => ({
       ...channel,
       pricing: pricingMap.get(channel.id) || [],
@@ -285,7 +276,6 @@ export class ChannelRepository {
 
     const channel = result.rows[0];
 
-    // Fetch pricing separately
     const pricingResult = await db.query(
       `SELECT 
         id,
@@ -301,7 +291,6 @@ export class ChannelRepository {
       [channelId]
     );
 
-    // Add pricing array to channel
     channel.pricing = pricingResult?.rows || [];
 
     return channel;

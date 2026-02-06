@@ -99,10 +99,9 @@ export class AutoReleaseSenderService {
                 currentDeal.channel_owner_wallet_address as string,
                 currentDeal.price_ton.toString(),
                 `Auto-release: Buyer did not confirm within timeout period (Deal #${deal.id})`,
-                false // Already checked idempotency above
+                false
               );
 
-              // Update status and record tx hash atomically
               const updateResult = await client.query(
                 `UPDATE deals 
                  SET status = 'completed', payment_tx_hash = $1, updated_at = CURRENT_TIMESTAMP
@@ -133,7 +132,6 @@ export class AutoReleaseSenderService {
           { ttl: 60000 } // 60 seconds in milliseconds (fund release takes longer)
         );
       } catch (lockError: any) {
-        // If lock acquisition failed, another instance is processing this deal
         if (lockError.message?.includes('Failed to acquire distributed lock')) {
           logger.debug(`Deal #${deal.id} auto-release skipped (locked by another instance)`, {
             dealId: deal.id,
@@ -160,7 +158,6 @@ export class AutoReleaseSenderService {
       }
 
       try {
-        // Notify both parties about deal auto-completion (buyer didn't confirm)
         await TelegramNotificationService.notifyDealAutoCompleted(
           deal.id,
           deal.advertiser_id,
@@ -177,7 +174,6 @@ export class AutoReleaseSenderService {
           dealId: deal.id,
           error: notifError.message,
         });
-        // Don't fail the whole operation if notification fails
       }
 
       logger.info(`Successfully auto-released funds for Deal #${deal.id}`, {
@@ -305,7 +301,6 @@ export class AutoReleaseSenderService {
 
               const currentDeal = dealCheck.rows[0];
 
-              // Check if already refunded
               if (currentDeal.status === 'refunded' && currentDeal.refund_tx_hash) {
                 logger.debug(`Deal #${deal.id} already refunded`, {
                   dealId: deal.id,
@@ -330,13 +325,11 @@ export class AutoReleaseSenderService {
                 advertiserWalletAddress,
                 currentDeal.price_ton.toString(),
                 `Refund: Deal declined (Deal #${deal.id})`,
-                false // Already checked idempotency above
+                false
               );
 
-              // Validate transaction exists
               if (txHash) {
                 try {
-                  // Verify transaction exists on blockchain
                   const txExists = await TONService.verifyTransaction(txHash, currentDeal.escrow_address);
                   if (!txExists) {
                     throw new Error(`Transaction ${txHash} not found on blockchain`);
@@ -351,7 +344,6 @@ export class AutoReleaseSenderService {
                 }
               }
 
-              // Update status and record refund tx hash atomically
               const updateResult = await client.query(
                 `UPDATE deals 
                  SET status = 'refunded', refund_tx_hash = $1, updated_at = CURRENT_TIMESTAMP
@@ -424,7 +416,6 @@ export class AutoReleaseSenderService {
           dealId: deal.id,
           error: notifError.message,
         });
-        // Don't fail the whole operation if notification fails
       }
 
       logger.info(`Successfully refunded funds for Deal #${deal.id}`, {

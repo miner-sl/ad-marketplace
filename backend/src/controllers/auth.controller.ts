@@ -4,7 +4,6 @@ import { authService } from '../services/auth.service';
 import { telegramAuthService } from '../services/telegram-auth.service';
 import logger from '../utils/logger';
 
-// Validation schemas
 const telegramWidgetAuthSchema = z.object({
   id: z.number(),
   first_name: z.string(),

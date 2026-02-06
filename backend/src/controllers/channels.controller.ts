@@ -132,7 +132,6 @@ export class ChannelsController {
       }
 
       if (result.channel && result.channelInfo) {
-        // Fetch channel stats using the telegram_channel_id from the created channel
         const stats = await TelegramService.fetchChannelStats(result.channel.telegram_channel_id);
         await ChannelModel.saveStats(result.channel.id, stats);
 
@@ -237,7 +236,7 @@ export class ChannelsController {
     }
   }
 
-  static async getAllTopics(request: FastifyRequest, reply: FastifyReply) {
+  static async getAllTopics(_: FastifyRequest, reply: FastifyReply) {
     try {
       const topics = topicsService.getAllTopics();
       return topics;
@@ -260,8 +259,7 @@ export class ChannelsController {
         });
       }
 
-      // Verify ownership
-      const channel = await ChannelModel.findById(channelId);
+      const channel = await ChannelModel.findChannelOwnerById(channelId);
       if (!channel) {
         return reply.code(404).send({
           error: 'Channel not found',
@@ -275,7 +273,6 @@ export class ChannelsController {
         });
       }
 
-      // Prepare updates
       const updates: {
         is_active?: boolean;
         topic_id?: number | null;
@@ -294,7 +291,6 @@ export class ChannelsController {
         updates.price_ton = body.price;
       }
 
-      // Update channel
       const updatedChannel = await ChannelModel.updateChannel(channelId, updates);
 
       return {
@@ -335,18 +331,16 @@ export class ChannelsController {
           message: 'channelName is required',
         });
       }
+      //
+      // const isAllowed = await throttleChannelValidate(request.user.id, channelName, 5);
+      //
+      // if (!isAllowed) {
+      //   return reply.code(429).send({
+      //     error: 'Too Many Requests',
+      //     message: 'Please wait a few seconds before checking again',
+      //   });
+      // }
 
-      // Throttle validation requests (5 seconds per user per channel)
-      const isAllowed = await throttleChannelValidate(request.user.id, channelName, 5);
-
-      if (!isAllowed) {
-        return reply.code(429).send({
-          error: 'Too Many Requests',
-          message: 'Please wait a few seconds before checking again',
-        });
-      }
-
-      // Validate channel admin status
       const isAdmin = await ChannelService.validateChannelAdmin(channelName);
 
       return {

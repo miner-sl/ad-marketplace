@@ -40,7 +40,6 @@ export class CreativeService {
   }
 
   static async requestRevision(dealId: number, notes: string): Promise<Creative> {
-    // Check if creative exists before requesting revision
     const creative = await this.findByDeal(dealId);
     if (!creative) {
       throw new Error(`Cannot request revision: Creative for Deal #${dealId} not found. Please submit a creative first.`);

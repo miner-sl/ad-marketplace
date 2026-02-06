@@ -112,12 +112,9 @@ export async function buildApp() {
     transformStaticCSP: (header: any) => header,
   });
 
-  // Auth routes (no rate limiting for login endpoints)
   await app.register(authRouter, { prefix: '/api/auth' });
 
-  // API routes with rate limiting
   await app.register(async function (fastify) {
-    // Register rate limiting for all routes in this scope (/api)
     await fastify.register(require('@fastify/rate-limit'), {
       max: isProd ? 100 : 1000,
       timeWindow: '15 minutes',
@@ -128,14 +125,12 @@ export async function buildApp() {
       },
     });
 
-    // Register route handlers
     await fastify.register(channelsRouter, { prefix: '/channels' });
     await fastify.register(dealsRouter, { prefix: '/deals' });
     await fastify.register(campaignsRouter, { prefix: '/campaigns' });
     await fastify.register(userRouter, { prefix: '/user' });
   }, { prefix: '/api' });
 
-  // Webhook for Telegram bot
   app.post('/webhook', async (request, reply) => {
     try {
       await bot.handleUpdate(request.body as any);
@@ -153,7 +148,6 @@ export async function buildApp() {
     }
   });
 
-  // Error handler
   app.setErrorHandler((error, request, reply) => {
     const errorObj = error as Error & { statusCode?: number };
     const status = errorObj.statusCode || 500;

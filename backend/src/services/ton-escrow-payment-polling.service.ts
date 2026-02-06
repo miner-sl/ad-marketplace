@@ -87,7 +87,6 @@ export class TonEscrowPaymentPollingService {
 
       this.logger.info(`Processing ${deals.length} deals with pending payments`);
 
-      // Batch fetch users to avoid N+1 queries
       const userIds = new Set<number>();
       deals.forEach((deal: any) => {
         userIds.add(deal.advertiser_id);
@@ -119,7 +118,6 @@ export class TonEscrowPaymentPollingService {
               txHash: result.txHash,
             });
           } else {
-            // Log but don't treat as error if it's a concurrent processing or already confirmed case
             if (
               result.error?.reason === 'ConcurrentProcessing' ||
               result.error?.reason === 'AlreadyConfirmed' ||
@@ -142,7 +140,6 @@ export class TonEscrowPaymentPollingService {
             error: error.message,
             stack: error.stack,
           });
-          // Continue processing other deals even if one fails
         }
       }
 

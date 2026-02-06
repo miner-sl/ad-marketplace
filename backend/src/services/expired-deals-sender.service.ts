@@ -75,7 +75,6 @@ export class ExpiredDealsSenderService {
         );
       }
 
-      // Wait for all notifications to be queued (but don't fail if they fail)
       await Promise.allSettled(notificationPromises);
 
       this.logger.info(`Successfully declined expired Deal #${deal.id}`, {

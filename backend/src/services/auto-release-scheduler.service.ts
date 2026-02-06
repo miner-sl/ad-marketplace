@@ -91,7 +91,6 @@ export class AutoReleaseSchedulerService {
 
       this.logger.info(`Processing ${deals.length} verified deals for auto-release`);
 
-      // Batch fetch users to avoid N+1 queries
       const userIds = new Set<number>();
       deals.forEach((deal: any) => {
         userIds.add(deal.advertiser_id);
@@ -102,8 +101,6 @@ export class AutoReleaseSchedulerService {
 
       for (const deal of deals) {
         try {
-          // Check if deal still requires release (might have been processed by another instance)
-          // The distributed lock in AutoReleaseSenderService will handle concurrent processing
           const advertiser = usersMap.get(deal.advertiser_id);
           const channelOwner = usersMap.get(deal.channel_owner_id);
 
@@ -124,7 +121,6 @@ export class AutoReleaseSchedulerService {
               txHash: result.txHash,
             });
           } else {
-            // Log but don't treat as error if it's a concurrent processing or no-release-needed case
             if (result.error?.reason === 'ConcurrentProcessing' || result.error?.reason === 'NoReleaseNeeded') {
               this.logger.debug(`Deal #${deal.id} auto-release skipped`, {
                 dealId: deal.id,
@@ -143,7 +139,6 @@ export class AutoReleaseSchedulerService {
             error: error.message,
             stack: error.stack,
           });
-          // Continue processing other deals even if one fails
         }
       }
 
@@ -179,7 +174,6 @@ export class AutoReleaseSchedulerService {
 
       this.logger.info(`Processing ${deals.length} declined deals for refund`);
 
-      // Batch fetch users to avoid N+1 queries
       const userIds = new Set<number>();
       deals.forEach((deal: any) => {
         userIds.add(deal.advertiser_id);
@@ -200,7 +194,6 @@ export class AutoReleaseSchedulerService {
             continue;
           }
 
-          // Get advertiser wallet address from user
           const advertiserWalletAddress = (advertiser as any).wallet_address;
 
           if (!advertiserWalletAddress) {
@@ -229,7 +222,6 @@ export class AutoReleaseSchedulerService {
               txHash: result.txHash,
             });
           } else {
-            // Log but don't treat as error if it's a concurrent processing or no-refund-needed case
             if (result.error?.reason === 'ConcurrentProcessing' || result.error?.reason === 'NoRefundNeeded') {
               this.logger.debug(`Deal #${deal.id} refund skipped`, {
                 dealId: deal.id,
@@ -248,7 +240,6 @@ export class AutoReleaseSchedulerService {
             error: error.message,
             stack: error.stack,
           });
-          // Continue processing other deals even if one fails
         }
       }
 

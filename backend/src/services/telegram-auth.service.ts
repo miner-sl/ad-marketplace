@@ -55,7 +55,6 @@ export class TelegramAuthService {
       throw new Error('Auth data expired');
     }
 
-    // Convert payload to Record<string, string> for checkSignature
     const dataCheck: Record<string, string> = {
       id: String(payload.id),
       first_name: payload.first_name,
@@ -79,7 +78,6 @@ export class TelegramAuthService {
       dataCheck.is_premium = String(payload.is_premium);
     }
 
-    // Validate signature using @grammyjs/validator
     const isValid = checkSignature(this.botToken, dataCheck);
 
     if (!isValid) {
@@ -102,17 +100,14 @@ export class TelegramAuthService {
       throw new Error('Init data too large');
     }
 
-    // Parse the init data string
     const searchParams = new URLSearchParams(initDataString);
 
-    // Validate using @grammyjs/validator
     const isValid = validateWebAppData(this.botToken, searchParams);
 
     if (!isValid) {
       throw new Error('Invalid Web App init data');
     }
 
-    // Parse user data
     const userStr = searchParams.get('user');
     const authDateStr = searchParams.get('auth_date');
     const hash = searchParams.get('hash');
@@ -123,7 +118,6 @@ export class TelegramAuthService {
 
     const authDate = parseInt(authDateStr, 10);
 
-    // Check auth_date is not too old
     const authAge = Math.floor(Date.now() / 1000) - authDate;
     if (authAge > this.maxAuthAge) {
       throw new Error('Auth data expired');

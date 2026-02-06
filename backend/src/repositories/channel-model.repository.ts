@@ -28,14 +28,6 @@ export class ChannelModel {
     return result.rows;
   }
 
-  static async findTopicById(id: number): Promise<Topic | null> {
-    const result = await db.query(
-      'SELECT * FROM topics WHERE id = $1',
-      [id]
-    );
-    return result.rows[0] || null;
-  }
-
   static async findByTelegramId(telegramChannelId: number): Promise<Channel | null> {
     const result = await db.query(
       'SELECT * FROM channels WHERE telegram_channel_id = $1',
@@ -44,9 +36,9 @@ export class ChannelModel {
     return result.rows[0] || null;
   }
 
-  static async findById(channelId: number): Promise<Channel | null> {
+  static async findChannelOwnerById(channelId: number): Promise<Pick<Channel, 'owner_id'> | null> {
     const result = await db.query(
-      'SELECT * FROM channels WHERE id = $1',
+      'SELECT owner_id FROM channels WHERE id = $1',
       [channelId]
     );
     return result.rows[0] || null;
@@ -278,7 +270,6 @@ export class ChannelModel {
         throw new Error(`Channel #${channelId} not found`);
       }
 
-      // If price_ton is provided, update/create pricing for 'post' format
       if (updates.price_ton !== undefined) {
         await client.query(
           `INSERT INTO channel_pricing (channel_id, ad_format, price_ton, is_active)
@@ -319,7 +310,6 @@ export class ChannelModel {
   }
 
   static async verifyAdminStatus(channelId: number, userId: number, telegramUserId: number): Promise<boolean> {
-    // Check if user is channel owner
     const channel = await db.query(
       'SELECT owner_id FROM channels WHERE id = $1',
       [channelId]
@@ -328,7 +318,6 @@ export class ChannelModel {
       return true;
     }
 
-    // Check if user is an active manager
     const manager = await db.query(
       'SELECT * FROM channel_managers WHERE channel_id = $1 AND telegram_user_id = $2 AND is_active = TRUE',
       [channelId, telegramUserId]

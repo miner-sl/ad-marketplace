@@ -12,7 +12,6 @@ const userRouter: FastifyPluginAsync = async (fastify) => {
     preHandler: [validateQuery(getUserMeQuerySchema)],
   }, UserController.getCurrentUser);
 
-  // Register/update user
   fastify.post('/register', UserController.registerUser);
 };
 

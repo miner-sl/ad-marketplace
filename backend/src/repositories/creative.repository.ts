@@ -149,7 +149,6 @@ export class CreativeRepository {
    * Request revision of a creative within an existing transaction
    */
   static async requestRevisionWithClient(client: PoolClient, dealId: number, notes: string): Promise<Creative> {
-    // Check if creative exists first
     const creativeResult = await client.query(
       `SELECT * FROM creatives WHERE deal_id = $1 ORDER BY created_at DESC LIMIT 1`,
       [dealId]
@@ -159,7 +158,6 @@ export class CreativeRepository {
       throw new Error(`Cannot request revision: Creative for Deal #${dealId} not found. Please submit a creative first.`);
     }
 
-    // Update creative to needs_revision status
     return await this.rejectWithClient(client, dealId, notes);
   }
 }

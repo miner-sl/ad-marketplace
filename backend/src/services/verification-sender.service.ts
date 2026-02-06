@@ -111,7 +111,6 @@ export class VerificationSenderService {
         };
       }
 
-      // Post exists - check if duration requirement is met
       const now = new Date();
       const minPublicationDurationDays = deal.min_publication_duration_days || 7;
       let publicationDurationMet = false;
@@ -124,7 +123,6 @@ export class VerificationSenderService {
       }
 
       if (!publicationDurationMet) {
-        // Duration requirement not met - notify channel owner but don't verify yet
         this.logger.info(`Deal #${deal.id}: Post verified but duration requirement not met`, {
           dealId: deal.id,
           daysSinceFirstPublication: Math.floor(daysSinceFirstPublication),
@@ -233,7 +231,6 @@ export class VerificationSenderService {
         }
       }
 
-      // Bot has access - check if post meets minimum publication duration
       const minPublicationDurationDays = deal.min_publication_duration_days || 7;
       if (deal.actual_post_time) {
         const postTime = new Date(deal.actual_post_time);
@@ -255,8 +252,6 @@ export class VerificationSenderService {
           return false;
         }
       } else {
-        // No actual_post_time recorded, but verification period passed
-        // Assume post exists if bot has access and content matches
         this.logger.info(`Deal #${deal.id}: Post verified (verification period passed, bot has access)`, {
           dealId: deal.id,
           minPublicationDurationDays,
@@ -357,7 +352,6 @@ export class VerificationSenderService {
         dealId: deal.id,
         error: error.message,
       });
-      // Don't fail verification if content check fails
       return true;
     }
   }

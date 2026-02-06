@@ -13,7 +13,6 @@ async function testConnection() {
   try {
     console.log('🔍 Testing database connection...\n');
 
-    // Test basic connection
     const result = await db.query('SELECT NOW() as current_time, version() as postgres_version');
     console.log('✅ Database connection successful!');
     console.log(`   Current time: ${result.rows[0].current_time}`);
@@ -38,7 +37,6 @@ async function testConnection() {
       console.log('📋 No migrations have been executed yet');
     }
 
-    // Check if escrow_wallets table exists
     const escrowCheck = await db.query(`
       SELECT EXISTS (
         SELECT FROM information_schema.tables 

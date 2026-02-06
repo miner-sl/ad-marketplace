@@ -361,7 +361,6 @@ export class DealFlowService {
         throw new Error('Deal not found');
       }
 
-      // Convert Telegram ID to database user ID
       const userResult = await client.query(
         'SELECT * FROM users WHERE id = $1',
         [requestedBy]
@@ -588,7 +587,7 @@ export class DealFlowService {
         [dealId, reason || null]
       );
 
-      const messageText = reason 
+      const messageText = reason
         ? `Deal declined by channel owner: ${reason}`
         : 'Deal declined by channel owner';
 
@@ -672,7 +671,6 @@ export class DealFlowService {
       throw new Error('Unauthorized');
     }
 
-    // Find the most recent message sent by this user
     const messageResult = await db.query(
       `SELECT id FROM deal_messages 
        WHERE deal_id = $1 AND sender_id = $2 
@@ -682,7 +680,6 @@ export class DealFlowService {
     );
 
     if (!messageResult.rows || messageResult.rows.length === 0) {
-      // If no message exists, create a new one
       await db.query(
         `INSERT INTO deal_messages (deal_id, sender_id, message_text)
          VALUES ($1, $2, $3)`,
@@ -691,7 +688,6 @@ export class DealFlowService {
       return { message: 'Message created' };
     }
 
-    // Update the most recent message
     const updateResult = await db.query(
       `UPDATE deal_messages 
        SET message_text = $1 
@@ -711,7 +707,6 @@ export class DealFlowService {
       [dealId]
     );
 
-    // Determine recipient (the other party in the deal)
     const recipientId = deal.channel_owner_id === senderId
       ? deal.advertiser_id
       : deal.channel_owner_id;

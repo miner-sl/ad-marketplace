@@ -115,9 +115,7 @@ export class AuthService {
     return await UserModel.findById(userId);
   }
 
-
   private prepareTelegramUsername(telegramUser: TelegramUser): string {
-    // Generate username if not provided
     const username = telegramUser.username && telegramUser.username !== ''
       ? telegramUser.username
       : `tg_${telegramUser.id}`;

@@ -550,7 +550,6 @@ export class TelegramNotificationService {
       const advertiser = await UserModel.findById(advertiserId);
       const channelOwner = await UserModel.findById(channelOwnerId);
 
-      // Notify advertiser with confirmation button
       if (advertiser) {
         const confirmMessage =
           `✅ Deal #${dealId} Verified!\n\n` +

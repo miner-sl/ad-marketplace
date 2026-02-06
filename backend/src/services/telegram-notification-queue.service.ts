@@ -63,7 +63,6 @@ export class TelegramNotificationQueueService {
       maxRetriesPerRequest: null,
     });
 
-    // Queue can be created on all workers (needed for adding jobs)
     this.notificationQueue = new Queue<TelegramNotificationJob>(
       TelegramNotificationQueueService.QUEUE_NAME,
       {
@@ -88,7 +87,6 @@ export class TelegramNotificationQueueService {
       return;
     }
 
-    // Worker only runs on primary worker
     const workerConnection = getRedisClient().duplicate({
       maxRetriesPerRequest: null,
     });

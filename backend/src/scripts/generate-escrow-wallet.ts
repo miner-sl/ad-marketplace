@@ -69,7 +69,6 @@ function getNetwork(): 'mainnet' | 'testnet' {
 async function generateEscrowWallet(dealId: number): Promise<EscrowWalletInfo> {
   const network = getNetwork();
 
-  // Check if wallet already exists
   const existing = await db.query(
     'SELECT address FROM escrow_wallets WHERE deal_id = $1',
     [dealId]

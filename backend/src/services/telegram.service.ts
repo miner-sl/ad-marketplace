@@ -2,6 +2,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import * as dotenv from 'dotenv';
 import { JSDOM } from 'jsdom';
 import { getRandomUserAgent } from '../utils/network/useragent';
+import {formatUsername} from "../models/tg.util";
 
 dotenv.config();
 
@@ -47,10 +48,7 @@ export class TelegramService {
     description?: string;
   }> {
     try {
-      // Ensure username starts with @
-      const formattedUsername = username.startsWith('@') ? username : `@${username}`;
-
-      // Telegram Bot API getChat accepts username with @ prefix
+      const formattedUsername = formatUsername(username);
       const chat = await bot.getChat(formattedUsername);
 
       return {
@@ -69,7 +67,6 @@ export class TelegramService {
    */
   static async isBotAdmin(channelId: number): Promise<boolean> {
     try {
-      // Get bot's own user ID
       const botInfo = await bot.getMe();
       const member = await bot.getChatMember(channelId, botInfo.id);
       return member.status === 'administrator' || member.status === 'creator';
@@ -83,13 +80,9 @@ export class TelegramService {
    */
   static async isBotAdminByUsername(username: string): Promise<boolean> {
     try {
-      // Ensure username starts with @
-      const formattedUsername = username.startsWith('@') ? username : `@${username}`;
+      const formattedUsername = formatUsername(username);
 
-      // Get channel info first to get the channel ID
       const channelInfo = await this.getChannelInfoByUsername(formattedUsername);
-
-      // Then check if bot is admin
       return await this.isBotAdmin(channelInfo.id);
     } catch (error) {
       return false;

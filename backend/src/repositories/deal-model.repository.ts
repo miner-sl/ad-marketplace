@@ -91,9 +91,7 @@ export class DealModel {
       }
     }
 
-    // Only add channel if it has an id (meaning the join found a channel)
     if (channel.id) {
-      // Add topic to channel if topic exists
       if (topic.id) {
         channel.topic = topic;
       }
@@ -157,7 +155,6 @@ export class DealModel {
 
       const deal = dealCheck.rows[0];
 
-      // Idempotency check: if payment already confirmed, return existing deal
       if (deal.payment_tx_hash && deal.status !== 'payment_pending') {
         const logger = (await import('../utils/logger')).default;
         logger.info(`Payment already confirmed for Deal #${id}`, {
@@ -172,7 +169,6 @@ export class DealModel {
         throw new Error(`Cannot confirm payment in status: ${deal.status}`);
       }
 
-      // Atomic update: check both status AND payment_tx_hash IS NULL
       const result = await client.query(
         `UPDATE deals 
          SET status = 'paid', payment_tx_hash = $1, payment_confirmed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
@@ -249,7 +245,6 @@ export class DealModel {
         throw new Error(`Deal #${id} not found`);
       }
 
-      // Ensure date is in UTC (convert to ISO string and back to ensure UTC)
       const utcDate = new Date(verificationUntil.toISOString());
 
       const result = await client.query(
@@ -318,7 +313,6 @@ export class DealModel {
 
       const deal = dealCheck.rows[0];
 
-      // Only allow cancellation in certain statuses
       const cancellableStatuses = ['pending', 'negotiating', 'payment_pending'];
       if (!cancellableStatuses.includes(deal.status)) {
         throw new Error(`Cannot cancel deal in status: ${deal.status}`);

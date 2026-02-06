@@ -77,7 +77,6 @@ export class VerificationSchedulerService {
 
       this.logger.info(`Processing ${deals.length} deals for verification`);
 
-      // Batch fetch users to avoid N+1 queries
       const userIds = new Set<number>();
       deals.forEach((deal: any) => {
         userIds.add(deal.advertiser_id);
@@ -89,7 +88,6 @@ export class VerificationSchedulerService {
 
       for (const deal of deals) {
         try {
-          // Check if deal still requires verification (might have been processed by another instance)
           const advertiser = usersMap.get(deal.advertiser_id);
           const channelOwner = usersMap.get(deal.channel_owner_id);
 
@@ -115,7 +113,6 @@ export class VerificationSchedulerService {
               });
             }
           } else {
-            // Log but don't treat as error if it's a duration requirement or verification period issue
             if (
               result.error?.reason === 'DurationRequirementNotMet' ||
               result.error?.reason === 'VerificationPeriodNotComplete'
@@ -137,7 +134,6 @@ export class VerificationSchedulerService {
             error: error.message,
             stack: error.stack,
           });
-          // Continue processing other deals even if one fails
         }
       }
 

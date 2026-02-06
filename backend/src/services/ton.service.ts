@@ -893,24 +893,19 @@ export class TONService {
    */
   static async getTransactions(address: string, limit: number = 10): Promise<any[]> {
     try {
-      // Validate address format first
       if (!this.isValidAddress(address)) {
         console.warn('Invalid address format:', address);
         return [];
       }
 
-      // Try to convert address to raw format if needed (some APIs require raw format)
       let formattedAddress = address;
       try {
-        // Parse address to ensure it's in correct format
         const parsedAddress = Address.parse(address);
         formattedAddress = parsedAddress.toString();
       } catch (e) {
-        // If parsing fails, use original address
         console.warn('Address parsing failed, using original:', address);
       }
 
-      // return mockTx;
       const url = `${this.providerUrl}/getTransactions?address=${encodeURIComponent(formattedAddress)}&limit=${limit}${this.apiKey ? `&api_key=${this.apiKey}` : ''}`;
       console.log('transactions url', url);
 
@@ -928,7 +923,6 @@ export class TONService {
         error?: string;
         code?: number;
       };
-      // Check if API returned an error
       if (data.ok === false || data.error) {
         // Common errors:
         // - "cannot locate transaction" - address is new or has no transactions (not critical)
@@ -948,14 +942,12 @@ export class TONService {
             address: formattedAddress
           });
         }
-        // Return empty array instead of throwing - allows fallback to balance check
         return [];
       }
 
       return data.result || [];
     } catch (error: any) {
       console.error('Failed to get transactions:', error);
-      // Return empty array instead of throwing - allows fallback to balance check
       return [];
     }
   }
@@ -986,12 +978,9 @@ export class TONService {
         return false;
       }
 
-      // If address is provided, check transactions for that address
       if (address && this.isValidAddress(address)) {
         try {
           const transactions = await this.getTransactions(address, 100);
-          
-          // Check if the transaction hash exists in the transaction list
           for (const tx of transactions) {
             const txIdHash = tx.transaction_id?.hash || tx.hash || tx.transaction_id;
             if (txIdHash === txHash) {
@@ -1007,17 +996,16 @@ export class TONService {
         }
       }
 
-      // Fallback: Try to verify via TON API directly
       try {
-        const parsedAddress = address ? Address.parse(address) : null;
-        const formattedAddress = parsedAddress?.toString() || '';
-        
+        // const parsedAddress = address ? Address.parse(address) : null;
+        // const formattedAddress = parsedAddress?.toString() || '';
+
         // Use TON API to check transaction
         // Note: TON API doesn't have direct transaction lookup by hash,
         // so we rely on checking transaction history
         // If we can't verify via address, we'll assume it's valid if it's a properly formatted hash
         // In production, you might want to use a TON explorer API or wait for transaction confirmation
-        
+
         // For now, if we have a non-empty hash that looks valid, we'll trust it
         // This is a simplified verification - in production you might want stricter checks
         if (txHash && txHash.length > 10 && !txHash.startsWith('tx_')) {

@@ -106,7 +106,6 @@ export class TelegramChannelStatsRefreshSchedulerService {
             error: error.message,
             stack: error.stack,
           });
-          // Continue processing other channels even if one fails
         }
       }
 

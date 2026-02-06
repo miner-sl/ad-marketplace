@@ -77,7 +77,6 @@ export class AutoPostSchedulerService {
 
       this.logger.info(`Processing ${pendingPosts.length} pending scheduled posts`);
 
-      // Batch fetch channel owners to avoid N+1 queries
       const channelOwnerIds = Array.from(new Set(pendingPosts.map((d: any) => d.channel_owner_id)));
       const usersMap = await UserModel.findByIds(channelOwnerIds);
 
@@ -116,7 +115,6 @@ export class AutoPostSchedulerService {
             error: error.message,
             stack: error.stack,
           });
-          // Continue processing other deals even if one fails
         }
       }
 

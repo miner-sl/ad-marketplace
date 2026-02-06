@@ -61,7 +61,6 @@ export async function init(options: {
     });
   }
 
-  // Mount all components used in the project.
   backButton.mount.ifAvailable();
   initData.restore();
 

@@ -35,7 +35,6 @@ export function useTonTransfer() {
       // Convert TON to nanotons (1 TON = 1,000,000,000 nanotons)
       const amountNanotons = (amountUSDT).toString()
 
-      // Create transaction
       const transaction = {
         validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes validity
         messages: [

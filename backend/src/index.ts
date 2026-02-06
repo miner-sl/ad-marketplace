@@ -7,7 +7,7 @@ import logger from './utils/logger';
 import env from './utils/env';
 import db from './db/connection';
 import { closeRedis } from './utils/redis';
-import { getWorkerId, isPrimaryWorker } from "./utils/cluster.util";
+import { getWorkerId, isPrimaryWorker } from './utils/cluster.util';
 import { topicsService } from './services/topics.service';
 import { buildApp } from './app';
 import { TelegramNotificationQueueService } from './services/telegram-notification-queue.service';
@@ -66,10 +66,8 @@ async function bootstrap(): Promise<void> {
       error: error.message,
       stack: error.stack,
     });
-    // Don't fail startup if topics fail to load, but log the error
   }
 
-  // Initialize Telegram notification queue service
   try {
     const notificationQueueService = TelegramNotificationQueueService.getInstance();
     notificationQueueService.onModuleInit();
@@ -79,7 +77,6 @@ async function bootstrap(): Promise<void> {
       error: error.message,
       stack: error.stack,
     });
-    // Don't fail startup if queue fails to initialize, but log the error
   }
 
   const app = await buildApp();
@@ -203,12 +200,10 @@ function startCluster(): void {
       `Primary ${String(process.pid)} starting ${String(actualWorkers)} workers...`,
     );
 
-    // Fork workers - each will listen on the same port (OS handles load balancing)
     for (let i = 0; i < actualWorkers; i++) {
       cluster.fork();
     }
 
-    // Handle worker exit with automatic restart
     cluster.on("exit", (worker, code, signal) => {
       const reason = signal !== "" ? signal : String(code);
       logger.warn(
@@ -217,7 +212,6 @@ function startCluster(): void {
       cluster.fork();
     });
 
-    // Handle worker online
     cluster.on("online", (worker) => {
       logger.info(
         `Worker ${String(worker.process.pid)} (id: ${String(worker.id)}) is online`,

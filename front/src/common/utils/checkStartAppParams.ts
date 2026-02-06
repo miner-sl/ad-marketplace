@@ -1,5 +1,3 @@
-// ch - chat/channel
-
 export const parseTGUrlParams = (str: string | null) => {
   const splittedString = str?.split('_')
 

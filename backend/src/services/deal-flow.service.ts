@@ -135,12 +135,6 @@ export class DealFlowService {
       }
 
       const channelAdmins = await TelegramService.getChannelAdmins(channel?.telegram_channel_id);
-      console.log(JSON.stringify(channelAdmins))
-      channelAdmins.forEach(u => {
-        console.log({user: u.user})
-      })
-
-      console.log({channelAdmins: channelAdmins.map((admin) => admin.user.id), telegramUserId});
       const isChannelAdmin = channelAdmins.find((admin) => String(admin.user.id) === String(telegramUserId));
       if (!isChannelAdmin) {
         throw new Error('You are not an admin of this channel');
@@ -167,7 +161,6 @@ export class DealFlowService {
       }
 
       const escrowAddress = await TONService.generateEscrowAddress(dealId);
-      console.log('escrowAddress', escrowAddress);
       const updateResult = await client.query(
         `UPDATE deals 
          SET escrow_address = $1, channel_owner_wallet_address = $2, status = 'payment_pending', updated_at = CURRENT_TIMESTAMP

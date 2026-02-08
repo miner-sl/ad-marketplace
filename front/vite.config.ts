@@ -4,8 +4,13 @@ import svgr from 'vite-plugin-svgr'
 import mkcert from 'vite-plugin-mkcert';
 import { visualizer } from 'rollup-plugin-visualizer';
 import path from 'path'
+// const isProd = process.env.NODE_ENV === 'production';
 
 export default defineConfig({
+  // Base path for static assets (for GitHub Pages deployment)
+  // Set via VITE_BASE_PATH environment variable, defaults to '/'
+  // base: isProd ? '/auction.github.io' : '/',
+  base: '/',
   server: {
     host: '0.0.0.0',
     port: 5173,
@@ -92,5 +97,8 @@ export default defineConfig({
         global: 'globalThis',
       },
     },
+  },
+  define: {
+    'global': 'globalThis',
   },
 })

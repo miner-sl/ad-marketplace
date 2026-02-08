@@ -1,4 +1,4 @@
-import TelegramBot from 'node-telegram-bot-api';
+import TelegramBot, {ChatMember} from 'node-telegram-bot-api';
 import * as dotenv from 'dotenv';
 import { JSDOM } from 'jsdom';
 import { getRandomUserAgent } from '../utils/network/useragent';
@@ -44,6 +44,7 @@ export class TelegramService {
   static async getChannelInfoByUsername(username: string): Promise<{
     id: number;
     title?: string;
+    telegramId?: string;
     username?: string;
     description?: string;
   }> {
@@ -54,6 +55,7 @@ export class TelegramService {
       return {
         id: chat.id as number,
         title: (chat as any).title,
+        telegramId: (chat as any).user?.id,
         username: (chat as any).username,
         description: (chat as any).description,
       };
@@ -108,7 +110,7 @@ export class TelegramService {
   }>> {
     try {
       const admins = await bot.getChatAdministrators(channelId);
-      return admins.map((admin) => ({
+      return admins.map((admin: ChatMember) => ({
         user: admin.user,
         status: admin.status,
         can_post_messages: admin.can_post_messages,

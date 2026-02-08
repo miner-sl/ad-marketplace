@@ -1,4 +1,3 @@
-export * from './chat.types'
 export * from './admin.types'
 export * from './app.types'
 export * from './auth.types'

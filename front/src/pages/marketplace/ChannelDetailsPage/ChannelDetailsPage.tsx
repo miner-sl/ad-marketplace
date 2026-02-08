@@ -20,14 +20,16 @@ import {
   Text,
   useToast,
 } from '@components'
+
 import {useChannelQuery, useSetChannelPricingMutation, useUpdateChannelMutation} from '@store-new'
 import {useClipboard, useTelegramUser} from '@hooks'
 import {useAuth} from '@context'
 import {ROUTES_NAME} from '@routes'
 import type {AdFormat, Channel, ChannelStats} from '@types'
-import styles from './ChannelDetailsPage.module.scss'
 import {checkIsMobile, createMembersCount, getChannelLink, hapticFeedback, separateNumber} from '@utils'
 import {PREDEFINED_TOPICS} from "../../../common/constants/topics";
+
+import styles from './ChannelDetailsPage.module.scss'
 
 interface ChannelHeaderProps {
   channel: Channel
@@ -96,7 +98,6 @@ export const ChannelDetailsPage = () => {
   const updateChannelMutation = useUpdateChannelMutation()
   const {copy} = useClipboard()
 
-  // Check if current user is the channel owner
   const isChannelOwner = user && channel && user.id === channel.owner_id
 
   // Edit mode state

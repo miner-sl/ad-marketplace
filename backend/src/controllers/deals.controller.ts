@@ -1,11 +1,15 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
+import { Address } from '@ton/core';
 import { DealModel } from '../repositories/deal-model.repository';
 import { DealRepository } from '../repositories/deal.repository';
 import { CreativeRepository } from '../repositories/creative.repository';
 import { DealFlowService } from '../services/deal-flow.service';
 import { UserModel } from '../repositories/user.repository';
 import { ChannelModel } from '../repositories/channel-model.repository';
+import { ChannelRepository } from '../repositories/channel.repository';
 import { TelegramNotificationService } from '../services/telegram-notification.service';
+import { generateUserIDHash } from '../utils/verifyTonProof';
+import getRedisClient from '../utils/redis';
 import logger from '../utils/logger';
 
 export class DealsController {
@@ -152,8 +156,43 @@ export class DealsController {
   static async acceptDeal(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
-      const { channel_owner_id } = request.body as any;
-      const deal = await DealFlowService.acceptDeal(parseInt(id), channel_owner_id);
+      const userId = request.user?.telegramId as number;
+
+      console.log(request.user, '\n==================');
+      const deal = await DealFlowService.acceptDeal(parseInt(id), userId);
+      
+      if (deal) {
+        try {
+          const channelInfo = await ChannelRepository.getBasicInfo(deal.channel_id);
+          const channelName = channelInfo?.title || channelInfo?.username || `Channel #${deal.channel_id}`;
+
+          await TelegramNotificationService.notifyPaymentInvoice(
+            deal.id,
+            deal.advertiser_id,
+            {
+              dealId: deal.id,
+              channelId: deal.channel_id,
+              channelName: channelName,
+              priceTon: parseFloat(deal.price_ton.toString()),
+              adFormat: deal.ad_format,
+              escrowAddress: deal.escrow_address,
+            }
+          );
+
+          logger.info(`Payment invoice notification sent for Deal #${deal.id}`, {
+            dealId: deal.id,
+            advertiserId: deal.advertiser_id,
+          });
+        } catch (notifError: any) {
+          // Log but don't fail if notification fails
+          logger.warn('Failed to send payment invoice notification', {
+            error: notifError.message,
+            dealId: deal.id,
+            stack: notifError.stack,
+          });
+        }
+      }
+      
       return deal;
     } catch (error: any) {
       logger.error('Failed to accept deal', {
@@ -328,6 +367,131 @@ export class DealsController {
         dealId: (request.params as { id: string }).id,
       });
       reply.code(500).send({ error: error.message });
+    }
+  }
+
+  static async submitPayment(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const userId = request.user?.id;
+      if (!userId) {
+        return reply.code(401).send({
+          status: "failed",
+          error: "Unauthorized",
+        });
+      }
+
+      const { dealId } = request.params as { dealId: string };
+      const dealIdNum = parseInt(dealId);
+
+      if (!dealIdNum || isNaN(dealIdNum)) {
+        return reply.code(400).send({
+          status: "failed",
+          error: "Valid deal ID is required",
+        });
+      }
+
+      const deal = await DealModel.findById(dealIdNum);
+
+      if (!deal) {
+        return reply.code(404).send({
+          status: "failed",
+          error: "Deal not found",
+        });
+      }
+
+      if (deal.status !== 'payment_pending') {
+        return reply.code(400).send({
+          status: "failed",
+          error: `Deal is not in payment_pending status. Current status: ${deal.status}`,
+        });
+      }
+
+      if (deal.advertiser_id !== userId) {
+        return reply.code(403).send({
+          status: "failed",
+          error: "Only the advertiser can submit payment for this deal",
+        });
+      }
+
+      const redis = getRedisClient();
+      const paymentKey = `deal-payment-pending-${dealIdNum}`;
+      const existingPayment = await redis.get(paymentKey);
+
+      if (existingPayment) {
+        logger.info(`Payment already submitted for Deal #${dealIdNum}`, {
+          dealId: dealIdNum,
+          userId,
+        });
+        return reply.send({
+          status: "success",
+          result: {
+            processed: false,
+            message: "Payment submission already exists",
+          },
+        });
+      }
+
+      const { wallet, boc } = request.body as { wallet?: string; boc?: string };
+
+      if (deal.price_ton > 0) {
+        const userHash = generateUserIDHash(userId);
+        const payload = `deal-${deal.id}-${userHash}`;
+
+        const paymentData = {
+          wallet: wallet || "",
+          wallet_raw: wallet ? Address.parse(wallet).toRawString() : "",
+          boc: boc || "",
+          time: Date.now() / 1000,
+          payload: payload,
+        };
+
+        await redis.set(
+          paymentKey,
+          JSON.stringify(paymentData),
+          'EX',
+          3600 // Expire after 1 hour
+        );
+
+        logger.info(`Payment submitted for Deal #${dealIdNum}`, {
+          dealId: dealIdNum,
+          userId,
+          paymentKey,
+          paymentData: { ...paymentData, wallet_raw: paymentData.wallet_raw.substring(0, 20) + '...' },
+        });
+
+        return reply.send({
+          status: "success",
+          result: {
+            processed: false,
+            message: "Payment submitted and pending verification",
+          },
+        });
+      } else {
+        logger.info(`Free deal payment processed immediately for Deal #${dealIdNum}`, {
+          dealId: dealIdNum,
+          userId,
+        });
+
+        return reply.send({
+          status: "success",
+          result: {
+            processed: true,
+            message: "Payment processed (free deal)",
+          },
+        });
+      }
+    } catch (error: any) {
+      logger.error('Failed to submit payment', {
+        error: error.message,
+        stack: error.stack,
+        userId: request.user?.id,
+        dealId: (request.params as { dealId: string })?.dealId,
+      });
+
+      return reply.code(500).send({
+        status: "failed",
+        error: "Internal server error",
+      });
     }
   }
 }

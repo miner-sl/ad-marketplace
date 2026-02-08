@@ -42,7 +42,7 @@ function App() {
           <TonConnectUIProvider
             manifestUrl={config.tonConnectManifestUrl}
             actionsConfiguration={{
-              twaReturnUrl: `https://t.me/${config.botName}/gate`,
+              twaReturnUrl: `https://t.me/${config.botName}/app`,
             }}
           >
             <ToastProvider>

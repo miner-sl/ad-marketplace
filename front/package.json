@@ -7,6 +7,7 @@
     "dev": "vite",
     "dev:https": "cross-env HTTPS=true vite",
     "build": "tsc -b && vite build",
+    "build:github": "cross-env VITE_BASE_PATH=/auction.github.io tsc -b && vite build",
     "build:analyze": "cross-env ANALYZE=true tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -14,9 +15,12 @@
   "dependencies": {
     "@tanstack/react-query": "^5.90.20",
     "@tma.js/sdk-react": "^3.0.8",
+    "@ton/core": "^0.63.0",
     "@tonconnect/ui-react": "^2.1.0",
+    "buffer": "^6.0.3",
     "classnames": "^2.5.1",
     "eruda": "^3.4.3",
+    "js-confetti": "^0.13.1",
     "lottie-react": "^2.4.1",
     "lottie-web": "^5.13.0",
     "react": "^19.2.0",

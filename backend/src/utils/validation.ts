@@ -127,6 +127,17 @@ export const declineDealSchema = z.object({
   reason: z.string().optional(),
 });
 
+export const submitPaymentSchema = z.preprocess(
+  (data: any) => {
+    return data;
+  },
+  z.object({
+    // description: z.string().min(1).max(512),
+    wallet: z.string().optional(),
+    boc: z.string().optional(),
+  }),
+);
+
 export const validateChannelSchema = z.object({
   channelName: z.string().min(1),
 });

@@ -1,4 +1,4 @@
-import {Address, beginCell, fromNano, internal, toNano} from '@ton/core';
+import {Address, beginCell, Cell, fromNano, internal, storeMessage, toNano} from '@ton/core';
 import {mnemonicNew, mnemonicToWalletKey} from '@ton/crypto';
 import {TonClient, WalletContractV4} from '@ton/ton';
 import * as dotenv from 'dotenv';
@@ -6,9 +6,58 @@ import {mockTx} from "./mock-tx.service";
 import logger from '../utils/logger';
 import db from '../db/connection';
 import crypto from 'crypto';
+import {tonClient} from "../utils/ton";
 
 dotenv.config();
 
+
+export const verifyTransaction = async (
+  bocBase64: string,
+  wallet_address: string,
+) => {
+  const cell = Cell.fromBase64(bocBase64);
+  const address = Address.parse(wallet_address);
+  const messageHash = cell.hash().toString("hex");
+
+  const transactions = await tonClient.getTransactions(address, {
+    limit: 10,
+    archival: true,
+  });
+
+  const txs = transactions.map((tx) => {
+    const hashes = [];
+    hashes.push(tx.hash().toString("hex"));
+
+    if (tx.inMessage) {
+      const cell = beginCell().store(storeMessage(tx.inMessage)).endCell();
+      hashes.push(cell.hash().toString("hex"));
+      hashes.push(tx.inMessage.body.hash().toString("hex"));
+    }
+
+    for (const msg of tx.outMessages.values()) {
+      const cell = beginCell().store(storeMessage(msg)).endCell();
+      hashes.push(cell.hash().toString("hex"));
+      hashes.push(msg.body.hash().toString("hex"));
+    }
+
+    return {
+      tx,
+      hashes,
+    };
+  });
+
+  const tx = txs.find((i) => i.hashes.includes(messageHash));
+
+  if (tx) {
+    if (tx.tx.description.type === "generic") {
+      if (tx.tx.description.computePhase.type === "vm") {
+        return tx.tx.description.computePhase.success ?? false;
+      }
+    }
+  }
+
+  return false;
+};
 /**
  * Retry utility function
  */
@@ -112,19 +161,7 @@ export class TONService {
    * Get TON client for network operations
    */
   private static getTonClient(): TonClient {
-    const isMainnet = process.env.TON_NETWORK === 'mainnet';
-
-    // Use proper RPC endpoints
-    const endpoint = isMainnet
-      ? process.env.TON_RPC_URL || 'https://toncenter.com/api/v2/jsonRPC'
-      : process.env.TON_RPC_URL || 'https://testnet.toncenter.com/api/v2/jsonRPC';
-
-    logger.info(`Connecting to TON ${isMainnet ? 'mainnet' : 'testnet'}`, { endpoint });
-
-    return new TonClient({
-      endpoint,
-      apiKey: this.apiKey,
-    });
+    return tonClient
   }
 
   /**
@@ -219,8 +256,10 @@ export class TONService {
         return existing.rows[0].address;
       }
 
+      console.log('generateEscrowWallet')
       const wallet = await this.generateEscrowWallet();
 
+      console.log('escrowAddress', wallet.address);
       const encryptedMnemonic = this.encryptSecretKey(Buffer.from(wallet.mnemonic, 'utf8'));
       const encryptedSecretKey = this.encryptSecretKey(wallet.secretKey);
 
@@ -236,6 +275,10 @@ export class TONService {
         [dealId, wallet.address, encryptedMnemonic, encryptedSecretKey, wallet.publicKey]
       );
 
+      console.log(`Generated escrow wallet for Deal #${dealId}`, {
+        dealId,
+        address: wallet.address,
+      })
       logger.info(`Generated escrow wallet for Deal #${dealId}`, {
         dealId,
         address: wallet.address,
@@ -574,9 +617,9 @@ export class TONService {
         };
       }
 
-      // Fallback: check balance (less reliable as balance might be from older transactions)
+
       const balance = await this.getBalance(address);
-      console.log('Checking balance:', { address, balance, expectedAmount });
+
       const balanceNano = BigInt(balance);
       const expectedNano = toNano(expectedAmount);
 

@@ -5,6 +5,7 @@ import { useAuth } from '@context';
 import { ROUTES_NAME } from '@routes';
 
 import styles from './AppHeader.module.scss';
+import {TonConnectButton} from "@tonconnect/ui-react";
 
 export function AppHeader() {
   const { user } = useAuth()
@@ -43,6 +44,7 @@ export function AppHeader() {
           </Text>
         </span>
       </BlockNew>
+      <TonConnectButton />
     </header>
   )
 }

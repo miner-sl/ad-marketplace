@@ -607,7 +607,7 @@ export class BotController {
     try {
       switch (action) {
         case 'accept':
-          await DealFlowService.acceptDeal(dealId, user.id, ctx.from!.id);
+          // await DealFlowService.acceptDeal(dealId, user.id, ctx.from!.id);
 
           const acceptedDeal = await DealModel.findById(dealId);
           if (!acceptedDeal || !acceptedDeal.escrow_address) {
@@ -1113,7 +1113,7 @@ export class BotController {
     }
 
     try {
-      await DealFlowService.acceptDeal(dealId, user.id, ctx.from!.id);
+      // await DealFlowService.acceptDeal(dealId, user.id, ctx.from!.id);
 
       const deal = await DealModel.findById(dealId);
       if (!deal || !deal.escrow_address) {

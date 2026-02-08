@@ -7,6 +7,7 @@ import dealsRouter from './routes/deals.route';
 import campaignsRouter from './routes/campaigns.route';
 import userRouter from './routes/user.route';
 import authRouter from './routes/auth.route';
+import transactionsRouter from './routes/transactions.route';
 import bot from './bot';
 import logger from './utils/logger';
 import env from './utils/env';
@@ -129,6 +130,7 @@ export async function buildApp() {
     await fastify.register(dealsRouter, { prefix: '/deals' });
     await fastify.register(campaignsRouter, { prefix: '/campaigns' });
     await fastify.register(userRouter, { prefix: '/user' });
+    await fastify.register(transactionsRouter, { prefix: '/transactions' });
   }, { prefix: '/api' });
 
   app.post('/webhook', async (request, reply) => {

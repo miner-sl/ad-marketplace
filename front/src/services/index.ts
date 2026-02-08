@@ -20,11 +20,9 @@ import type {
   TelegramWidgetUser,
   UpdateChannelRequest,
 } from '@types'
-import { isProd, getToken } from '@utils'
+import { getToken } from '@utils'
+import { API_BASE_URL } from './url.ts';
 
-const API_BASE_URL = isProd
-  ? 'https://api.example.com'
-  : 'http://localhost:3000/api'
 
 interface ApiResponse<T> {
   data: T | null
@@ -32,7 +30,7 @@ interface ApiResponse<T> {
   error?: string
 }
 
-async function apiRequest<T>(
+export async function apiRequest<T>(
   endpoint: string,
   options?: RequestInit & { skipAuthCheck?: boolean }
 ): Promise<ApiResponse<T>> {

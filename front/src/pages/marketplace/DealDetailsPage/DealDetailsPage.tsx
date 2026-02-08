@@ -1,6 +1,6 @@
 import {useParams} from 'react-router-dom'
-import {useState} from 'react'
-import {openTelegramLink} from '@tma.js/sdk-react'
+import {useRef, useState} from 'react'
+import {hapticFeedback, openTelegramLink} from '@tma.js/sdk-react'
 import {
   Block,
   BlockNew,
@@ -28,15 +28,32 @@ import {
   useUpdateDealMessageMutation,
 } from '@store-new'
 import styles from './DealDetailsPage.module.scss'
-import {useClipboard, useTonTransfer} from "@hooks"
+import {transferTonCall, useClipboard} from "@hooks"
 import config from '@config'
 import {useAuth} from "@context";
+import {initializeTonConnect, parseTONAddress, tonConnectUI} from "../../../common/utils/lazy.ts";
+import {
+  type SendTransactionResponse,
+  type TonProofItemReply,
+  useTonConnectUI,
+  useTonWallet
+} from "@tonconnect/ui-react";
+import {requestAPI} from "../../../common/utils/api.ts";
+import {playConfetti, popupManager} from "@utils";
+import {apiRequest} from "@services";
 
 interface DealHeaderProps {
   deal: EnhancedDeal
 }
 
-const DealHeader = ({ deal }: DealHeaderProps) => {
+type WalletFormStore = {
+  wallet?: string;
+  wallet_initState?: string;
+  ton_proof?: TonProofItemReply;
+};
+
+
+const DealHeader = ({deal}: DealHeaderProps) => {
   if (!deal) {
     return null
   }
@@ -55,7 +72,7 @@ const DealHeader = ({ deal }: DealHeaderProps) => {
         <Text type="title" align="center" weight="bold">
           Deal #{deal.id}
         </Text>
-        <DealStatusBadge status={deal.status} />
+        <DealStatusBadge status={deal.status}/>
       </BlockNew>
       {deal.formattedMembersCount && (
         <BlockNew margin="top" marginValue={8}>
@@ -81,7 +98,7 @@ export const DealDetailsPage = () => {
   // const { user } = useUser()
   const dealId = id ? parseInt(id) : 0
   const {user} = useAuth();
-
+  const [formWallet, setFormWallet] = useState<WalletFormStore>({});
   const {data: deal, isLoading} = useDealQuery(dealId, user?.telegramId);
   // const { data: creative } = useDealCreativeQuery(dealId)
   const acceptDealMutation = useAcceptDealMutation()
@@ -95,26 +112,16 @@ export const DealDetailsPage = () => {
   // const submitCreativeMutation = useSubmitCreativeMutation()
   const {copy} = useClipboard()
   const {showToast} = useToast()
-  const {transferTon, isConnected} = useTonTransfer()
+  // const {transferTon, isConnected} = useTonTransfer()
   const [showDeclineModal, setShowDeclineModal] = useState(false)
-  if (isLoading || !deal) {
-    return (
-      <Page back>
-        <PageLayout>
-          <TelegramBackButton/>
-          <Spinner size={32} />
-        </PageLayout>
-      </Page>
-    )
-  }
 
-  const isChannelOwner = deal.channel_owner_id === user?.id
-  const isAdvertiser = deal.advertiser_id === user?.id
+  const isChannelOwner = deal && deal?.channel_owner_id === user?.id
+  const isAdvertiser = deal?.advertiser_id === user?.id
   const canInteract = isChannelOwner || isAdvertiser
-  const canEditMessage = isAdvertiser && deal.status === 'negotiating'
+  const canEditMessage = isAdvertiser && deal?.status === 'negotiating'
 
   const handleAdvertiserClick = () => {
-    const advertiser = typeof deal.advertiser === 'object' && deal.advertiser !== null ? deal.advertiser : null
+    const advertiser = deal && typeof deal.advertiser === 'object' && deal.advertiser !== null ? deal.advertiser : null
     if (advertiser) {
       if (advertiser.username) {
         openTelegramLink(`https://t.me/${advertiser.username.replace('@', '')}`)
@@ -127,11 +134,254 @@ export const DealDetailsPage = () => {
 
 
   const handleEscrowAddressClick = () => {
-    if (deal.escrow_address) {
+    if (deal?.escrow_address) {
       const url = getTONScanUrl(deal.escrow_address);
       window.open(url, '_blank');
     }
   }
+
+  const tonConnectRef = useRef<boolean>(false);
+
+  const onClickButton = async () => {
+    // if (processing()) return;
+    // await playConfetti({
+    //   emojis: ["🎉"],
+    // });
+    //
+    hapticFeedback.impactOccurred("soft");
+
+    const popup = await popupManager.openPopup({
+      title: 'Payment',
+      message: 'Do you want to pay deal for USDT?',
+      buttons: [
+        {
+          id: "ok",
+          type: 'destructive',
+          text: "Pay",
+        },
+        {
+          id: "cancel",
+          type: "cancel",
+        },
+      ],
+    });
+
+    if (!popup.button_id || popup.button_id === "cancel") return;
+
+    // setProcessing(true);
+
+
+    let boc: string | undefined;
+
+    // const fee = modals.participate.contest?.fee;
+    const fee = true;
+    if (fee) {
+      const result = await handlePayment();
+
+      console.log({result})
+      if (result) {
+        boc = result.boc;
+      } else {
+        // setProcessing(false);
+        return;
+      }
+    }
+
+    const request = await requestAPI(
+      `/deal/${dealId}/pay`,
+      {
+        boc: boc,
+        wallet: formWallet.wallet,
+      },
+      "POST",
+      120_000,
+    );
+
+    if (request) {
+      const {status} = request;
+
+      if (status === "success") {
+        hapticFeedback.impactOccurred('medium');
+        await playConfetti({
+          emojis: ["🎉"],
+        });
+
+        // batch(() => {
+        //   setState("done");
+        //   toggleSignal("fetchContest");
+        // });
+
+        return;
+      }
+    }
+
+    showToast({
+      type: 'warning',
+      message: 'Failed to pay deal. Please try again.',
+    });
+    // setProcessing(false);
+  };
+
+
+  const handlePayment = async () => {
+    // return true;
+    if (!deal || !deal.escrow_address) {
+      return false;
+    }
+    // debugger;
+    if (!tonConnectUI) {
+      tonConnectRef.current = await initializeTonConnect();
+      return handlePayment();
+    }
+
+    if (tonConnectUI?.connected) {
+      await tonConnectUI?.disconnect();
+    }
+
+    tonConnectUI?.setConnectRequestParameters({
+      state: "loading",
+    });
+
+    const request = await requestAPI(
+      "/transactions/payload/create",
+      undefined,
+      "GET",
+    );
+
+    if (!request) return;
+
+    const {
+      result: {payload},
+    } = request;
+
+    tonConnectUI?.setConnectRequestParameters({
+      state: "ready",
+      value: {
+        tonProof: payload,
+      },
+    });
+
+    await tonConnectUI?.openModal();
+
+    return new Promise<false | SendTransactionResponse>((resolve) => {
+      const disposeOnStatusChange = tonConnectUI?.onStatusChange(
+        async (wallet) => {
+          disposeOnModalStateChange?.();
+          disposeOnStatusChange?.();
+
+          setFormWallet((store: WalletFormStore): WalletFormStore => {
+            if (wallet) {
+              store.wallet = wallet?.account.address;
+              store.wallet_initState = wallet.account.walletStateInit;
+            }
+
+            if (wallet?.connectItems?.tonProof) {
+              store.ton_proof = wallet?.connectItems?.tonProof;
+            }
+            return store;
+          });
+
+          const request = await requestAPI(
+            `/transactions/deal/${deal?.id}/create`,
+            {
+              // description: form.description,
+              wallet: formWallet.wallet,
+              wallet_initState: formWallet.wallet_initState,
+              ton_proof: formWallet.ton_proof
+                ? JSON.stringify(formWallet.ton_proof)
+                : undefined,
+            },
+            'POST'
+          );
+
+          // const request = await requestAPI(
+          //   `/contest/${modals.participate.contest?.slug}/transaction/create`,
+          //   {
+          //     description: form.description,
+          //     wallet: formWallet.wallet,
+          //     wallet_initState: formWallet.wallet_initState,
+          //     ton_proof: formWallet.ton_proof
+          //       ? JSON.stringify(formWallet.ton_proof)
+          //       : undefined,
+          //   },
+          //   "POST",
+          // );
+
+          if (request && deal.escrow_address) {
+            const {
+              result: {
+                payload: {
+                  // master: payload_master,
+                  target: payload_target,
+                },
+              },
+            } = request.data;
+
+
+            if (tonConnectUI) {
+              transferTonCall(
+                tonConnectUI,
+                deal.escrow_address,
+                deal.price_ton,
+                payload_target,
+                // formWallet.wallet,
+                // modals.participate.contest?.fee ?? 0,
+                // modals.participate.contest?.fee_wallet ?? ""
+              )
+                // tonConnectUI
+                // ?.sendTransaction({
+                //   validUntil: Math.floor(Date.now() / 1000) + 300,
+                //   messages: [
+                //     // {
+                //     //   address:
+                //     //     parseTONAddress(
+                //     //       modals.participate.contest?.fee_wallet ?? "",
+                //     //     ) ?? "",
+                //     //   amount: (
+                //     //     (1 - (0.01)) *
+                //     //     0.01 *
+                //     //     1e9
+                //     //   ).toString(),
+                //     //   payload: payload_target,
+                //     // },
+                //     {
+                //       address: deal?.escrow_address ?? "",
+                //       amount: (
+                //         0.01 *
+                //         0.01 * 1e9
+                //       ).toString(),
+                //       payload: payload_master,
+                //     },
+                //   ],
+                // })
+                .then(resolve)
+                .catch((e) => {
+                  console.error(e);
+                  resolve(false);
+                });
+            }
+          } else {
+            showToast({
+              type: 'warning',
+              // icon: F/aSolidCircleExclamation,
+              message: 'failed to send transaction',
+              // text: t("errors.fetch"),
+            });
+          }
+        },
+      );
+
+      const disposeOnModalStateChange = tonConnectUI?.onModalStateChange(
+        (state) => {
+          if (state.status === "closed") {
+            resolve(false);
+          }
+
+          disposeOnModalStateChange?.();
+        },
+      );
+    });
+  };
 
   const handleAcceptDeal = async () => {
     if (!user) return
@@ -155,8 +405,8 @@ export const DealDetailsPage = () => {
         return
       }
       setShowDeclineModal(false)
-      await declineDealMutation.mutateAsync({ id: dealId, reason });
-      showToast({message: 'Deal declined successfully', type: 'success' });
+      await declineDealMutation.mutateAsync({id: dealId, reason});
+      showToast({message: 'Deal declined successfully', type: 'success'});
 
     } catch (error) {
       showToast({
@@ -190,6 +440,9 @@ export const DealDetailsPage = () => {
   // }
 
   const handleRequestChanges = async () => {
+    if (!deal) {
+      return;
+    }
     const notes = prompt('Please provide your requested changes:')
     if (!notes || !notes.trim()) {
       return
@@ -212,38 +465,41 @@ export const DealDetailsPage = () => {
       })
     }
   }
-
-  const handlePayDeal = async () => {
-    if (!deal.escrow_address) {
-      showToast({ type: 'error', message: 'Escrow address not available' })
-      return
-    }
-
-    if (!isConnected) {
-      showToast({
-        type: 'error',
-        message: 'Please connect your USDT wallet first'
-      })
-      return
-    }
-
-    try {
-      await transferTon(
-        deal.escrow_address,
-        deal.price_ton,
-        `Payment for Deal #${deal.id}`
-      )
-      showToast({
-        type: 'success',
-        message: 'Transaction sent successfully. Waiting for confirmation...',
-      })
-    } catch (error) {
-      // Error handling is done in the hook
-      console.error('Payment failed:', error)
-    }
-  }
+  //
+  // const handlePayDeal = async () => {
+  //   if (!deal || !deal.escrow_address) {
+  //     showToast({type: 'error', message: 'Escrow address not available'})
+  //     return
+  //   }
+  //
+  //   if (!isConnected) {
+  //     showToast({
+  //       type: 'error',
+  //       message: 'Please connect your USDT wallet first'
+  //     })
+  //     return
+  //   }
+  //
+  //   try {
+  //     await transferTon(
+  //       deal.escrow_address,
+  //       deal.price_ton,
+  //       `Payment for Deal #${deal.id}`
+  //     )
+  //     showToast({
+  //       type: 'success',
+  //       message: 'Transaction sent successfully. Waiting for confirmation...',
+  //     })
+  //   } catch (error) {
+  //     // Error handling is done in the hook
+  //     console.error('Payment failed:', error)
+  //   }
+  // }
 
   const handleEditMessage = async () => {
+    if (!deal) {
+      return;
+    }
     const currentMessage = deal.messages && deal.messages.length > 0
       ? deal.messages[0].message_text
       : ''
@@ -279,19 +535,31 @@ export const DealDetailsPage = () => {
     }
   }
 
-  const isAdvertiserUser = typeof deal.advertiser === 'object' && deal.advertiser !== null
-    ? deal.advertiser.telegram_id === user?.id
+  const isAdvertiserUser = deal && typeof deal.advertiser === 'object' && deal.advertiser !== null
+    ? String(deal.advertiser.telegram_id) === String(user?.telegram_id)
     : false
-  const showPaymentButton = isAdvertiserUser && deal.status === 'payment_pending' && deal.escrow_address !== undefined;
+  const showPaymentButton = deal && isAdvertiserUser && deal.status === 'payment_pending' && deal.escrow_address !== undefined;
 
-  const channelStats = deal.channel?.stats
+  const wallet = useTonWallet();
+  const channelStats = deal?.channel?.stats
+  if (isLoading || !deal) {
+    return (
+      <Page back>
+        <PageLayout>
+          <TelegramBackButton/>
+          <Spinner size={32}/>
+        </PageLayout>
+      </Page>
+    )
+  }
+
 
   return (
     <Page back>
       <PageLayout>
         <TelegramBackButton/>
 
-        <DealHeader deal={deal} />
+        <DealHeader deal={deal}/>
 
         {channelStats && (
           <Block margin="bottom" marginValue={24}>
@@ -421,7 +689,7 @@ export const DealDetailsPage = () => {
                     <Text type="text" weight="medium">
                       Channel:
                     </Text>
-                    <ChannelLink channel={deal.channel} showLabel={false} textType="text" />
+                    <ChannelLink channel={deal.channel} showLabel={false} textType="text"/>
                   </BlockNew>
                 }
               />
@@ -567,7 +835,7 @@ export const DealDetailsPage = () => {
                         </Text>
                       }
                       before={
-                        <Icon name="checkmark" size={28} color="accent" />
+                        <Icon name="checkmark" size={28} color="accent"/>
                       }
                       onClick={handleAcceptDeal}
                       disabled={acceptDealMutation.isPending}
@@ -580,7 +848,7 @@ export const DealDetailsPage = () => {
                         </Text>
                       }
                       before={
-                        <Icon name="cross" size={28} color="danger" />
+                        <Icon name="cross" size={28} color="danger"/>
                       }
                       onClick={handleDeclineDeal}
                       disabled={declineDealMutation.isPending}
@@ -593,7 +861,7 @@ export const DealDetailsPage = () => {
                         </Text>
                       }
                       before={
-                        <Icon name="share" size={28} color="accent" />
+                        <Icon name="share" size={28} color="accent"/>
                       }
                       onClick={handleRequestChanges}
                     />
@@ -604,19 +872,26 @@ export const DealDetailsPage = () => {
           </BlockNew>
         ) : null}
 
-        <Block margin="top" marginValue="auto">
-          <Text type="caption" align="center" color="tertiary">
-            Deal #{deal.id} • Status: {deal.status}
-          </Text>
-        </Block>
       </PageLayout>
 
       {showPaymentButton && (
-        <TelegramMainButton
-          text={`Pay ${deal.price_ton} USDT`}
-          onClick={handlePayDeal}
-          isVisible={true}
-        />
+        <>
+          {wallet?.account ? (
+
+          <TelegramMainButton
+            text={`Pay ${deal.price_ton} USDT`}
+            onClick={onClickButton}
+            isVisible={true}
+          />
+          ) : (
+            <TelegramMainButton
+              text={`Connect Wallet`}
+              onClick={onClickButton}
+              isVisible={true}
+            />
+          )}
+
+        </>
       )}
 
       <DeclineDealModal

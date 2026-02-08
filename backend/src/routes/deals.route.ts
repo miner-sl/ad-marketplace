@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { validateBody, validateQuery } from '../middleware/validation';
 import { authMiddleware } from '../middleware/auth';
-import { createDealSchema, confirmPaymentSchema, submitCreativeSchema, listDealsQuerySchema, dealRequestsQuerySchema, declineDealSchema } from '../utils/validation';
+import { createDealSchema, confirmPaymentSchema, submitCreativeSchema, listDealsQuerySchema, dealRequestsQuerySchema, declineDealSchema, submitPaymentSchema } from '../utils/validation';
 import { DealsController } from '../controllers/deals.controller';
 
 const dealsRouter: FastifyPluginAsync = async (fastify) => {
@@ -48,6 +48,10 @@ const dealsRouter: FastifyPluginAsync = async (fastify) => {
   fastify.post('/:id/decline', {
     preHandler: [authMiddleware, validateBody(declineDealSchema)],
   }, DealsController.declineDeal);
+
+  fastify.post('/:dealId/pay', {
+    preHandler: [authMiddleware, validateBody(submitPaymentSchema)],
+  }, DealsController.submitPayment);
 };
 
 export default dealsRouter;

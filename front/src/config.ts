@@ -42,8 +42,9 @@ const devConfigBase: BaseConfig = {
   apiHost: 'http://192.168.64.1:3000',
   // apiHost: 'http://localhost:3000',
   botName: 'NonNano_Bot',
-  appName: 'Open',
+  appName: 'app',
   tonConnectManifestUrl: 'https://cdn.joincommunity.xyz/gateway/manifest.json',
+  // tonConnectManifestUrl: '/manifest.json',
   accessToken: import.meta.env.VITE_ACCESS_TOKEN,
 }
 

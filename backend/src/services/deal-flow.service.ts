@@ -11,6 +11,7 @@ import { DealRepository } from '../repositories/deal.repository';
 import { ChannelRepository } from '../repositories/channel.repository';
 import logger from '../utils/logger';
 import { distributedLock } from '../utils/lock';
+import {TelegramService} from "./telegram.service";
 
 export class DealFlowService {
   /**
@@ -59,7 +60,7 @@ export class DealFlowService {
         `INSERT INTO deals (
           deal_type, listing_id, campaign_id, channel_id, channel_owner_id,
           advertiser_id, ad_format, price_ton, scheduled_post_time
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *`,
         [
           data.deal_type,
@@ -113,27 +114,43 @@ export class DealFlowService {
    * Accept deal (channel owner accepts advertiser request)
    * Uses transaction to ensure atomicity
    */
-  static async acceptDeal(dealId: number, channelOwnerId: number, telegramUserId?: number): Promise<any> {
+  static async acceptDeal(dealId: number, telegramUserId: number): Promise<any> {
     return await withTx(async (client) => {
-      const user = await UserModel.findByTelegramId(channelOwnerId);
-      if (!user) {
-        throw new Error('User not found');
+      const channelOwner = await UserModel.findByTelegramId(telegramUserId)
+      if (!channelOwner) {
+        throw new Error('User not have access to this deal');
       }
       const dealResult = await client.query(
         `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
         [dealId]
       );
-
       const deal = dealResult.rows[0];
-      if (!deal || deal.channel_owner_id !== user.id) {
+      if (!deal || deal.channel_owner_id !== channelOwner.id) {
         throw new Error('Deal not found or unauthorized');
+      }
+
+      const channel = await ChannelRepository.findById(deal.channel_id);
+      if (!channel || !channel.telegram_channel_id) {
+        throw new Error('Channel not found');
+      }
+
+      const channelAdmins = await TelegramService.getChannelAdmins(channel?.telegram_channel_id);
+      console.log(JSON.stringify(channelAdmins))
+      channelAdmins.forEach(u => {
+        console.log({user: u.user})
+      })
+
+      console.log({channelAdmins: channelAdmins.map((admin) => admin.user.id), telegramUserId});
+      const isChannelAdmin = channelAdmins.find((admin) => String(admin.user.id) === String(telegramUserId));
+      if (!isChannelAdmin) {
+        throw new Error('You are not an admin of this channel');
       }
 
       if (telegramUserId) {
         const isAdmin = await ChannelModel.verifyAdminStatus(
           deal.channel_id,
-          user.id,
-          telegramUserId
+          channelOwner.id,
+          channelOwner.telegram_id
         );
         if (!isAdmin) {
           throw new Error('You are no longer an admin of this channel');
@@ -144,12 +161,13 @@ export class DealFlowService {
         throw new Error(`Cannot accept deal in status: ${deal.status}`);
       }
 
-      const ownerWalletAddress = user.wallet_address;
+      const ownerWalletAddress = channelOwner.wallet_address;
       if (!ownerWalletAddress) {
         throw new Error('Channel owner wallet address not set. Please set your wallet address first.');
       }
 
       const escrowAddress = await TONService.generateEscrowAddress(dealId);
+      console.log('escrowAddress', escrowAddress);
       const updateResult = await client.query(
         `UPDATE deals 
          SET escrow_address = $1, channel_owner_wallet_address = $2, status = 'payment_pending', updated_at = CURRENT_TIMESTAMP

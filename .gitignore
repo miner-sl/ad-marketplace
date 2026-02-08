@@ -10,3 +10,4 @@ backend/.env
 *~
 .vscode/
 .idea/
+front/src/components/TextEditor

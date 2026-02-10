@@ -12,6 +12,7 @@ import { ChannelRepository } from '../repositories/channel.repository';
 import { DealRepository } from '../repositories/deal.repository';
 import { CreativeRepository } from '../repositories/creative.repository';
 import logger from '../utils/logger';
+import { buildBotAdminLink } from '../utils/telegram';
 import {CampaignRepository} from "../repositories/campaign.repository";
 
 export class BotController {
@@ -800,7 +801,6 @@ export class BotController {
     try {
       await ctx.answerCbQuery('Checking admin status...');
 
-      // Validate channel admin status
       const isAdmin = await ChannelService.validateChannelAdmin(channelName);
 
       if (isAdmin) {
@@ -812,9 +812,8 @@ export class BotController {
         );
       } else {
         const botInfo = await TelegramService.bot.getMe();
-        const botUsername = botInfo.username;
-        const channelParam = channelName.startsWith('@') ? channelName.replace('@', '') : channelName;
-        const addBotLink = `https://t.me/${botUsername}?startchannel=${channelParam}&admin=post_stories+post_messages`;
+        const botUsername = botInfo.username || '';
+        const addBotLink = buildBotAdminLink(botUsername, channelName);
 
         await ctx.reply(
           `❌ Bot Admin Status: Not Admin\n\n` +

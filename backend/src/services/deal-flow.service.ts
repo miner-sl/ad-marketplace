@@ -1,3 +1,5 @@
+import {PoolClient} from 'pg';
+
 import { DealModel } from '../repositories/deal-model.repository';
 import { ChannelModel } from '../repositories/channel-model.repository';
 import { UserModel } from '../repositories/user.repository';
@@ -5,13 +7,17 @@ import { TONService } from './ton.service';
 import { CreativeService } from './creative.service';
 import { PostService } from './post.service';
 import { TelegramNotificationQueueService } from './telegram-notification-queue.service';
-import { withTx } from '../utils/transaction';
-import db from '../db/connection';
 import { DealRepository } from '../repositories/deal.repository';
 import { ChannelRepository } from '../repositories/channel.repository';
+import {TelegramService} from './telegram.service';
+import {TelegramNotificationService} from './telegram-notification.service';
+
+import { withTx } from '../utils/transaction';
+import db from '../db/connection';
 import logger from '../utils/logger';
 import { distributedLock } from '../utils/lock';
-import {TelegramService} from "./telegram.service";
+import {Deal} from '../models/deal.types';
+import env from '../utils/env';
 
 export class DealFlowService {
   /**
@@ -114,7 +120,7 @@ export class DealFlowService {
    * Accept deal (channel owner accepts advertiser request)
    * Uses transaction to ensure atomicity
    */
-  static async acceptDeal(dealId: number, telegramUserId: number): Promise<any> {
+  static async acceptDeal(dealId: number, telegramUserId: number): Promise<Deal> {
     return await withTx(async (client) => {
       const channelOwner = await UserModel.findByTelegramId(telegramUserId)
       if (!channelOwner) {
@@ -160,23 +166,51 @@ export class DealFlowService {
         throw new Error('Channel owner wallet address not set. Please set your wallet address first.');
       }
 
-      const escrowAddress = await TONService.generateEscrowAddress(dealId);
-      const updateResult = await client.query(
-        `UPDATE deals 
-         SET escrow_address = $1, channel_owner_wallet_address = $2, status = 'payment_pending', updated_at = CURRENT_TIMESTAMP
-         WHERE id = $3 AND status IN ('pending', 'negotiating')
-         RETURNING *`,
-        [escrowAddress, ownerWalletAddress, dealId]
-      );
-
-      if (updateResult.rows.length === 0) {
-        throw new Error('Deal status changed during processing');
-      }
-
-      const updated = updateResult.rows[0];
-
-      return updated;
+      const updatedDeal: Deal = await DealModel.updateStatus(dealId, 'payment_pending');
+      return updatedDeal;
     });
+  }
+
+  static async generateEscrowAddress(deal: Deal): Promise<any> {
+    const dealId = deal.id;
+    if (deal.escrow_address !== null) {
+      return deal;
+    }
+
+    const ownerWalletAddress = deal.channel_owner_wallet_address;
+    if (!ownerWalletAddress) {
+      throw new Error('Channel owner wallet address not set. Please set your wallet address first.');
+    }
+    const channel = await ChannelRepository.findById(deal.channel_id);
+    if (!channel || !channel.telegram_channel_id) {
+      throw new Error('Channel not found');
+    }
+
+    const channelAdmins = await TelegramService.getChannelAdmins(channel?.telegram_channel_id);
+    const isChannelAdmin = channelAdmins.find((admin) => String(admin.user.username) === env.TELEGRAM_BOT_USERNAME);
+    if (!isChannelAdmin) {
+      await TelegramNotificationService.notifyAboutAddBotAsAdmin(deal, channel, channel.owner_id);
+      throw new Error('You are not an admin of this channel');
+    }
+
+    const escrowAddress = await TONService.generateEscrowAddress(dealId);
+    const updateDeal = await DealModel.updateEscrowAddress(escrowAddress, ownerWalletAddress, dealId);
+
+    if (deal.status === 'payment_pending') {
+      await TelegramNotificationService.notifyPaymentInvoice(
+        dealId,
+        deal.advertiser_id,
+        {
+          dealId: deal.id,
+          channelId: deal.channel_id,
+          channelName: channel.title,
+          priceTon: parseFloat(deal.price_ton.toString()),
+          adFormat: deal.ad_format,
+          escrowAddress: deal.escrow_address,
+        },
+      );
+    }
+    return updateDeal;
   }
 
   /**

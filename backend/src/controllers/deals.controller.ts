@@ -160,8 +160,8 @@ export class DealsController {
 
       console.log(request.user, '\n==================');
       const deal = await DealFlowService.acceptDeal(parseInt(id), userId);
-      
-      if (deal) {
+
+      if (deal && deal.escrow_address !== null && deal.status === 'payment_pending') {
         try {
           const channelInfo = await ChannelRepository.getBasicInfo(deal.channel_id);
           const channelName = channelInfo?.title || channelInfo?.username || `Channel #${deal.channel_id}`;
@@ -184,7 +184,6 @@ export class DealsController {
             advertiserId: deal.advertiser_id,
           });
         } catch (notifError: any) {
-          // Log but don't fail if notification fails
           logger.warn('Failed to send payment invoice notification', {
             error: notifError.message,
             dealId: deal.id,
@@ -192,7 +191,7 @@ export class DealsController {
           });
         }
       }
-      
+
       return deal;
     } catch (error: any) {
       logger.error('Failed to accept deal', {

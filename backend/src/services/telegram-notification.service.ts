@@ -1,5 +1,8 @@
 import { UserModel } from '../repositories/user.repository';
 import { TelegramNotificationQueueService } from './telegram-notification-queue.service';
+import { TelegramService } from './telegram.service';
+import { buildBotAdminLink } from '../utils/telegram';
+import env from '../utils/env';
 import logger from '../utils/logger';
 
 export interface NotificationData {
@@ -685,12 +688,7 @@ export class TelegramNotificationService {
       }
 
       // Build bot admin link
-      // Format: https://t.me/botusername?startchannel=channelusername&admin=post_stories+post_messages
-      // If channel has username, include it; otherwise use empty string (Telegram will prompt)
-      const channelParam = channelUsername ? channelUsername.replace('@', '') : '';
-      const addBotLink = channelParam
-        ? `https://t.me/${botUsername}?startchannel=${channelParam}&admin=post_stories+post_messages`
-        : `https://t.me/${botUsername}?startchannel=&admin=post_stories+post_messages`;
+      const addBotLink = buildBotAdminLink(botUsername, channelUsername);
 
       const message =
         `✅ Channel Registered Successfully!\n\n` +
@@ -738,7 +736,88 @@ export class TelegramNotificationService {
         channelId,
         error: error.message,
       });
-      // Don't throw - notification failure shouldn't break channel creation
+    }
+  }
+
+  /**
+   * Notify channel owner that bot needs to be added as admin for deal processing
+   */
+  static async notifyAboutAddBotAsAdmin(deal: any, channel: any, channelOwnerId: number): Promise<void> {
+    try {
+      const channelOwner = await UserModel.findById(channelOwnerId);
+      if (!channelOwner) {
+        logger.warn(`Channel owner #${channelOwnerId} not found for bot admin notification`);
+        return;
+      }
+
+      let botUsername = env.TELEGRAM_BOT_USERNAME;
+      if (!botUsername) {
+        try {
+          const botInfo = await TelegramService.bot.getMe();
+          botUsername = botInfo.username || '';
+        } catch (error) {
+          logger.error('Failed to get bot username', { error });
+          botUsername = 'the bot';
+        }
+      }
+
+      const addBotLink = buildBotAdminLink(botUsername, channel.username);
+
+      const message =
+        `⚠️ Action Required: Add Bot as Admin\n\n` +
+        `📋 Deal #${deal.id} is ready to proceed, but the bot needs to be added as an admin to your channel.\n\n` +
+        `📺 Channel: ${channel.title || channel.username || `Channel #${channel.id}`}\n` +
+        (channel.username ? `🔗 Username: ${channel.username}\n` : '') +
+        `💰 Deal Amount: ${deal.price_ton} TON\n` +
+        `📝 Format: ${deal.ad_format}\n\n` +
+        `To continue with this deal, please add the bot as an admin with the following permissions:\n` +
+        `• Post messages\n` +
+        `• Post stories\n\n` +
+        `Click the button below to add the bot as admin:`;
+
+      const notificationButtons = {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: '➕ Add Bot as Admin',
+                url: addBotLink
+              }
+            ],
+            [
+              {
+                text: '🔄 Retry After Adding',
+                callback_data: `retry_escrow_${deal.id}`
+              }
+            ],
+            [
+              {
+                text: '📋 View Deal',
+                callback_data: `deal_details_${deal.id}`
+              }
+            ]
+          ]
+        }
+      };
+
+      await TelegramNotificationQueueService.queueTelegramMessage(
+        channelOwner.telegram_id,
+        message,
+        notificationButtons
+      );
+
+      logger.info(`Bot admin notification sent for Deal #${deal.id}`, {
+        dealId: deal.id,
+        channelOwnerId,
+        channelId: deal.channel_id,
+      });
+    } catch (error: any) {
+      logger.error(`Error sending bot admin notification`, {
+        dealId: deal.id,
+        channelOwnerId,
+        error: error.message,
+        stack: error.stack,
+      });
     }
   }
 }

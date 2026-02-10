@@ -8,6 +8,7 @@ import {
   TelegramChannelStatsRefreshSchedulerService
 } from '../services/telegram-channel-stats-refresh-scheduler.service';
 import {ExpiredDealsSchedulerService} from '../services/expired-deals-scheduler.service';
+import {EscrowAddressSchedulerService} from '../services/escrow-address-scheduler.service';
 
 import logger from '../utils/logger';
 import {isPrimaryWorker} from '../utils/cluster.util';
@@ -20,6 +21,7 @@ export class CronJobsSchedulerService {
   private static tonEscrowPaymentPollingService: TonEscrowPaymentPollingService | null = null;
   private static telegramChannelStatsRefreshSchedulerService: TelegramChannelStatsRefreshSchedulerService | null = null;
   private static expiredDealsSchedulerService: ExpiredDealsSchedulerService | null = null;
+  private static escrowAddressSchedulerService: EscrowAddressSchedulerService | null = null;
 
   /**
    * Start all cron jobs
@@ -59,10 +61,15 @@ export class CronJobsSchedulerService {
     this.expiredDealsSchedulerService.onModuleInit();
     this.expiredDealsSchedulerService.start();
 
+    // Initialize escrow address scheduler service
+    this.escrowAddressSchedulerService = new EscrowAddressSchedulerService();
+    this.escrowAddressSchedulerService.onModuleInit();
+    this.escrowAddressSchedulerService.start();
+
     // TODO maybe need to merge some jobs into one
     // TODO scalable jobs
 
-    logger.info(`Started ${this.jobs.length} cron job(s) + PostSchedulerService + AutoReleaseSchedulerService + VerificationSchedulerService + TonEscrowPaymentPollingService + TelegramChannelStatsRefreshSchedulerService + ExpiredDealsSchedulerService`);
+    logger.info(`Started ${this.jobs.length} cron job(s) + PostSchedulerService + AutoReleaseSchedulerService + VerificationSchedulerService + TonEscrowPaymentPollingService + TelegramChannelStatsRefreshSchedulerService + ExpiredDealsSchedulerService + EscrowAddressSchedulerService`);
   }
 
   /**
@@ -100,6 +107,11 @@ export class CronJobsSchedulerService {
     if (this.expiredDealsSchedulerService) {
       this.expiredDealsSchedulerService.stop();
       this.expiredDealsSchedulerService = null;
+    }
+
+    if (this.escrowAddressSchedulerService) {
+      this.escrowAddressSchedulerService.stop();
+      this.escrowAddressSchedulerService = null;
     }
 
     logger.info('Stopped all cron jobs');

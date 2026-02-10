@@ -15,6 +15,17 @@ export interface DealListFilters {
 }
 
 export class DealRepository {
+  static async findDealsNeedingEscrow(limit: number = 20): Promise<any[]> {
+    const result = await db.query(
+      `SELECT * FROM deals 
+       WHERE status IN ('pending', 'negotiating', 'payment_pending')
+       AND escrow_address IS NULL
+       ORDER BY created_at ASC
+       LIMIT $1`,
+      [limit]
+    );
+    return result.rows || [];
+  }
   /**
    * List deals with filters (status, deal_type)
    */

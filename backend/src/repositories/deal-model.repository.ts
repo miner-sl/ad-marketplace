@@ -1,6 +1,7 @@
 import db from '../db/connection';
 import { withTx } from '../utils/transaction';
 import { Deal, DealStatus, DealType } from '../models/deal.types';
+import {PoolClient} from "pg";
 
 export class DealModel {
   static async create(data: {
@@ -387,5 +388,21 @@ export class DealModel {
       [limit]
     );
     return result.rows;
+  }
+
+  static async updateEscrowAddress(escrowAddress: string, ownerWalletAddress: string, dealId: number): Promise<Deal> {
+    const result = await withTx(async (client: PoolClient) => {
+      return await client.query(
+        `UPDATE deals 
+         SET escrow_address = $1, channel_owner_wallet_address = $2, status = 'payment_pending', updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3 AND escrow_address IS NULL
+         RETURNING *`,
+        [escrowAddress, ownerWalletAddress, dealId]
+      );
+    });
+    if (!result?.rows && result.rows.length === 0) {
+      throw new Error('Deal status changed during processing');
+    }
+    return result.rows.at(0);
   }
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Confetti from 'react-confetti'
 
 import {useWindowSize} from "../../hooks/useWindowSize";
+import {hapticFeedback} from "@utils";
 
 interface ConfettiAnimationProps {
   active: boolean
@@ -10,9 +11,7 @@ interface ConfettiAnimationProps {
   width?: number
 }
 
-const DURATION = 2500
-
-// const webApp = window?.Telegram?.WebApp
+const DURATION = 2500;
 
 export const ConfettiAnimation = (props: ConfettiAnimationProps) => {
   const { width: windowWith, height: windowHeight } = useWindowSize()
@@ -28,7 +27,7 @@ export const ConfettiAnimation = (props: ConfettiAnimationProps) => {
 
   useEffect(() => {
     if (active) {
-      // webApp?.HapticFeedback?.impactOccurred('soft')
+      hapticFeedback('soft');
 
       const timer = setTimeout(() => {
         setIsConfettiRecycled(false)

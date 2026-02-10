@@ -4,6 +4,7 @@ import type { ChangeEvent } from 'react'
 
 import styles from './ListInput.module.scss'
 import { Icon } from '../Icon'
+import {hapticFeedback} from "@utils";
 
 export interface ListInputProps {
   textColor?: 'primary' | 'secondary' | 'tertiary'
@@ -72,6 +73,7 @@ export const ListInput: React.FC<ListInputProps> = ({
 
   const handleClear = () => {
     if (onChange && !disabled) {
+      hapticFeedback('soft');
       onChange('')
     }
   }

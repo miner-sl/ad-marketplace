@@ -3,15 +3,16 @@ type HapticImpactType = 'soft' | 'medium' | 'heavy' | 'light'
 
 type HapticFeedbackType = HapticImpactType | HapticNotificationType
 
+import { hapticFeedback as tmaHapticFeedback }  from "@tma.js/sdk-react";
+
 export const hapticFeedback = (type: HapticFeedbackType) => {
-  const webApp = window?.Telegram?.WebApp
   try {
     if (['success', 'warning', 'error'].includes(type)) {
-      webApp?.HapticFeedback?.notificationOccurred(
+      tmaHapticFeedback.notificationOccurred(
         type as HapticNotificationType
       )
     } else {
-      webApp?.HapticFeedback?.impactOccurred(type as HapticImpactType)
+      tmaHapticFeedback.impactOccurred(type as HapticImpactType)
     }
   } catch (error) {
     console.error(error)

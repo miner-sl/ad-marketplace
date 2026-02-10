@@ -9,16 +9,17 @@
   box-shadow: 0 4px 40px 0 rgba(0, 0, 0, 0.2);
   z-index: 0;
   transition: 0.2s;
-  transform: scale(0.3);
   opacity: 0;
   transform-origin: top right;
 }
 
 .dropdownActive {
+  overflow-y: scroll;
+  height: 320px;
+
   opacity: 1;
   visibility: visible;
   z-index: 20;
-  transform: scale(1);
 }
 
 .list {

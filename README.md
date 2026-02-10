@@ -3,40 +3,45 @@
 A Node.js backend for a Telegram Mini App marketplace connecting channel owners and advertisers with TON blockchain escrow functionality.
 
 ## Features
+### 1. Done
 - [X] distributed lock (redis)
 - [X] jwt auth
 - [X] channel topic
+- [X] tg notification queue (?)
+- [X] scheduler post verification, auto publication
+- [X] setup post publication time
+- [X] check that user really admin before send to their address money
+- [X] channel topic
+
+### 2. TODO
+- [ ] scheduler for generate escrow wallet at ton
 - [ ] role [admin moderator, channel owner, ads buyer]
 - [ ] channel verification and advertiser verification
 - [ ] use tg stats for gather stats
 - [ ] recheck every 30 days admin rights user + bot , subs count, 
 - [ ] transactions history
 - [ ] integrate i18n
-- [ ] channel topic, geo/country, language, budget range, format
+- [ ] channel geo/country, language, budget range, format
 - [ ] SEARCH: vectorize channels fields and sort relevance by cosine distance
 - [ ] store images before publish
 - [ ] dashboard (revenue by month, channel page views, in favorites, in favorites, placemnets, earned)
 - [ ] transaction history 
-- [ ] marketplace catalog with basket or fast buy flow (select type, place order, wait moderation)
+- [ ] channels catalog with basket or fast buy flow (select type, place order, wait moderation)
 - [ ] super admin for moderate channels
 - [ ] Store escrow wallet secret in KMS/HSM/encrypted at database (?)
-- [ ] sick ui
-- [ ] tg notification queue (?)
+- [ ] sleek ui
 - [ ] ads payments by advertiser (integrate tonconnect)
-- [ ] scheduler post verification, auto publication
 - [ ] support all telegram message entities in post (emoji, animated/premium emoji, markdown formatting and etc)
 https://core.telegram.org/type/MessageEntity
 - [ ] fix transactions operation
 - [ ] telegram post analytics
 - [ ] use usdt for prices
-- [ ] refunds/release funds in ton
+- [ ] refunds money to channel owner
 - [ ] Release funds to channel owner check transaction really exist
 - [ ] /check payments without mock transactions
-- [ ] setup post publication time
 - [ ] check edit post text,
 - [ ] attach media, photos, formatted with telegram entities
 - [ ] mini app
-- [ ] check that user really admin before send to their address money
 - [ ] deploy to vps workflow
 
 

@@ -21,8 +21,7 @@ import type {
   UpdateChannelRequest,
 } from '@types'
 import { getToken } from '@utils'
-import { API_BASE_URL } from './url.ts';
-
+import { API_BASE_URL } from './url';
 
 interface ApiResponse<T> {
   data: T | null
@@ -32,7 +31,8 @@ interface ApiResponse<T> {
 
 export async function apiRequest<T>(
   endpoint: string,
-  options?: RequestInit & { skipAuthCheck?: boolean }
+  options?: RequestInit & { skipAuthCheck?: boolean },
+  timeoutMs = 10000,
 ): Promise<ApiResponse<T>> {
   try {
     const token = getToken()
@@ -42,11 +42,15 @@ export async function apiRequest<T>(
     if (token && !options?.skipAuthCheck) {
       headers.set('Authorization', `Bearer ${token}`)
     }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
+      signal : controller.signal
     })
+    clearTimeout(timer);
 
     if (!response.ok) {
       return {

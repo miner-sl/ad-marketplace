@@ -1,5 +1,5 @@
-import {getToken} from "./token.ts";
-import {API_BASE_URL} from "../../services/url.ts";
+import {getToken} from "./token";
+import {API_BASE_URL} from "../../services/url";
 
 export const requestAPI = async (
   path = "/",

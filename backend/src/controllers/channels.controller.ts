@@ -7,7 +7,6 @@ import { TelegramService } from '../services/telegram.service';
 import { ChannelService } from '../services/channel.service';
 import { topicsService } from '../services/topics.service';
 import { setChannelPricingSchema, updateChannelStatusSchema, updateChannelSchema, validateChannelSchema } from '../utils/validation';
-import { throttleChannelValidate } from '../utils/throttle';
 import logger from '../utils/logger';
 
 export class ChannelsController {

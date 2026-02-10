@@ -1,4 +1,4 @@
-import {isProd} from "../common/config.ts";
+import {isProd} from "../common/config";
 
 export const API_BASE_URL = isProd
   ? 'https://api.example.com'

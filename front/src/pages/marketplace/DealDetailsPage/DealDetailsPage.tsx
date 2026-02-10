@@ -31,14 +31,14 @@ import styles from './DealDetailsPage.module.scss'
 import {transferTonCall, useClipboard} from "@hooks"
 import config from '@config'
 import {useAuth} from "@context";
-import {initializeTonConnect, parseTONAddress, tonConnectUI} from "../../../common/utils/lazy.ts";
+import {initializeTonConnect, parseTONAddress, tonConnectUI} from "../../../common/utils/lazy";
 import {
   type SendTransactionResponse,
   type TonProofItemReply,
   useTonConnectUI,
   useTonWallet
 } from "@tonconnect/ui-react";
-import {requestAPI} from "../../../common/utils/api.ts";
+import {requestAPI} from "../../../common/utils/api";
 import {playConfetti, popupManager} from "@utils";
 import {apiRequest} from "@services";
 

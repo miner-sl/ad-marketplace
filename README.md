@@ -14,6 +14,7 @@ A Node.js backend for a Telegram Mini App marketplace connecting channel owners 
 - [X] channel topic
 
 ### 2. TODO
+- [ ] connect wallet by channel owner
 - [ ] scheduler for generate escrow wallet at ton
 - [ ] role [admin moderator, channel owner, ads buyer]
 - [ ] channel verification and advertiser verification

@@ -1,6 +1,5 @@
 import { useEffect, memo } from 'react'
 import { useLocation } from 'react-router-dom'
-
 import { mainButton } from '@tma.js/sdk-react'
 
 import { isProd } from '../../common/config'
@@ -60,9 +59,8 @@ export const TelegramMainButton = memo(
     ])
 
     if (
-      false
-      // !isProd
-      // && isVisible
+      !isProd
+      && isVisible
     ) {
       return (
         <button

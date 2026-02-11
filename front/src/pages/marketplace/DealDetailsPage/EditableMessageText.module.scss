@@ -1,0 +1,36 @@
+.editRoot {
+  flex: 1;
+  height: fit-content;
+}
+
+.textarea {
+  flex: 1;
+  width: 100%;
+  min-height: 80px;
+  height: 100%;
+  white-space: pre-wrap;
+
+  border: none;
+  outline: none;
+
+  font: inherit;
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.4;
+
+  background-color: transparent;
+  color: var(--color-textIconsPrimary);
+  border-radius: 8px;
+  resize: vertical;
+  box-sizing: border-box;
+
+  &::placeholder {
+    color: var(--tgui--hint_color, #999);
+  }
+
+  &:active,
+  &:focus {
+    outline: none;
+    border: none;
+  }
+}

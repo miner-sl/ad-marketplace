@@ -16,7 +16,7 @@ interface ButtonProps {
     | 'link'
     | 'primary-gradient'
     | 'accent'
-  size?: 'small' | 'medium'
+  size?: 'xs' |'small' | 'medium'
 }
 
 export const Button = ({

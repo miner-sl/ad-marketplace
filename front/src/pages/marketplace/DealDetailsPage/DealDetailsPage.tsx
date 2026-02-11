@@ -4,7 +4,6 @@ import {hapticFeedback, openTelegramLink} from '@tma.js/sdk-react'
 import {
   Block,
   BlockNew,
-  Button,
   ChannelLink,
   DealStatusBadge,
   DeclineDealModal,
@@ -29,6 +28,7 @@ import {
   useRequestCreativeRevisionMutation,
   useUpdateDealMessageMutation,
 } from '@store-new'
+import {EditableMessageText} from './EditableMessageText'
 import styles from './DealDetailsPage.module.scss'
 import {transferTonCall, useClipboard} from "@hooks"
 import config from '@config'
@@ -115,8 +115,7 @@ export const DealDetailsPage = () => {
   const isChannelOwner = deal && deal?.channel_owner_id === user?.id
   const isAdvertiser = deal && user && deal?.advertiser_id === user?.id;
   const canInteract = isChannelOwner || isAdvertiser
-  const canEditMessage = isAdvertiser && deal?.status === 'negotiating'
-  console.log({advertiser_id: deal?.advertiser_id, user, isAdvertiser, status: deal?.status});
+  const canEditMessage = isAdvertiser && (deal?.status === 'negotiating' || deal?.status === 'pending')
 
   const handleAdvertiserClick = () => {
     const advertiser = deal && typeof deal.advertiser === 'object' && deal.advertiser !== null ? deal.advertiser : null
@@ -494,31 +493,14 @@ export const DealDetailsPage = () => {
   //   }
   // }
 
-  const handleEditMessage = async () => {
-    if (!deal) {
-      return;
-    }
-    const currentMessage = deal.messages && deal.messages.length > 0
-      ? deal.messages[0].message_text
-      : ''
-    const newMessage = prompt('Edit post message:', currentMessage)
-
-    if (newMessage === null) {
-      return // User cancelled
-    }
-
-    if (!newMessage.trim()) {
-      showToast({
-        type: 'error',
-        message: 'Message cannot be empty',
-      })
-      return
-    }
-
+  const handleSaveMessage = async (message_text: string) => {
     try {
+      if (updateDealMessageMutation.isPending) {
+        return;
+      }
       await updateDealMessageMutation.mutateAsync({
-        dealId: dealId,
-        message_text: newMessage.trim(),
+        dealId,
+        message_text,
       })
       showToast({
         type: 'success',
@@ -530,6 +512,7 @@ export const DealDetailsPage = () => {
         type: 'error',
         message: error?.message || 'Failed to update message',
       })
+      throw error
     }
   }
 
@@ -558,53 +541,51 @@ export const DealDetailsPage = () => {
         <TelegramBackButton/>
 
         <DealHeader deal={deal}/>
-        {(canInteract && deal.status === 'pending') || (deal.owner && deal.status === 'pending') ? (
+        {deal.status === 'pending' && (canInteract || (deal.owner && isChannelOwner)) ? (
           <Block margin="top" marginValue={24}>
-            {isChannelOwner && deal.owner && deal.status === 'pending' && (
-              <BlockNew gap={4} row>
-                <>
-                  <ListItem
-                    text={
-                      <Text type="text" color="accent">
-                        Accept
-                      </Text>
-                    }
-                    before={
-                      <Icon name="checkmark" size={28} color="accent"/>
-                    }
-                    onClick={handleAcceptDeal}
-                    disabled={acceptDealMutation.isPending}
-                  />
-                  <ListItem
-                    text={
-                      <Text type="text" color="danger">
-                        Decline
-                      </Text>
-                    }
-                    before={
-                      <Icon name="cross" size={28} color="danger"/>
-                    }
-                    onClick={handleDeclineDeal}
-                    disabled={declineDealMutation.isPending}
-                  />
-                  <ListItem
-                    text={
-                      <Text type="text">
-                        Request Changes
-                      </Text>
-                    }
-                    before={
-                      <Icon name="share" size={28} color="accent"/>
-                    }
-                    onClick={handleRequestChanges}
-                  />
-                </>
-              </BlockNew>
-            )}
+            <BlockNew gap={4} row>
+              <>
+                <ListItem
+                  text={
+                    <Text type="text" color="accent">
+                      Accept
+                    </Text>
+                  }
+                  before={
+                    <Icon name="checkmark" size={28} color="accent"/>
+                  }
+                  onClick={handleAcceptDeal}
+                  disabled={acceptDealMutation.isPending}
+                />
+                <ListItem
+                  text={
+                    <Text type="text" color="danger">
+                      Decline
+                    </Text>
+                  }
+                  before={
+                    <Icon name="cross" size={28} color="danger"/>
+                  }
+                  onClick={handleDeclineDeal}
+                  disabled={declineDealMutation.isPending}
+                />
+                <ListItem
+                  text={
+                    <Text type="text">
+                      Request Changes
+                    </Text>
+                  }
+                  before={
+                    <Icon name="share" size={28} color="accent"/>
+                  }
+                  onClick={handleRequestChanges}
+                />
+              </>
+            </BlockNew>
           </Block>
         ) : null}
 
-        <Block gap={8} margin="top" marginValue={24}>
+        <Block gap={4} margin="top" marginValue={12}>
           {channelStats && (
             <Block margin="bottom" marginValue={24}>
               <Block paddingValue={16}>
@@ -783,33 +764,12 @@ export const DealDetailsPage = () => {
 
             <Block padding="top" paddingValue={16} gap={12}>
               <List header="Post Message">
-                {deal.messages && deal.messages.length > 0 && deal.messages[0]?.message_text && (
-                  <ListItem
-                    text={(
-                      <Text type="text">
-                        {deal.messages[0].message_text}
-                      </Text>
-                    )}
-                    after={
-                      canEditMessage ? (
-                        <Button
-                          size="small"
-                          // prefix={(
-                          //   <Icon
-                          //     name="cross"
-                          //     size={12}
-                          //     color="secondary"
-                          //     className={styles.clickable}
-                          //
-                          //   />
-                          // )}
-                          onClick={handleEditMessage}
-                        >
-
-                          Edit
-                        </Button>
-                      ) : undefined
-                    }
+                {deal.messages && deal.messages.length > 0 && (
+                  <EditableMessageText
+                    isPending={updateDealMessageMutation.isPending}
+                    value={deal.messages[0]?.message_text?.trim() ?? ''}
+                    canEdit={!!canEditMessage}
+                    onSave={handleSaveMessage}
                   />
                 )}
               </List>

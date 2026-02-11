@@ -133,17 +133,6 @@ export const AddChannelPage = () => {
   }
 
   const isLoading = createChannelMutation.isPending
-  // const [isTopicDropdownOpen, setIsTopicDropdownOpen] = useState(false);
-  // const topicButtonRef = useRef<HTMLDivElement>(null)
-  //
-  // const handleToggleTopicDropdown = (value?: boolean) => {
-  //   setIsTopicDropdownOpen(value !== undefined ? value : !isTopicDropdownOpen);
-  // }
-
-
-  // const selectedTopicLabel = topicId
-  //   ? PREDEFINED_TOPICS.find((t) => t.id === topicId)?.name || 'Select topic'
-  //   : 'Any Topics'
 
   return (
     <Page back>

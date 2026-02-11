@@ -258,46 +258,18 @@ export class ChannelsController {
         });
       }
 
-      const channel = await ChannelModel.findChannelOwnerById(channelId);
-      if (!channel) {
-        return reply.code(404).send({
-          error: 'Channel not found',
+      const result = await ChannelService.update(request.user.id, channelId, {
+        topic: body.topic,
+        active: body.active,
+        price: body.price
+      });
+      if (!result.ok) {
+        return reply.code(result.status || 500).send({
+          error: result.error || 'Failed to update channel',
+          message: result.message,
         });
       }
-
-      if (channel.owner_id !== request.user.id) {
-        return reply.code(403).send({
-          error: 'Forbidden',
-          message: 'You do not have permission to update this channel',
-        });
-      }
-
-      const updates: {
-        is_active?: boolean;
-        topic_id?: number | null;
-        price_ton?: number;
-      } = {};
-
-      if (body.active !== undefined) {
-        updates.is_active = body.active;
-      }
-
-      if (body.topic !== undefined) {
-        updates.topic_id = body.topic;
-      }
-
-      if (body.price !== undefined) {
-        updates.price_ton = body.price;
-      }
-
-      const updatedChannel = await ChannelModel.updateChannel(channelId, updates);
-
-      return {
-        id: updatedChannel.id,
-        is_active: updatedChannel.is_active,
-        topic_id: updatedChannel.topic_id,
-        message: 'Channel updated successfully',
-      };
+      return reply.send(result.data);
     } catch (error: any) {
       logger.error('Failed to update channel', {
         error: error.message,

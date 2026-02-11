@@ -22,6 +22,11 @@ export interface ChannelRegistrationResult {
   message?: string;
 }
 
+export interface UpdateChannelDto {
+  active?: boolean;
+  price?: number;
+  topic?: number | null;
+}
 export interface ChannelStatusUpdateResult {
   success: boolean;
   channel?: Channel;
@@ -284,5 +289,61 @@ export class ChannelService {
       });
       return false;
     }
+  }
+
+  static async update(userId: number, channelId: number, body: UpdateChannelDto) {
+    const channel = await ChannelModel.findChannelOwnerById(channelId);
+    if (!channel) {
+      return {
+        ok: false,
+        status: 404,
+        error: 'Channel not found',
+      }
+    }
+
+    if (channel.owner_id !== userId) {
+      return{
+        ok: false,
+        status: 403,
+        error: 'Forbidden',
+        message: 'You do not have permission to update this channel',
+      };
+    }
+
+    const updates: {
+      is_active?: boolean;
+      topic_id?: number | null;
+      price_ton?: number;
+    } = {};
+
+    if (body.active !== undefined) {
+      updates.is_active = body.active;
+    }
+
+    if (body.topic !== undefined) {
+      updates.topic_id = body.topic;
+    }
+
+    if (body.price !== undefined) {
+      updates.price_ton = body.price;
+      await ChannelModel.setPricing(
+        channelId,
+        'post',
+        body.price,
+        true,
+      );
+    }
+
+    const updatedChannel = await ChannelModel.updateChannel(channelId, updates);
+
+    return {
+      ok: true,
+      data: {
+        id: updatedChannel.id,
+        is_active: updatedChannel.is_active,
+        topic_id: updatedChannel.topic_id,
+        message: 'Channel updated successfully',
+      }
+    };
   }
 }

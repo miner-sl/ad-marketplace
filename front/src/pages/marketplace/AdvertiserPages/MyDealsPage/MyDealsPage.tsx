@@ -26,6 +26,7 @@ import styles from './MyDealsPage.module.scss'
 const STATUS_OPTIONS: Array<DealStatus | 'all'> = [
   'all',
   'pending',
+  'negotiating',
   'payment_pending',
   'paid',
   'creative_submitted',
@@ -37,9 +38,16 @@ const STATUS_OPTIONS: Array<DealStatus | 'all'> = [
 ]
 
 const formatStatusLabel = (status: DealStatus | 'all'): string => {
-  if (status === 'all') return 'All'
+  if (status === 'all') return 'All';
+  if (status === 'negotiating') return 'Need Changes';
   return status.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())
 }
+
+
+const dropdownOptions = STATUS_OPTIONS.map((status) => ({
+  label: formatStatusLabel(status),
+  value: status,
+}))
 
 export const MyDealsPage = () => {
   const navigate = useNavigate()
@@ -56,10 +64,6 @@ export const MyDealsPage = () => {
     setIsDropdownOpen(value !== undefined ? value : !isDropdownOpen)
   }
 
-  const dropdownOptions = STATUS_OPTIONS.map((status) => ({
-    label: formatStatusLabel(status),
-    value: status,
-  }))
 
   const filteredDeals = deals || [];
 

@@ -764,9 +764,9 @@ export const DealDetailsPage = () => {
 
           {(canInteract && deal.status === 'pending') || (deal.owner && deal.status === 'pending') ? (
             <Block margin="top" marginValue={24}>
-              <List header="ACTIONS">
-                <BlockNew gap={4}>
-                  {isChannelOwner && deal.owner && deal.status === 'pending' && (
+              {isChannelOwner && deal.owner && deal.status === 'pending' && (
+                <List header="ACTIONS">
+                  <BlockNew gap={4}>
                     <>
                       <ListItem
                         text={
@@ -804,9 +804,9 @@ export const DealDetailsPage = () => {
                         onClick={handleRequestChanges}
                       />
                     </>
-                  )}
-                </BlockNew>
-              </List>
+                  </BlockNew>
+                </List>
+              )}
             </Block>
           ) : null}
         </Block>

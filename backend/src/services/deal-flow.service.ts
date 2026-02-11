@@ -395,7 +395,7 @@ export class DealFlowService {
    * @param notes - Revision notes
    */
   static async requestRevision(dealId: number, requestedBy: number, notes: string): Promise<any> {
-    return await withTx(async (client) => {
+    const deal = await withTx(async (client) => {
       const dealResult = await client.query(
         `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
         [dealId]
@@ -439,6 +439,10 @@ export class DealFlowService {
 
       return updateResult.rows[0];
     });
+    if (deal.status === 'negotiating') {
+      await TelegramNotificationService.notifyRevisionRequested(deal, requestedBy, notes);
+    }
+    return deal;
   }
 
   /**

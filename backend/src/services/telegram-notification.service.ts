@@ -4,6 +4,7 @@ import { TelegramService } from './telegram.service';
 import { buildBotAdminLink } from '../utils/telegram';
 import env from '../utils/env';
 import logger from '../utils/logger';
+import {Deal} from '../models/deal.types';
 
 export interface NotificationData {
   dealId: number;
@@ -818,6 +819,59 @@ export class TelegramNotificationService {
         error: error.message,
         stack: error.stack,
       });
+    }
+  }
+
+  /**
+   * Notify advertiser about revision request
+   */
+  static async notifyRevisionRequested(deal: Deal, requestedBy: number, notes: string): Promise<void> {
+    try {
+      const advertiser = await UserModel.findById(deal.advertiser_id);
+      if (!advertiser) {
+        logger.warn(`Advertiser #${deal.advertiser_id} not found for revision request notification`);
+        return;
+      }
+
+      const notificationMessage =
+        `⚠️ Revision Requested for Deal #${deal.id}\n\n` +
+        `The channel owner has requested changes to your creative submission.\n\n` +
+        `💬 Revision Notes:\n${notes}\n\n` +
+        `Please review the feedback and submit an updated creative.\n\n` +
+        `Use /deal ${deal.id} to view details and upload a new creative.`;
+
+      const botUsername = env.TELEGRAM_BOT_USERNAME || 'NonNano_Bot';
+      // const appName = 'app';
+      // const miniAppUrl = `https://t.me/${botUsername}/${appName}?startapp=deal_${deal.id}`;
+      const miniAppUrl = `https://t.me/${botUsername}`;
+
+      const notificationButtons = {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '📋 View Deal', callback_data: `deal_details_${deal.id}` },
+              {
+                text: '📋 View Deal (Mini App)',
+                web_app: { url: miniAppUrl }
+              }
+            ]
+          ]
+        }
+      };
+
+      await TelegramNotificationQueueService.queueTelegramMessage(
+        advertiser.telegram_id,
+        notificationMessage,
+        notificationButtons
+      );
+    } catch (error: any) {
+      logger.error(`Error sending revision request notification`, {
+        dealId: deal.id,
+        advertiserId: deal.advertiser_id,
+        requestedBy,
+        error: error.message,
+      });
+      throw error;
     }
   }
 }

@@ -21,7 +21,7 @@ export const ChannelLink = ({
   }
 
   const channelLink = getChannelLink(channel)
-  const channelName = channel.title || `@${channel.username || 'channel'}`
+  const channelName = `@${channel.title}` || `@${channel.username || 'channel'}`
 
   const handleChannelClick = () => {
     if (channelLink) {

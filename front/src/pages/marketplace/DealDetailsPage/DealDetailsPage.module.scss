@@ -9,3 +9,35 @@
 .flexRow {
   flex: 1;
 }
+
+.requestChangesSheetHeader {
+  padding: 16px;
+}
+
+.textarea {
+  width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  background-color: var(--color-background-base);
+  color: var(--color-textIconsPrimary);
+  font-size: 15px;
+  font-weight: 400;
+  border: none;
+  outline: none;
+  border-radius: 8px;
+  box-sizing: border-box;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
+  max-height: 150px;
+
+  &::placeholder {
+    color: var(--color-textIconsTertiary);
+  }
+
+  &:active,
+  &:focus {
+    border: none;
+    outline: none;
+  }
+}

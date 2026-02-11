@@ -1,11 +1,13 @@
-import {useParams} from 'react-router-dom';
-import {useRef, useState} from 'react';
-import {openTelegramLink} from '@tma.js/sdk-react';
-import {type SendTransactionResponse, type TonProofItemReply, useTonWallet} from '@tonconnect/ui-react';
+import cn from 'classnames';
+import { useParams } from 'react-router-dom';
+import { useRef, useState } from 'react';
+import { openTelegramLink } from '@tma.js/sdk-react';
+import { type SendTransactionResponse, type TonProofItemReply, useTonWallet } from '@tonconnect/ui-react';
 
 import {
   Block,
   BlockNew,
+  Button,
   ChannelLink,
   DealStatusBadge,
   DeclineDealModal,
@@ -16,13 +18,14 @@ import {
   ListItem,
   Page,
   PageLayout,
+  Sheet,
   Spinner,
   TelegramBackButton,
   TelegramMainButton,
   Text,
   useToast,
 } from '@components';
-import {EditableMessageText} from './EditableMessageText';
+import { EditableMessageText } from './EditableMessageText';
 
 import {
   type EnhancedDeal,
@@ -32,14 +35,14 @@ import {
   useRequestCreativeRevisionMutation,
   useUpdateDealMessageMutation,
 } from '@store-new'
-import {useAuth} from '@context';
+import { useAuth } from '@context';
 
-import {transferTonCall, useClipboard} from "@hooks";
+import { transferTonCall, useClipboard } from "@hooks";
 import config from '@config'
-import {initializeTonConnect, tonConnectUI} from '../../../common/utils/lazy';
-import {requestAPI} from "../../../common/utils/api";
-import {confirmActionPopup, goTo, hapticFeedback, playConfetti, popupManager} from '@utils';
-import type {DealMessage} from '@types';
+import { initializeTonConnect, tonConnectUI } from '../../../common/utils/lazy';
+import { requestAPI } from "../../../common/utils/api";
+import { confirmActionPopup, goTo, hapticFeedback, playConfetti, popupManager } from '@utils';
+import type { DealMessage } from '@types';
 
 import styles from './DealDetailsPage.module.scss';
 
@@ -54,7 +57,7 @@ type WalletFormStore = {
   ton_proof?: TonProofItemReply;
 };
 
-const DealHeader = ({deal}: DealHeaderProps) => {
+const DealHeader = ({ deal }: DealHeaderProps) => {
   if (!deal) {
     return undefined;
   }
@@ -73,7 +76,7 @@ const DealHeader = ({deal}: DealHeaderProps) => {
         <Text type="title" align="center" weight="bold">
           Deal #{deal.id}
         </Text>
-        <DealStatusBadge status={deal.status}/>
+        <DealStatusBadge status={deal.status} />
       </BlockNew>
       {deal.formattedMembersCount && (
         <BlockNew margin="top" marginValue={8}>
@@ -101,7 +104,7 @@ const ListLinkView = ({
   link,
   copyText = 'Copied to clipboard'
 }: { link: string, value: string, title: string, copyText: string }) => {
-  const {copy} = useClipboard();
+  const { copy } = useClipboard();
 
   const handleEscrowAddressClick = () => {
     goTo(link);
@@ -137,11 +140,11 @@ const ListLinkView = ({
 }
 
 export const DealDetailsPage = () => {
-  const {id} = useParams<{ id: string }>()
+  const { id } = useParams<{ id: string }>()
   const dealId = id ? parseInt(id) : 0
-  const {user} = useAuth();
+  const { user } = useAuth();
   const [formWallet, setFormWallet] = useState<WalletFormStore>({});
-  const {data: deal, isLoading} = useDealQuery(dealId, user?.telegramId);
+  const { data: deal, isLoading } = useDealQuery(dealId, user?.telegramId);
   // const { data: creative } = useDealCreativeQuery(dealId)
   const acceptDealMutation = useAcceptDealMutation();
   const declineDealMutation = useDeclineDealMutation();
@@ -152,13 +155,15 @@ export const DealDetailsPage = () => {
   // const { data: creative } = useDealCreativeQuery(dealId)
   // const creative: Creative | null = deal?.creative;
   // const submitCreativeMutation = useSubmitCreativeMutation()
-  const {showToast} = useToast()
+  const { showToast } = useToast()
   // const {transferTon, isConnected} = useTonTransfer()
   const [showDeclineModal, setShowDeclineModal] = useState(false)
+  const [showRequestChangesSheet, setShowRequestChangesSheet] = useState(false)
+  const [requestChangesNotes, setRequestChangesNotes] = useState('')
 
   const isChannelOwner = deal && deal?.channel_owner_id === user?.id
   const isAdvertiser = deal && user && deal?.advertiser_id === user?.id;
-  const canInteract = isChannelOwner || isAdvertiser
+  // const canInteract = isChannelOwner || isAdvertiser
   const canEditMessage = isAdvertiser && (deal?.status === 'negotiating' || deal?.status === 'pending')
 
   const handleAdvertiserClick = () => {
@@ -211,7 +216,6 @@ export const DealDetailsPage = () => {
     if (fee) {
       const result = await handlePayment();
 
-      console.log({result})
       if (result) {
         boc = result.boc;
       } else {
@@ -231,7 +235,7 @@ export const DealDetailsPage = () => {
     );
 
     if (request) {
-      const {status} = request;
+      const { status } = request;
 
       if (status === "success") {
         hapticFeedback('medium');
@@ -284,7 +288,7 @@ export const DealDetailsPage = () => {
     if (!request) return;
 
     const {
-      result: {payload},
+      result: { payload },
     } = request;
 
     tonConnectUI?.setConnectRequestParameters({
@@ -446,8 +450,8 @@ export const DealDetailsPage = () => {
 
       hapticFeedback('soft');
       setShowDeclineModal(false)
-      await declineDealMutation.mutateAsync({id: dealId, reason});
-      showToast({message: 'Deal declined successfully', type: 'success'});
+      await declineDealMutation.mutateAsync({ id: dealId, reason });
+      showToast({ message: 'Deal declined successfully', type: 'success' });
     } catch (error) {
       showToast({
         message: error instanceof Error ? error.message : 'Failed to decline deal',
@@ -479,28 +483,35 @@ export const DealDetailsPage = () => {
   //   }
   // }
 
-  const handleRequestChanges = async () => {
-    if (!deal) {
-      return;
-    }
-    const notes = prompt('Please provide your requested changes:')
-    if (!notes || !notes.trim() || notes.trim().length < 5) {
+  const openRequestChangesSheet = () => {
+    if (!deal) return
+    setRequestChangesNotes('')
+    setShowRequestChangesSheet(true)
+  }
+
+  const closeRequestChangesSheet = () => {
+    setShowRequestChangesSheet(false)
+    setRequestChangesNotes('')
+  }
+
+  const handleRequestChangesDone = async () => {
+    const notes = requestChangesNotes.trim()
+    if (notes.length < 5) {
       return
     }
-    const ok = await confirmActionPopup('Draft Deal', 'Do you want to draft deal?');
-    if (!ok) {
-      return;
-    }
-    hapticFeedback('soft');
+    const ok = await confirmActionPopup('Draft Deal', 'Do you want to draft deal?')
+    if (!ok) return
+    hapticFeedback('soft')
     try {
       await requestRevisionMutation.mutateAsync({
-        dealId: deal.id,
-        notes: notes.trim(),
-      });
+        dealId: deal!.id,
+        notes,
+      })
       showToast({
         type: 'success',
         message: 'Revision request sent successfully',
       })
+      closeRequestChangesSheet()
     } catch (error: any) {
       console.error('Failed to request revision:', error)
       showToast({
@@ -575,8 +586,8 @@ export const DealDetailsPage = () => {
     return (
       <Page back>
         <PageLayout>
-          <TelegramBackButton/>
-          <Spinner size={32}/>
+          <TelegramBackButton />
+          <Spinner size={32} />
         </PageLayout>
       </Page>
     )
@@ -586,10 +597,10 @@ export const DealDetailsPage = () => {
   return (
     <Page back>
       <PageLayout>
-        <TelegramBackButton/>
+        <TelegramBackButton />
 
-        <DealHeader deal={deal}/>
-        {deal.status === 'pending' && (canInteract || (deal.owner && isChannelOwner)) ? (
+        <DealHeader deal={deal} />
+        {deal.status === 'pending' && ((deal.owner && isChannelOwner)) ? (
           <Block margin="top" marginValue={24}>
             <BlockNew gap={8} row>
               <>
@@ -600,7 +611,7 @@ export const DealDetailsPage = () => {
                     </Text>
                   }
                   before={
-                    <Icon name="checkmark" size={28} color="accent"/>
+                    <Icon name="checkmark" size={28} color="accent" />
                   }
                   onClick={handleAcceptDeal}
                   disabled={acceptDealMutation.isPending}
@@ -612,7 +623,7 @@ export const DealDetailsPage = () => {
                     </Text>
                   }
                   before={
-                    <Icon name="cross" size={28} color="danger"/>
+                    <Icon name="cross" size={28} color="danger" />
                   }
                   onClick={handleDeclineDeal}
                   disabled={declineDealMutation.isPending}
@@ -624,14 +635,14 @@ export const DealDetailsPage = () => {
                     </Text>
                   }
                   before={
-                    <Icon name="share" size={28} color="accent"/>
+                    <Icon name="share" size={28} color="accent" />
                   }
-                  onClick={handleRequestChanges}
+                  onClick={openRequestChangesSheet}
                 />
               </>
             </BlockNew>
           </Block>
-        ) : null}
+        ) : undefined}
 
         <Block gap={4} margin="top" marginValue={12}>
           {channelStats && (
@@ -733,7 +744,7 @@ export const DealDetailsPage = () => {
                   text="Channel"
                   after={
                     <BlockNew row align="center" gap={8}>
-                      <ChannelLink channel={deal.channel} showLabel={false} textType="text"/>
+                      <ChannelLink channel={deal.channel} showLabel={false} textType="text" />
                     </BlockNew>
                   }
                 />
@@ -825,9 +836,9 @@ export const DealDetailsPage = () => {
                   />
                 )}
               </List>
-              {deal.messages && deal.messages.length >= 1 && (
+              {deal.revisionMessages.length > 0 && (
                 <List header="Chanell Owner Messages">
-                  {deal.messages.slice(1).map((dealMessage: DealMessage) => (
+                  {deal.revisionMessages.map((dealMessage: DealMessage) => (
                     dealMessage.message_text ? (
                       <ListItem
                         key={dealMessage.id}
@@ -836,28 +847,8 @@ export const DealDetailsPage = () => {
                             {dealMessage.message_text}
                           </Text>
                         )}
-                        after={
-                          <></>
-                          // canEditMessage ? (
-                          //   <Button
-                          //     prefix={(
-                          //       <Icon
-                          //         name="cross"
-                          //         size={20}
-                          //         color="primary"
-                          //         className={styles.clickable}
-                          //
-                          //       />
-                          //     )}
-                          //     onClick={handleEditMessage}
-                          //   >
-                          //
-                          //     Edit
-                          //   </Button>
-                          // ) : undefined
-                        }
                       />
-                    ) : null
+                    ) : undefined
                   ))}
                 </List>
               )}
@@ -892,6 +883,47 @@ export const DealDetailsPage = () => {
         onConfirm={handleConfirmDecline}
         onClose={() => setShowDeclineModal(false)}
       />
+
+      <Sheet opened={showRequestChangesSheet} onClose={closeRequestChangesSheet}>
+        <BlockNew gap={12}>
+          <BlockNew paddingValue={16}>
+            <Block>
+              <Text type="text" weight="medium" align="center">
+                Request Changes
+              </Text>
+            </Block>
+            <Block margin="top" marginValue={4}>
+              <Text type="caption" color="tertiary" align="center">
+                Please provide your requested changes (at least 5 characters).
+              </Text>
+            </Block>
+            <Block margin="top" marginValue={16}>
+              <textarea
+                className={cn(styles.requestChangesNotes, styles.textarea)}
+                value={requestChangesNotes}
+                onChange={(e) => setRequestChangesNotes(e.target.value)}
+                placeholder="Describe the changes you need..."
+                rows={4}
+                maxLength={500}
+              />
+            </Block>
+          </BlockNew>
+          <BlockNew row justify="end" gap={8} paddingValue={16}>
+            <Button type="secondary" onClick={closeRequestChangesSheet}>
+              Cancel
+            </Button>
+            <Button
+              prefix={requestRevisionMutation.isPending ? <Spinner size={16} /> : undefined}
+              disabled={requestChangesNotes.trim().length < 5 || requestRevisionMutation.isPending}
+              type="accent"
+              onClick={handleRequestChangesDone}
+            >
+              Done
+            </Button>
+
+          </BlockNew>
+        </BlockNew>
+      </Sheet>
     </Page>
   )
 }

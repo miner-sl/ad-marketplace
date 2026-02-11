@@ -17,7 +17,7 @@ import type {
   SetChannelPricingRequest,
   UpdateChannelRequest,
   AdFormat,
-  ChannelPricing,
+  ChannelPricing, DealMessage,
 } from '@types'
 import {PREDEFINED_TOPICS} from '../../common/constants/topics'
 import {collapseAddress, separateNumber, createMembersCount} from '@utils'
@@ -48,6 +48,7 @@ export interface EnhancedDeal extends Deal {
   formattedAverageViews?: string
   formattedAverageReach?: string
   formattedMembersCount?: string
+  revisionMessages: DealMessage[]
   postLink?: string
   paymentTxLink?: string
 }
@@ -378,12 +379,14 @@ export const useDealQuery = (id: number, userId?: number) => {
         ? createMembersCount(subscribersCount)
         : undefined
 
+      const revisionMessages = deal.messages && deal.messages.length >= 1 ? deal.messages.slice(1).filter(msg => msg.message_text.startsWith('Revision: ')) : [];
 
       return {
         ...deal,
         postLink: deal.status === 'posted' && deal.channel && deal.post_message_id ?
           buildPostLink(deal.channel?.username, deal.channel.telegram_channel_id, deal.post_message_id)
           : undefined,
+        revisionMessages,
         paymentTxLink: buildTonscanTxLink(deal.payment_tx_hash),
         formattedPostVerificationTime,
         formattedScheduledPostTime,

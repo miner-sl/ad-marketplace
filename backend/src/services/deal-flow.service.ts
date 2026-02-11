@@ -62,6 +62,7 @@ export class DealFlowService {
 
     return {
       ok: true,
+      // @ts-ignore
       data: deals.map((deal) => ({...deal, price_ton: parseInt(deal.price_ton) })),
     };
   }
@@ -229,13 +230,12 @@ export class DealFlowService {
     return deal;
   }
 
-  static async generateEscrowAddress(deal: Deal): Promise<any> {
+  static async generateEscrowAddress(deal: Deal, ownerWalletAddress: string): Promise<any> {
     const dealId = deal.id;
     if (deal.escrow_address !== null) {
       return deal;
     }
 
-    const ownerWalletAddress = deal.channel_owner_wallet_address;
     if (!ownerWalletAddress) {
       throw new Error('Channel owner wallet address not set. Please set your wallet address first.');
     }
@@ -601,6 +601,7 @@ export class DealFlowService {
   static async declineDealWithNotification(dealId: number, channelOwnerId: number, reason?: string): Promise<any> {
     try {
       const deal = await this.declineDeal(dealId, channelOwnerId, reason);
+      console.log({deal})
       const channelInfo = await DealFlowService.getChannelInfoForDeal(dealId);
       await TelegramNotificationService.notifyDealDeclined(dealId, deal.advertiser_id, {
         dealId: deal,
@@ -816,11 +817,11 @@ export class DealFlowService {
       is_advertiser: advertiser.is_advertiser,
     } : null;
 
-    // Remove sensitive fields before sending the response
     const { channel_owner_wallet_address, ...dealWithoutWallet } = deal;
 
     return {
       ...dealWithoutWallet,
+      postLink: deal.status === 'posted' ? PostService.buildPostLink(deal.channel_username, deal.telegram_channel_id, deal.message_id) : undefined,
       owner: user !== null ? user?.id === deal.channel_owner_id : false,
       advertiser: advertiserInfo,
       messages,

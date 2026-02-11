@@ -125,6 +125,10 @@ export const updateChannelSchema = z.object({
   topic: z.number().int().positive().optional().nullable(),
 });
 
+export const updateWalletAddressSchema = z.object({
+  wallet_address: z.string().min(1),
+});
+
 export const declineDealSchema = z.object({
   dealId: z.number().int().positive(),
   reason: z.string().optional(),

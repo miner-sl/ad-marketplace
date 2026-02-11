@@ -39,8 +39,8 @@ export class TelegramPopupManager {
 			const telegramButtons = options.buttons.map(btn => ({
 				id: btn.id,
 				text: btn.text || '',
-				type: btn.type === 'ok' || btn.type === 'close' || btn.type === 'cancel' 
-					? 'cancel' 
+				type: btn.type === 'ok' || btn.type === 'close' || btn.type === 'cancel'
+					? 'cancel'
 					: btn.type as 'default' | 'destructive' | 'cancel'
 			}));
 
@@ -69,3 +69,25 @@ export class TelegramPopupManager {
 }
 
 export const popupManager = new TelegramPopupManager();
+
+export const confirmActionPopup = async (title: string, description: string) => {
+	const popup = await popupManager.openPopup({
+		title: title,
+		message: description,
+		buttons: [
+			{
+				id: 'ok',
+				type: 'default',
+				text: 'Confirm'
+			},
+			{
+				id: 'cancel',
+				type: 'cancel',
+			},
+		],
+	});
+
+	const canceled = !popup.button_id || popup.button_id === 'cancel';
+	console.log(popup.button_id, 'button_id', canceled,  popup.button_id === 'ok');
+	return !canceled;
+}

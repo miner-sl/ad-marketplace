@@ -1,10 +1,12 @@
 import * as cron from 'node-cron';
 
 import { DealFlowService } from './deal-flow.service';
-import  {DealRepository } from '../repositories/deal.repository';
+import { DealRepository } from '../repositories/deal.repository';
+import { UserModel} from '../repositories/user.repository';
 
 import { isPrimaryWorker } from '../utils/cluster.util';
 import logger from '../utils/logger';
+import type { User } from '../models/user.types';
 
 export class EscrowAddressSchedulerService {
   private readonly logger = logger;
@@ -29,7 +31,7 @@ export class EscrowAddressSchedulerService {
       this.logger.warn('EscrowAddressSchedulerService: Job already started');
       return;
     }
-
+    // void this.processDealsNeedingEscrow();
     this.job = cron.schedule('*/5 * * * *', async () => {
       await this.processDealsNeedingEscrow();
     });
@@ -64,7 +66,8 @@ export class EscrowAddressSchedulerService {
 
       for (const deal of deals) {
         try {
-          if (!deal.channel_owner_wallet_address) {
+          const owner: User|null = await UserModel.findById(deal.channel_owner_id)
+          if (!owner?.wallet_address) {
             this.logger.warn(`Deal #${deal.id}: Channel owner wallet address not set, skipping`, {
               dealId: deal.id,
               status: deal.status,
@@ -72,7 +75,7 @@ export class EscrowAddressSchedulerService {
             continue;
           }
 
-          await DealFlowService.generateEscrowAddress(deal);
+          await DealFlowService.generateEscrowAddress(deal, owner.wallet_address);
 
           this.logger.info(`Successfully generated escrow address for Deal #${deal.id}`, {
             dealId: deal.id,

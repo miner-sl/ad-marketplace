@@ -24,7 +24,7 @@ export function useClipboard() {
 
   return {
     copy: (text: string, message: string) => {
-      hapticFeedback('success')
+      hapticFeedback('success');
 
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard

@@ -54,7 +54,7 @@ export class DealsController {
 
       const deal = await DealFlowService.getDealById(parseInt(id), telegramUserId);
 
-      return deal;
+      return reply.send(deal);
     } catch (error: any) {
       logger.error('Failed to get deal', {
         error: error.message,
@@ -99,7 +99,7 @@ export class DealsController {
         postText,
       });
 
-      return result;
+      return reply.send(result);
     } catch (error: any) {
       logger.error('Failed to create deal', {
         error: error.message,
@@ -116,7 +116,7 @@ export class DealsController {
 
       const deal = await DealFlowService.acceptDealWithNotify(parseInt(id), userId);
 
-      return deal;
+      return reply.send(deal);
     } catch (error: any) {
       logger.error('Failed to accept deal', {
         error: error.message,
@@ -132,7 +132,7 @@ export class DealsController {
       const { id } = request.params as { id: string };
       const { tx_hash } = request.body as any;
       const deal = await DealFlowService.confirmPayment(parseInt(id), tx_hash);
-      return deal;
+      return reply.send(deal);
     } catch (error: any) {
       logger.error('Failed to confirm payment', {
         error: error.message,
@@ -152,7 +152,7 @@ export class DealsController {
         channel_owner_id,
         { contentType: content_type, contentData: content_data }
       );
-      return creative;
+      return reply.send(creative);
     } catch (error: any) {
       logger.error('Failed to submit creative', {
         error: error.message,
@@ -168,7 +168,7 @@ export class DealsController {
       const { id } = request.params as { id: string };
       const { advertiser_id } = request.body as any;
       const deal = await DealFlowService.approveCreative(parseInt(id), advertiser_id);
-      return deal;
+      return reply.send(deal);
     } catch (error: any) {
       logger.error('Failed to approve creative', {
         error: error.message,
@@ -189,7 +189,7 @@ export class DealsController {
         userId,
         notes
       );
-      return deal;
+      return reply.send(deal);
     } catch (error: any) {
       logger.error('Failed to request revision', {
         error: error.message,
@@ -219,7 +219,7 @@ export class DealsController {
         userId,
         message_text
       );
-      return result;
+      return reply.send(result);
     } catch (error: any) {
       logger.error('Failed to update deal message', {
         error: error.message,
@@ -264,7 +264,7 @@ export class DealsController {
       }
 
       const deal = await DealFlowService.declineDealWithNotification(Number(id), userId, reason);
-      return deal;
+      return reply.send(deal);
     } catch (error: any) {
       logger.error('Failed to decline deal', {
         error: error.message,

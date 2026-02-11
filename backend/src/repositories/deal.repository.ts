@@ -1,5 +1,6 @@
 import { PoolClient } from 'pg';
 import db from '../db/connection';
+import {Deal} from "../models/deal.types";
 
 export interface DealMessage {
   id: number;
@@ -16,7 +17,7 @@ export interface DealListFilters {
 }
 
 export class DealRepository {
-  static async findDealsNeedingEscrow(limit: number = 20): Promise<any[]> {
+  static async findDealsNeedingEscrow(limit: number = 20): Promise<Deal[]> {
     const result = await db.query(
       `SELECT * FROM deals 
        WHERE status IN ('pending', 'negotiating', 'payment_pending')
@@ -30,7 +31,7 @@ export class DealRepository {
   /**
    * List deals with filters (status, deal_type)
    */
-  static async listDealsWithFilters(filters: DealListFilters): Promise<any[]> {
+  static async listDealsWithFilters(filters: DealListFilters): Promise<Deal[]> {
     const { status, deal_type, limit = 100 } = filters;
 
     const result = await db.query(

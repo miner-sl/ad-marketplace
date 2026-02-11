@@ -4,7 +4,7 @@ export const goTo = (link: string) => {
   if (link.includes('t.me')) {
     openTelegramLink(link)
   } else {
-    openLink(link)
+    openLink(link, {tryInstantView: false})
   }
 }
 

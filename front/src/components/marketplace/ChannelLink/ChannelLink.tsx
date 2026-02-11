@@ -4,7 +4,7 @@ import type { Channel } from '@types'
 import { getChannelLink } from '@utils'
 
 interface ChannelLinkProps {
-  channel?: Channel | null
+  channel?: Channel | undefined
   showLabel?: boolean
   textType?: TextTypes
   weight?: 'normal' | 'medium' | 'bold'
@@ -17,7 +17,7 @@ export const ChannelLink = ({
   weight = 'normal'
 }: ChannelLinkProps) => {
   if (!channel) {
-    return null
+    return undefined;
   }
 
   const channelLink = getChannelLink(channel)

@@ -1,6 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useAuth } from '@context'
-import { TANSTACK_GC_TIME, TANSTACK_KEYS, TANSTACK_TTL } from '@utils'
+import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query'
+import {useAuth} from '@context'
+import {TANSTACK_GC_TIME, TANSTACK_KEYS, TANSTACK_TTL} from '@utils'
 import type {
   Channel,
   ChannelFilters,
@@ -19,8 +19,8 @@ import type {
   AdFormat,
   ChannelPricing,
 } from '@types'
-import { PREDEFINED_TOPICS } from '../../common/constants/topics'
-import { collapseAddress, separateNumber, createMembersCount } from '@utils'
+import {PREDEFINED_TOPICS} from '../../common/constants/topics'
+import {collapseAddress, separateNumber, createMembersCount} from '@utils'
 
 import {
   channelsAPI,
@@ -28,6 +28,7 @@ import {
   campaignsAPI,
   dealsAPI,
 } from './api'
+import config from "@config";
 
 export interface EnhancedChannel extends Omit<Channel, 'topic'> {
   activeAdFormats: AdFormat[]
@@ -39,6 +40,7 @@ export interface EnhancedChannel extends Omit<Channel, 'topic'> {
 }
 
 export interface EnhancedDeal extends Deal {
+  formattedPostVerificationTime?: string
   formattedScheduledPostTime?: string
   formattedEscrowAddress?: string
   advertiserDisplayName?: string
@@ -46,11 +48,13 @@ export interface EnhancedDeal extends Deal {
   formattedAverageViews?: string
   formattedAverageReach?: string
   formattedMembersCount?: string
+  postLink?: string
+  paymentTxLink?: string
 }
 
 // Channels
 export const useChannelsQuery = (filters?: ChannelFilters) => {
-  const { user } = useAuth()
+  const {user} = useAuth()
   const userId = user?.id
 
   return useQuery<Channel[], Error, EnhancedChannel[]>({
@@ -122,7 +126,7 @@ export const useCreateChannelMutation = () => {
   return useMutation({
     mutationFn: (data: CreateChannelRequest) => channelsAPI.createChannel(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.CHANNELS })
+      queryClient.invalidateQueries({queryKey: TANSTACK_KEYS.CHANNELS})
     },
   })
 }
@@ -136,7 +140,7 @@ export const useSetChannelPricingMutation = () => {
       queryClient.invalidateQueries({
         queryKey: TANSTACK_KEYS.CHANNEL(variables.channel_id),
       })
-      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.CHANNELS })
+      queryClient.invalidateQueries({queryKey: TANSTACK_KEYS.CHANNELS})
     },
   })
 }
@@ -144,13 +148,13 @@ export const useSetChannelPricingMutation = () => {
 export const useUpdateChannelStatusMutation = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) =>
+    mutationFn: ({id, is_active}: { id: number; is_active: boolean }) =>
       channelsAPI.updateChannelStatus(id, is_active),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: TANSTACK_KEYS.CHANNEL(variables.id),
       })
-      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.CHANNELS })
+      queryClient.invalidateQueries({queryKey: TANSTACK_KEYS.CHANNELS})
     },
   })
 }
@@ -158,13 +162,13 @@ export const useUpdateChannelStatusMutation = () => {
 export const useUpdateChannelMutation = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: UpdateChannelRequest }) =>
+    mutationFn: ({id, data}: { id: number; data: UpdateChannelRequest }) =>
       channelsAPI.updateChannel(id, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: TANSTACK_KEYS.CHANNEL(variables.id),
       })
-      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.CHANNELS })
+      queryClient.invalidateQueries({queryKey: TANSTACK_KEYS.CHANNELS})
     },
   })
 }
@@ -209,9 +213,9 @@ export const useUpdateChannelListingMutation = () => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
-      id,
-      data,
-    }: {
+                   id,
+                   data,
+                 }: {
       id: number
       data: Partial<CreateChannelListingRequest> & { is_active?: boolean }
     }) => channelListingsAPI.updateChannelListing(id, data),
@@ -264,7 +268,7 @@ export const useCreateCampaignMutation = () => {
     mutationFn: (data: CreateCampaignRequest) =>
       campaignsAPI.createCampaign(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.CAMPAIGNS })
+      queryClient.invalidateQueries({queryKey: TANSTACK_KEYS.CAMPAIGNS})
     },
   })
 }
@@ -273,9 +277,9 @@ export const useUpdateCampaignMutation = () => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
-      id,
-      data,
-    }: {
+                   id,
+                   data,
+                 }: {
       id: number
       data: Partial<CreateCampaignRequest> & { status?: Campaign['status'] }
     }) => campaignsAPI.updateCampaign(id, data),
@@ -283,7 +287,7 @@ export const useUpdateCampaignMutation = () => {
       queryClient.invalidateQueries({
         queryKey: TANSTACK_KEYS.CAMPAIGN(variables.id),
       })
-      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.CAMPAIGNS })
+      queryClient.invalidateQueries({queryKey: TANSTACK_KEYS.CAMPAIGNS})
     },
   })
 }
@@ -293,7 +297,7 @@ export const useDeleteCampaignMutation = () => {
   return useMutation({
     mutationFn: (id: number) => campaignsAPI.deleteCampaign(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.CAMPAIGNS })
+      queryClient.invalidateQueries({queryKey: TANSTACK_KEYS.CAMPAIGNS})
     },
   })
 }
@@ -306,6 +310,29 @@ export const useDealsQuery = (filters?: DealFilters) => {
   })
 }
 
+function buildPostLink(channelUsername: string | undefined, telegramChannelId: number, messageId: number): string {
+  if (channelUsername) {
+    return `https://t.me/${channelUsername.replace('@', '')}/${messageId}`;
+  } else if (telegramChannelId) {
+    // Convert channel ID format: -1001234567890 -> 1234567890
+    const channelIdStr = telegramChannelId.toString().replace('-100', '');
+    return `https://t.me/c/${channelIdStr}/${messageId}`;
+  }
+  return '';
+}
+
+function buildTonscanTxLink(txHash: string | undefined) {
+  if (!txHash) return undefined;
+
+  const baseUrl = config?.isDev
+    ? 'https://testnet.tonscan.org'
+    : 'https://tonscan.org';
+
+  const encodedHash = encodeURIComponent(txHash);
+  return `${baseUrl}/tx/${encodedHash}`;
+}
+
+
 export const useDealQuery = (id: number, userId?: number) => {
   return useQuery<Deal, Error, EnhancedDeal>({
     queryKey: [...TANSTACK_KEYS.DEAL(id), userId],
@@ -313,6 +340,10 @@ export const useDealQuery = (id: number, userId?: number) => {
     select: (deal) => {
       const formattedScheduledPostTime = deal.scheduled_post_time
         ? new Date(deal.scheduled_post_time).toLocaleString()
+        : undefined
+
+      const formattedPostVerificationTime = deal.post_verification_until
+        ? new Date(deal.post_verification_until).toLocaleString()
         : undefined
 
       const formattedEscrowAddress = deal.escrow_address
@@ -347,8 +378,14 @@ export const useDealQuery = (id: number, userId?: number) => {
         ? createMembersCount(subscribersCount)
         : undefined
 
+
       return {
         ...deal,
+        postLink: deal.status === 'posted' && deal.channel && deal.post_message_id ?
+          buildPostLink(deal.channel?.username, deal.channel.telegram_channel_id, deal.post_message_id)
+          : undefined,
+        paymentTxLink: buildTonscanTxLink(deal.payment_tx_hash),
+        formattedPostVerificationTime,
         formattedScheduledPostTime,
         formattedEscrowAddress,
         advertiserDisplayName,
@@ -379,7 +416,7 @@ export const useCreateDealMutation = () => {
   return useMutation({
     mutationFn: (data: CreateDealRequest) => dealsAPI.createDeal(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.DEALS })
+      queryClient.invalidateQueries({queryKey: TANSTACK_KEYS.DEALS})
     },
   })
 }
@@ -387,13 +424,13 @@ export const useCreateDealMutation = () => {
 export const useAcceptDealMutation = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, channel_owner_id }: { id: number; channel_owner_id: number }) =>
+    mutationFn: ({id, channel_owner_id}: { id: number; channel_owner_id: number }) =>
       dealsAPI.acceptDeal(id, channel_owner_id),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: TANSTACK_KEYS.DEAL(variables.id),
       })
-      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.DEALS })
+      queryClient.invalidateQueries({queryKey: TANSTACK_KEYS.DEALS})
     },
   })
 }
@@ -401,10 +438,12 @@ export const useAcceptDealMutation = () => {
 export const useDeclineDealMutation = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, reason }: { id: number; reason?: string }) => dealsAPI.declineDeal(id, reason),
-    onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.DEAL(id) })
-      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.DEALS })
+    mutationFn: ({id, reason}: { id: number; reason?: string }) => dealsAPI.declineDeal(id, reason),
+    onSuccess: (_, {id}) => {
+      queryClient.invalidateQueries({
+        queryKey: TANSTACK_KEYS.DEAL(id),
+      })
+      queryClient.invalidateQueries({queryKey: TANSTACK_KEYS.DEALS})
     },
   })
 }
@@ -412,13 +451,13 @@ export const useDeclineDealMutation = () => {
 export const useConfirmPaymentMutation = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, tx_hash }: { id: number; tx_hash: string }) =>
+    mutationFn: ({id, tx_hash}: { id: number; tx_hash: string }) =>
       dealsAPI.confirmPayment(id, tx_hash),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: TANSTACK_KEYS.DEAL(variables.id),
       })
-      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.DEALS })
+      queryClient.invalidateQueries({queryKey: TANSTACK_KEYS.DEALS})
     },
   })
 }
@@ -432,7 +471,7 @@ export const useSubmitCreativeMutation = () => {
       queryClient.invalidateQueries({
         queryKey: TANSTACK_KEYS.DEAL(variables.deal_id),
       })
-      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.DEALS })
+      queryClient.invalidateQueries({queryKey: TANSTACK_KEYS.DEALS})
     },
   })
 }
@@ -442,8 +481,8 @@ export const useApproveCreativeMutation = () => {
   return useMutation({
     mutationFn: (dealId: number) => dealsAPI.approveCreative(dealId),
     onSuccess: (_, dealId) => {
-      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.DEAL(dealId) })
-      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.DEALS })
+      queryClient.invalidateQueries({queryKey: TANSTACK_KEYS.DEAL(dealId)})
+      queryClient.invalidateQueries({queryKey: TANSTACK_KEYS.DEALS})
     },
   })
 }
@@ -452,9 +491,9 @@ export const useRequestCreativeRevisionMutation = () => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
-      dealId,
-      notes,
-    }: {
+                   dealId,
+                   notes,
+                 }: {
       dealId: number
       notes: string
     }) => dealsAPI.requestCreativeRevision(dealId, notes),
@@ -462,7 +501,7 @@ export const useRequestCreativeRevisionMutation = () => {
       queryClient.invalidateQueries({
         queryKey: TANSTACK_KEYS.DEAL(variables.dealId),
       })
-      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.DEALS })
+      queryClient.invalidateQueries({queryKey: TANSTACK_KEYS.DEALS})
     },
   })
 }
@@ -471,9 +510,9 @@ export const useUpdateDealMessageMutation = () => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
-      dealId,
-      message_text,
-    }: {
+                   dealId,
+                   message_text,
+                 }: {
       dealId: number
       message_text: string
     }) => dealsAPI.updateDealMessage(dealId, message_text),
@@ -481,7 +520,7 @@ export const useUpdateDealMessageMutation = () => {
       queryClient.invalidateQueries({
         queryKey: TANSTACK_KEYS.DEAL(variables.dealId),
       })
-      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.DEALS })
+      queryClient.invalidateQueries({queryKey: TANSTACK_KEYS.DEALS})
     },
   })
 }
@@ -490,9 +529,9 @@ export const useSchedulePostMutation = () => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({
-      dealId,
-      scheduled_post_time,
-    }: {
+                   dealId,
+                   scheduled_post_time,
+                 }: {
       dealId: number
       scheduled_post_time: string
     }) => dealsAPI.schedulePost(dealId, scheduled_post_time),
@@ -500,7 +539,7 @@ export const useSchedulePostMutation = () => {
       queryClient.invalidateQueries({
         queryKey: TANSTACK_KEYS.DEAL(variables.dealId),
       })
-      queryClient.invalidateQueries({ queryKey: TANSTACK_KEYS.DEALS })
+      queryClient.invalidateQueries({queryKey: TANSTACK_KEYS.DEALS})
     },
   })
 }

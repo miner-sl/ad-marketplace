@@ -746,7 +746,7 @@ export class TONService {
       // Verify sufficient balance
       if (balance < amountNano) {
         throw new Error(
-          `Insufficient balance. Required: ${amount} TON (${amountNano.toString()} nanoTON), ` +
+          `Insufficient balance. Required: ${amount} USDT (${amountNano.toString()} nanoTON), ` +
           `Available: ${fromNano(balance)} TON (${balance.toString()} nanoTON)`
         );
       }

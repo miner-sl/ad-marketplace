@@ -1,7 +1,9 @@
 import { FastifyPluginAsync } from 'fastify';
-import { validateQuery } from '../middleware/validation';
+import { validateQuery, validateBody } from '../middleware/validation';
+import { authMiddleware } from '../middleware/auth';
 import { z } from 'zod';
 import { UserController } from '../controllers/user.controller';
+import { updateWalletAddressSchema } from '../utils/validation';
 
 const getUserMeQuerySchema = z.object({
   telegram_id: z.string().regex(/^\d+$/).transform(Number),
@@ -13,6 +15,10 @@ const userRouter: FastifyPluginAsync = async (fastify) => {
   }, UserController.getCurrentUser);
 
   fastify.post('/register', UserController.registerUser);
+
+  fastify.post('/update-wallet-address', {
+    preHandler: [authMiddleware, validateBody(updateWalletAddressSchema)],
+  }, UserController.updateWalletAddress);
 };
 
 export default userRouter;

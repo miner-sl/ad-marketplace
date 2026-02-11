@@ -38,10 +38,11 @@ import {transferTonCall, useClipboard} from "@hooks";
 import config from '@config'
 import {initializeTonConnect, tonConnectUI} from '../../../common/utils/lazy';
 import {requestAPI} from "../../../common/utils/api";
-import {hapticFeedback, playConfetti, popupManager} from '@utils';
+import {confirmActionPopup, goTo, hapticFeedback, playConfetti, popupManager} from '@utils';
 import type {DealMessage} from '@types';
 
 import styles from './DealDetailsPage.module.scss';
+
 
 interface DealHeaderProps {
   deal: EnhancedDeal
@@ -55,7 +56,7 @@ type WalletFormStore = {
 
 const DealHeader = ({deal}: DealHeaderProps) => {
   if (!deal) {
-    return undefined;;
+    return undefined;
   }
 
   return (
@@ -92,6 +93,49 @@ const getTONScanUrl = (address: string): string => {
   return `${baseUrl}/address/${address}`;
 }
 
+
+
+const ListLinkView = ({
+  title,
+  value,
+  link,
+  copyText = 'Copied to clipboard'
+}: { link: string, value: string, title: string, copyText: string }) => {
+  const {copy} = useClipboard();
+
+  const handleEscrowAddressClick = () => {
+    goTo(link);
+  }
+
+  return (
+    <ListItem
+      text={title}
+      after={
+        <BlockNew row align="center" gap={8}>
+          <div onClick={handleEscrowAddressClick} className={styles.clickable}>
+            <Text
+              type="text"
+              color="accent"
+            >
+              {value}
+            </Text>
+          </div>
+          <Icon
+            name="share"
+            size={20}
+            color="accent"
+            className={styles.clickable}
+            onClick={(e) => {
+              e.stopPropagation()
+              copy(link, copyText)
+            }}
+          />
+        </BlockNew>
+      }
+    />
+  )
+}
+
 export const DealDetailsPage = () => {
   const {id} = useParams<{ id: string }>()
   const dealId = id ? parseInt(id) : 0
@@ -108,7 +152,6 @@ export const DealDetailsPage = () => {
   // const { data: creative } = useDealCreativeQuery(dealId)
   // const creative: Creative | null = deal?.creative;
   // const submitCreativeMutation = useSubmitCreativeMutation()
-  const {copy} = useClipboard()
   const {showToast} = useToast()
   // const {transferTon, isConnected} = useTonTransfer()
   const [showDeclineModal, setShowDeclineModal] = useState(false)
@@ -127,14 +170,6 @@ export const DealDetailsPage = () => {
         // For users without username, use user ID
         openTelegramLink(`https://t.me/user${advertiser.telegram_id}`)
       }
-    }
-  }
-
-
-  const handleEscrowAddressClick = () => {
-    if (deal?.escrow_address) {
-      const url = getTONScanUrl(deal.escrow_address);
-      window.open(url, '_blank');
     }
   }
 
@@ -381,8 +416,13 @@ export const DealDetailsPage = () => {
     });
   };
 
+
   const handleAcceptDeal = async () => {
-    if (!user) return
+    if (!user) return;
+    const ok = await confirmActionPopup('Accept Deal', 'Do you want to accept deal?');
+    if (!ok) {
+      return;
+    }
     try {
       hapticFeedback('soft');
       await acceptDealMutation.mutateAsync({
@@ -392,7 +432,7 @@ export const DealDetailsPage = () => {
     } catch (error) {
       console.error('Failed to accept deal:', error)
     }
-  }
+  };
 
   const handleDeclineDeal = () => {
     setShowDeclineModal(true)
@@ -403,6 +443,7 @@ export const DealDetailsPage = () => {
       if (declineDealMutation.isPending) {
         return
       }
+
       hapticFeedback('soft');
       setShowDeclineModal(false)
       await declineDealMutation.mutateAsync({id: dealId, reason});
@@ -446,13 +487,16 @@ export const DealDetailsPage = () => {
     if (!notes || !notes.trim() || notes.trim().length < 5) {
       return
     }
-
+    const ok = await confirmActionPopup('Draft Deal', 'Do you want to draft deal?');
+    if (!ok) {
+      return;
+    }
     hapticFeedback('soft');
     try {
       await requestRevisionMutation.mutateAsync({
         dealId: deal.id,
         notes: notes.trim(),
-      })
+      });
       showToast({
         type: 'success',
         message: 'Revision request sent successfully',
@@ -525,7 +569,8 @@ export const DealDetailsPage = () => {
   const showPaymentButton = deal && isAdvertiserUser && deal.status === 'payment_pending' && deal.escrow_address !== undefined;
 
   const wallet = useTonWallet();
-  const channelStats = deal?.channel?.stats
+  const channelStats = deal?.channel?.stats;
+
   if (isLoading || !deal) {
     return (
       <Page back>
@@ -693,6 +738,14 @@ export const DealDetailsPage = () => {
                   }
                 />
               )}
+              {deal.postLink && (
+                <ListLinkView
+                  title="Post Link "
+                  value=" View Post"
+                  link={deal.postLink}
+                  copyText='Link to the channel post copied'
+                />
+              )}
               <ListItem
                 text="Ad Format"
                 after={
@@ -730,34 +783,30 @@ export const DealDetailsPage = () => {
                   }
                 />
               )}
-              {deal.escrow_address && deal.formattedEscrowAddress && (
-                <ListItem
-                  text=" Escrow Address"
-                  after={
-                    <BlockNew row align="center" gap={8}>
-                      <div onClick={handleEscrowAddressClick} className={styles.clickable}>
-                        <Text
-                          type="text"
-                          color="accent"
-                        >
-                          {deal.formattedEscrowAddress}
-                        </Text>
-                      </div>
-                      <Icon
-                        name="share"
-                        size={20}
-                        color="accent"
-                        className={styles.clickable}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          copy(deal.escrow_address!, 'Escrow address copied')
-                        }}
-                      />
-                    </BlockNew>
-                  }
+              {deal.postLink === null && deal.escrow_address && deal.formattedEscrowAddress && (
+                <ListLinkView
+                  title="Escrow Address"
+                  value={deal.formattedEscrowAddress}
+                  link={getTONScanUrl(deal.escrow_address)}
+                  copyText='Escrow address copied'
                 />
               )}
-              {deal.scheduled_post_time && (
+              {deal.paymentTxLink && deal.payment_tx_hash && (
+                <ListLinkView
+                  title="Payment Transcation"
+                  value="View"
+                  link={deal.paymentTxLink}
+                  copyText='Escrow address copied'
+                />
+              )}
+              {deal.formattedPostVerificationTime && deal.postLink ? (
+                <ListItem
+                  text="Post Validation Time"
+                  description={<Text type="caption2">Post verification time with automatic payout to channel
+                    owner</Text>}
+                  after={deal.formattedPostVerificationTime}
+                />
+              ) : deal.formattedScheduledPostTime && (
                 <ListItem
                   text="Scheduled Post Time"
                   after={deal.formattedScheduledPostTime}

@@ -6,9 +6,8 @@ export class UserController {
   static async getCurrentUser(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { telegram_id } = request.query as any;
-      
+
       const user = await UserModel.findByTelegramId(telegram_id);
-      
       if (!user) {
         return {
           registered: false,
@@ -79,6 +78,42 @@ export class UserController {
       logger.error('Failed to register user', {
         error: error.message,
         stack: error.stack,
+      });
+      reply.code(500).send({ error: error.message });
+    }
+  }
+
+  static async updateWalletAddress(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const userId = request.user?.id;
+      if (!userId) {
+        return reply.code(401).send({ error: 'Unauthorized' });
+      }
+
+      const { wallet_address } = request.body as { wallet_address: string };
+
+      // Get user to find their telegram_id
+      const user = await UserModel.findById(userId);
+      if (!user) {
+        return reply.code(404).send({ error: 'User not found' });
+      }
+
+      const updatedUser = await UserModel.updateWalletAddress(user.telegram_id, wallet_address);
+
+      return reply.send({
+        success: true,
+        user: {
+          id: updatedUser.id,
+          telegram_id: updatedUser.telegram_id,
+          wallet_address: updatedUser.wallet_address,
+        },
+        message: 'Wallet address updated successfully',
+      });
+    } catch (error: any) {
+      logger.error('Failed to update wallet address', {
+        error: error.message,
+        stack: error.stack,
+        userId: request.user?.id,
       });
       reply.code(500).send({ error: error.message });
     }

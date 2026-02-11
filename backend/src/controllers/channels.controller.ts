@@ -260,7 +260,7 @@ export class ChannelsController {
       const result = await ChannelService.update(request.user.id, channelId, {
         topic: body.topic,
         active: body.active,
-        price: body.price
+        price: body.price,
       });
       if (!result.ok) {
         return reply.code(result.status || 500).send({

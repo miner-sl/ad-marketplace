@@ -145,8 +145,8 @@ Examples:
 
     if (balanceNano < amountNano) {
       console.error(`\n❌ Error: Insufficient balance`);
-      console.error(`   Required: ${amount} TON (${amountNano.toString()} nanoTON)`);
-      console.error(`   Available: ${balanceTON} TON (${balance.toString()} nanoTON)`);
+      console.error(`   Required: ${amount} USDT (${amountNano.toString()} nanoTON)`);
+      console.error(`   Available: ${balanceTON} USDT (${balance.toString()} nanoTON)`);
       console.error(`   Shortfall: ${(amount - balanceTON).toFixed(9)} TON\n`);
       process.exit(1);
     }

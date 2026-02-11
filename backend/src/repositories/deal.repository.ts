@@ -50,7 +50,7 @@ export class DealRepository {
     const result = await db.query(
       `SELECT d.* FROM deals d
        INNER JOIN channels c ON d.channel_id = c.id
-       WHERE c.owner_id = $1 AND d.status = 'pending'
+       WHERE c.owner_id = $1 AND (d.status = 'pending' OR d.status='negotiating' OR d.status='payment_pending')
        ORDER BY d.created_at DESC
        LIMIT $2`,
       [ownerId, limit]

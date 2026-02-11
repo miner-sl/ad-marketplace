@@ -79,7 +79,7 @@ export const AddChannelPage = () => {
   }
 
   useEffect(() => {
-    if (!username.trim() || validateChannelMutation.isPending) {
+    if (!username.trim()) {
       return;
     }
     void handleValidateChannel();

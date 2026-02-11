@@ -33,6 +33,9 @@ export const submitCreativeSchema = z.object({
   content_data: z.record(z.any()),
 });
 
+export const requestRevisionSchema = z.object({
+  notes: z.string().min(4),
+});
 export const confirmPaymentSchema = z.object({
   tx_hash: z.string().min(1),
 });

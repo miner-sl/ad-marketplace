@@ -276,10 +276,10 @@ export const dealsAPI = {
 
   requestCreativeRevision: async (
     dealId: number,
-    revision_notes: string
+    notes: string
   ): Promise<Creative> => {
     const { data, ok, error } =
-      await MarketplaceService.requestCreativeRevision(dealId, revision_notes)
+      await MarketplaceService.requestCreativeRevision(dealId, notes)
     if (!ok || !data) {
       throw new Error(error || 'Failed to request creative revision')
     }

@@ -4,6 +4,7 @@ import {hapticFeedback, openTelegramLink} from '@tma.js/sdk-react'
 import {
   Block,
   BlockNew,
+  Button,
   ChannelLink,
   DealStatusBadge,
   DeclineDealModal,
@@ -36,6 +37,7 @@ import {initializeTonConnect, tonConnectUI} from "../../../common/utils/lazy";
 import {type SendTransactionResponse, type TonProofItemReply, useTonWallet} from "@tonconnect/ui-react";
 import {requestAPI} from "../../../common/utils/api";
 import {playConfetti, popupManager} from "@utils";
+import type {DealMessage} from "@types";
 
 interface DealHeaderProps {
   deal: EnhancedDeal
@@ -96,11 +98,11 @@ export const DealDetailsPage = () => {
   const [formWallet, setFormWallet] = useState<WalletFormStore>({});
   const {data: deal, isLoading} = useDealQuery(dealId, user?.telegramId);
   // const { data: creative } = useDealCreativeQuery(dealId)
-  const acceptDealMutation = useAcceptDealMutation()
-  const declineDealMutation = useDeclineDealMutation()
+  const acceptDealMutation = useAcceptDealMutation();
+  const declineDealMutation = useDeclineDealMutation();
   // const approveCreativeMutation = useApproveCreativeMutation()
-  const requestRevisionMutation = useRequestCreativeRevisionMutation()
-  const updateDealMessageMutation = useUpdateDealMessageMutation()
+  const requestRevisionMutation = useRequestCreativeRevisionMutation();
+  const updateDealMessageMutation = useUpdateDealMessageMutation();
   // TODO: Uncomment when useDealCreativeQuery is implemented
   // const { data: creative } = useDealCreativeQuery(dealId)
   // const creative: Creative | null = deal?.creative;
@@ -111,9 +113,10 @@ export const DealDetailsPage = () => {
   const [showDeclineModal, setShowDeclineModal] = useState(false)
 
   const isChannelOwner = deal && deal?.channel_owner_id === user?.id
-  const isAdvertiser = deal?.advertiser_id === user?.id
+  const isAdvertiser = deal && user && deal?.advertiser_id === user?.id;
   const canInteract = isChannelOwner || isAdvertiser
   const canEditMessage = isAdvertiser && deal?.status === 'negotiating'
+  console.log({advertiser_id: deal?.advertiser_id, user, isAdvertiser, status: deal?.status});
 
   const handleAdvertiserClick = () => {
     const advertiser = deal && typeof deal.advertiser === 'object' && deal.advertiser !== null ? deal.advertiser : null
@@ -439,14 +442,14 @@ export const DealDetailsPage = () => {
       return;
     }
     const notes = prompt('Please provide your requested changes:')
-    if (!notes || !notes.trim()) {
+    if (!notes || !notes.trim() || notes.trim().length < 5) {
       return
     }
 
     try {
       await requestRevisionMutation.mutateAsync({
         dealId: deal.id,
-        revision_notes: notes.trim(),
+        notes: notes.trim(),
       })
       showToast({
         type: 'success',
@@ -555,8 +558,53 @@ export const DealDetailsPage = () => {
         <TelegramBackButton/>
 
         <DealHeader deal={deal}/>
+        {(canInteract && deal.status === 'pending') || (deal.owner && deal.status === 'pending') ? (
+          <Block margin="top" marginValue={24}>
+            {isChannelOwner && deal.owner && deal.status === 'pending' && (
+              <BlockNew gap={4} row>
+                <>
+                  <ListItem
+                    text={
+                      <Text type="text" color="accent">
+                        Accept
+                      </Text>
+                    }
+                    before={
+                      <Icon name="checkmark" size={28} color="accent"/>
+                    }
+                    onClick={handleAcceptDeal}
+                    disabled={acceptDealMutation.isPending}
+                  />
+                  <ListItem
+                    text={
+                      <Text type="text" color="danger">
+                        Decline
+                      </Text>
+                    }
+                    before={
+                      <Icon name="cross" size={28} color="danger"/>
+                    }
+                    onClick={handleDeclineDeal}
+                    disabled={declineDealMutation.isPending}
+                  />
+                  <ListItem
+                    text={
+                      <Text type="text">
+                        Request Changes
+                      </Text>
+                    }
+                    before={
+                      <Icon name="share" size={28} color="accent"/>
+                    }
+                    onClick={handleRequestChanges}
+                  />
+                </>
+              </BlockNew>
+            )}
+          </Block>
+        ) : null}
 
-        <Block gap={8}>
+        <Block gap={8} margin="top" marginValue={24}>
           {channelStats && (
             <Block margin="bottom" marginValue={24}>
               <Block paddingValue={16}>
@@ -733,7 +781,7 @@ export const DealDetailsPage = () => {
               )}
             </List>
 
-            <Block padding="top" paddingValue={16}>
+            <Block padding="top" paddingValue={16} gap={12}>
               <List header="Post Message">
                 {deal.messages && deal.messages.length > 0 && deal.messages[0]?.message_text && (
                   <ListItem
@@ -744,71 +792,66 @@ export const DealDetailsPage = () => {
                     )}
                     after={
                       canEditMessage ? (
-                        <Icon
-                          name="share"
-                          size={20}
-                          color="primary"
-                          className={styles.clickable}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleEditMessage()
-                          }}
-                        />
+                        <Button
+                          size="small"
+                          // prefix={(
+                          //   <Icon
+                          //     name="cross"
+                          //     size={12}
+                          //     color="secondary"
+                          //     className={styles.clickable}
+                          //
+                          //   />
+                          // )}
+                          onClick={handleEditMessage}
+                        >
+
+                          Edit
+                        </Button>
                       ) : undefined
                     }
                   />
                 )}
               </List>
-            </Block>
-          </Block>
-
-          {(canInteract && deal.status === 'pending') || (deal.owner && deal.status === 'pending') ? (
-            <Block margin="top" marginValue={24}>
-              {isChannelOwner && deal.owner && deal.status === 'pending' && (
-                <List header="ACTIONS">
-                  <BlockNew gap={4}>
-                    <>
+              {deal.messages && deal.messages.length >= 1 && (
+                <List header="Chanell Owner Messages">
+                  {deal.messages.slice(1).map((dealMessage: DealMessage) => (
+                    dealMessage.message_text ? (
                       <ListItem
-                        text={
-                          <Text type="text" color="accent">
-                            Accept
-                          </Text>
-                        }
-                        before={
-                          <Icon name="checkmark" size={28} color="accent"/>
-                        }
-                        onClick={handleAcceptDeal}
-                        disabled={acceptDealMutation.isPending}
-                      />
-                      <ListItem
-                        text={
-                          <Text type="text" color="danger">
-                            Decline
-                          </Text>
-                        }
-                        before={
-                          <Icon name="cross" size={28} color="danger"/>
-                        }
-                        onClick={handleDeclineDeal}
-                        disabled={declineDealMutation.isPending}
-                      />
-                      <ListItem
-                        text={
+                        key={dealMessage.id}
+                        text={(
                           <Text type="text">
-                            Request Changes
+                            {dealMessage.message_text}
                           </Text>
+                        )}
+                        after={
+                          <></>
+                          // canEditMessage ? (
+                          //   <Button
+                          //     prefix={(
+                          //       <Icon
+                          //         name="cross"
+                          //         size={20}
+                          //         color="primary"
+                          //         className={styles.clickable}
+                          //
+                          //       />
+                          //     )}
+                          //     onClick={handleEditMessage}
+                          //   >
+                          //
+                          //     Edit
+                          //   </Button>
+                          // ) : undefined
                         }
-                        before={
-                          <Icon name="share" size={28} color="accent"/>
-                        }
-                        onClick={handleRequestChanges}
                       />
-                    </>
-                  </BlockNew>
+                    ) : null
+                  ))}
                 </List>
               )}
             </Block>
-          ) : null}
+          </Block>
+
         </Block>
 
       </PageLayout>

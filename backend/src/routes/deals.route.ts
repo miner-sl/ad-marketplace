@@ -1,7 +1,16 @@
 import { FastifyPluginAsync } from 'fastify';
 import { validateBody, validateQuery } from '../middleware/validation';
 import { authMiddleware } from '../middleware/auth';
-import { createDealSchema, confirmPaymentSchema, submitCreativeSchema, listDealsQuerySchema, dealRequestsQuerySchema, declineDealSchema, submitPaymentSchema } from '../utils/validation';
+import {
+  createDealSchema,
+  confirmPaymentSchema,
+  submitCreativeSchema,
+  listDealsQuerySchema,
+  dealRequestsQuerySchema,
+  declineDealSchema,
+  submitPaymentSchema,
+  requestRevisionSchema
+} from '../utils/validation';
 import { DealsController } from '../controllers/deals.controller';
 
 const dealsRouter: FastifyPluginAsync = async (fastify) => {
@@ -38,7 +47,7 @@ const dealsRouter: FastifyPluginAsync = async (fastify) => {
   }, DealsController.approveCreative);
 
   fastify.post('/:id/creative/revision', {
-    preHandler: [authMiddleware],
+    preHandler: [authMiddleware, validateBody(requestRevisionSchema)],
   }, DealsController.requestRevision);
 
   fastify.post('/:id/update-message', {

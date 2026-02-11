@@ -832,28 +832,28 @@ export class TelegramNotificationService {
         logger.warn(`Advertiser #${deal.advertiser_id} not found for revision request notification`);
         return;
       }
-
+      const botUsername = env.TELEGRAM_BOT_USERNAME || 'NonNano_Bot';
       const notificationMessage =
         `⚠️ Revision Requested for Deal #${deal.id}\n\n` +
         `The channel owner has requested changes to your creative submission.\n\n` +
         `💬 Revision Notes:\n${notes}\n\n` +
         `Please review the feedback and submit an updated creative.\n\n` +
+        `App https://t.me/${botUsername}/app` +
         `Use /deal ${deal.id} to view details and upload a new creative.`;
 
-      const botUsername = env.TELEGRAM_BOT_USERNAME || 'NonNano_Bot';
       // const appName = 'app';
       // const miniAppUrl = `https://t.me/${botUsername}/${appName}?startapp=deal_${deal.id}`;
-      const miniAppUrl = `https://t.me/${botUsername}`;
+      // const miniAppUrl = `https://t.me/${botUsername}/app`;
 
       const notificationButtons = {
         reply_markup: {
           inline_keyboard: [
             [
               { text: '📋 View Deal', callback_data: `deal_details_${deal.id}` },
-              {
-                text: '📋 View Deal (Mini App)',
-                web_app: { url: miniAppUrl }
-              }
+              // {
+              //   text: '📋 View Deal (Mini App)',
+              //   web_app: { url: miniAppUrl }
+              // }
             ]
           ]
         }

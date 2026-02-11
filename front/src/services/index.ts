@@ -302,11 +302,11 @@ export const MarketplaceService = {
 
   requestCreativeRevision: async (
     dealId: number,
-    revision_notes: string
+    notes: string
   ): Promise<ApiResponse<Creative>> => {
     return await apiRequest<Creative>(`/deals/${dealId}/creative/revision`, {
       method: 'POST',
-      body: JSON.stringify({ revision_notes }),
+      body: JSON.stringify({ notes }),
     })
   },
 

@@ -259,7 +259,7 @@ export class DealsController {
     try {
       const { id } = request.params as { id: string };
       const userId = request.user?.id as number;
-      const { notes } = request.body as any;
+      const { notes } = request.body as { notes: string };
       const deal = await DealFlowService.requestRevision(
         parseInt(id),
         userId,

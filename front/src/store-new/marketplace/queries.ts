@@ -453,11 +453,11 @@ export const useRequestCreativeRevisionMutation = () => {
   return useMutation({
     mutationFn: ({
       dealId,
-      revision_notes,
+      notes,
     }: {
       dealId: number
-      revision_notes: string
-    }) => dealsAPI.requestCreativeRevision(dealId, revision_notes),
+      notes: string
+    }) => dealsAPI.requestCreativeRevision(dealId, notes),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: TANSTACK_KEYS.DEAL(variables.dealId),

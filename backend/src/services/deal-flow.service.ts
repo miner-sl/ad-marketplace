@@ -434,7 +434,7 @@ export class DealFlowService {
       await client.query(
         `INSERT INTO deal_messages (deal_id, sender_id, message_text)
          VALUES ($1, $2, $3)`,
-        [dealId, requestedByDbId, `Revision requested: ${notes}`]
+        [dealId, requestedByDbId, `Revision: ${notes}`]
       );
 
       return updateResult.rows[0];

@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { CampaignRepository } from '../repositories/campaign.repository';
-import { UserModel } from '../repositories/user.repository';
+import { CampaignsService, CreateCampaignDto } from '../services/campaigns.service';
 import logger from '../utils/logger';
 
 export class CampaignsController {
@@ -55,42 +55,24 @@ export class CampaignsController {
 
   static async createCampaign(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const {
-        telegram_id,
-        title,
-        description,
-        budget_ton,
-        target_subscribers_min,
-        target_subscribers_max,
-        target_views_min,
-        target_languages,
-        preferred_formats,
-        username,
-        first_name,
-        last_name,
-      } = request.body as any;
+      const body = request.body as any;
 
-      const user = await UserModel.findOrCreate({
-        telegram_id,
-        username,
-        first_name,
-        last_name,
-      });
+      const dto: CreateCampaignDto = {
+        telegram_id: body.telegram_id,
+        title: body.title,
+        description: body.description,
+        budget_ton: body.budget_ton ? parseFloat(body.budget_ton) : undefined,
+        target_subscribers_min: body.target_subscribers_min ? parseInt(body.target_subscribers_min) : undefined,
+        target_subscribers_max: body.target_subscribers_max ? parseInt(body.target_subscribers_max) : undefined,
+        target_views_min: body.target_views_min ? parseInt(body.target_views_min) : undefined,
+        target_languages: body.target_languages,
+        preferred_formats: body.preferred_formats,
+        username: body.username,
+        first_name: body.first_name,
+        last_name: body.last_name,
+      };
 
-      await UserModel.updateRole(telegram_id, 'advertiser', true);
-
-      const campaign = await CampaignRepository.create({
-        advertiser_id: user.id,
-        title,
-        description,
-        budget_ton: budget_ton ? parseFloat(budget_ton) : undefined,
-        target_subscribers_min: target_subscribers_min ? parseInt(target_subscribers_min) : undefined,
-        target_subscribers_max: target_subscribers_max ? parseInt(target_subscribers_max) : undefined,
-        target_views_min: target_views_min ? parseInt(target_views_min) : undefined,
-        target_languages,
-        preferred_formats,
-      });
-
+      const campaign = await CampaignsService.createCampaign(dto);
       return campaign;
     } catch (error: any) {
       logger.error('Failed to create campaign', {

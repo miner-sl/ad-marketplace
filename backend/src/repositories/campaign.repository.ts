@@ -1,5 +1,7 @@
+import { PoolClient } from 'pg';
 import db from '../db/connection';
 import { Campaign } from '../models/campaign.types';
+import {withTx} from "../utils/transaction";
 
 export interface CampaignListFilters {
   advertiser_id?: number;
@@ -93,6 +95,35 @@ export class CampaignRepository {
   }
 
   /**
+   * Create a new campaign within an existing transaction
+   */
+  static async createWithClient(client: PoolClient, data: CampaignCreateData): Promise<Campaign> {
+    const result = await client.query(
+      `INSERT INTO campaigns (
+        advertiser_id, title, description, budget_ton,
+        target_subscribers_min, target_subscribers_max, target_views_min,
+        target_languages, preferred_formats, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active')
+      RETURNING *`,
+      [
+        data.advertiser_id,
+        data.title,
+        data.description,
+        data.budget_ton ?? null,
+        data.target_subscribers_min ?? null,
+        data.target_subscribers_max ?? null,
+        data.target_views_min ?? null,
+        data.target_languages ? JSON.stringify(data.target_languages) : null,
+        data.preferred_formats ? JSON.stringify(data.preferred_formats) : null,
+      ]
+    );
+    if (!result?.rows || result.rows.length === 0) {
+      throw new Error('Failed to create campaign');
+    }
+    return result.rows[0];
+  }
+
+  /**
    * Create a new campaign
    */
   static async create(data: CampaignCreateData): Promise<Campaign> {
@@ -165,13 +196,17 @@ export class CampaignRepository {
     updates.push(`updated_at = CURRENT_TIMESTAMP`);
     params.push(id);
 
-    const query = `UPDATE campaigns SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
-    const result = await db.query(query, params);
+    const result = withTx(async (client: PoolClient) => {
+      const query = `UPDATE campaigns SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+      const result = await client.query(query, params);
 
-    if (!result?.rows || result.rows.length === 0) {
-      throw new Error(`Campaign #${id} not found`);
-    }
+      if (!result?.rows || result.rows.length === 0) {
+        throw new Error(`Campaign #${id} not found`);
+      }
 
-    return result.rows[0];
+      return result.rows[0];
+    });
+
+    return result;
   }
 }

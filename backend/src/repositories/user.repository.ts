@@ -1,3 +1,4 @@
+import { PoolClient } from 'pg';
 import db from '../db/connection';
 import { withTx } from '../utils/transaction';
 import { User } from '../models/user.types';
@@ -126,6 +127,48 @@ export class UserModel {
     });
   }
 
+  /**
+   * Find or create user within an existing transaction
+   */
+  static async findOrCreateWithClient(
+    client: PoolClient,
+    data: {
+      telegram_id: number;
+      username?: string;
+      first_name?: string;
+      last_name?: string;
+    }
+  ): Promise<User> {
+    const existing = await client.query(
+      `SELECT * FROM users WHERE telegram_id = $1 FOR UPDATE`,
+      [data.telegram_id]
+    );
+    
+    if (existing.rows.length > 0) {
+      const result = await client.query(
+        `UPDATE users 
+         SET username = $1, first_name = $2, last_name = $3, updated_at = CURRENT_TIMESTAMP
+         WHERE telegram_id = $4
+         RETURNING *`,
+        [data.username, data.first_name, data.last_name, data.telegram_id]
+      );
+      return result.rows[0];
+    }
+    
+    const result = await client.query(
+      `INSERT INTO users (telegram_id, username, first_name, last_name)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [data.telegram_id, data.username, data.first_name, data.last_name]
+    );
+    
+    if (result.rows.length === 0) {
+      throw new Error(`Failed to create user with telegram_id: ${data.telegram_id}`);
+    }
+    
+    return result.rows[0];
+  }
+
   static async findOrCreate(data: {
     telegram_id: number;
     username?: string;
@@ -133,35 +176,32 @@ export class UserModel {
     last_name?: string;
   }): Promise<User> {
     return await withTx(async (client) => {
-      const existing = await client.query(
-        `SELECT * FROM users WHERE telegram_id = $1 FOR UPDATE`,
-        [data.telegram_id]
-      );
-      
-      if (existing.rows.length > 0) {
-        const result = await client.query(
-          `UPDATE users 
-           SET username = $1, first_name = $2, last_name = $3, updated_at = CURRENT_TIMESTAMP
-           WHERE telegram_id = $4
-           RETURNING *`,
-          [data.username, data.first_name, data.last_name, data.telegram_id]
-        );
-        return result.rows[0];
-      }
-      
-      const result = await client.query(
-        `INSERT INTO users (telegram_id, username, first_name, last_name)
-         VALUES ($1, $2, $3, $4)
-         RETURNING *`,
-        [data.telegram_id, data.username, data.first_name, data.last_name]
-      );
-      
-      if (result.rows.length === 0) {
-        throw new Error(`Failed to create user with telegram_id: ${data.telegram_id}`);
-      }
-      
-      return result.rows[0];
+      return await this.findOrCreateWithClient(client, data);
     });
+  }
+
+  /**
+   * Update user role within an existing transaction
+   */
+  static async updateRoleWithClient(
+    client: PoolClient,
+    telegramId: number,
+    role: 'channel_owner' | 'advertiser',
+    value: boolean
+  ): Promise<User> {
+    const field = role === 'channel_owner' ? 'is_channel_owner' : 'is_advertiser';
+    const result = await client.query(
+      `UPDATE users SET ${field} = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE telegram_id = $2
+       RETURNING *`,
+      [value, telegramId]
+    );
+    
+    if (result.rows.length === 0) {
+      throw new Error(`User with telegram_id ${telegramId} not found`);
+    }
+    
+    return result.rows[0];
   }
 
   static async updateRole(
@@ -170,19 +210,7 @@ export class UserModel {
     value: boolean
   ): Promise<User> {
     return await withTx(async (client) => {
-      const field = role === 'channel_owner' ? 'is_channel_owner' : 'is_advertiser';
-      const result = await client.query(
-        `UPDATE users SET ${field} = $1, updated_at = CURRENT_TIMESTAMP
-         WHERE telegram_id = $2
-         RETURNING *`,
-        [value, telegramId]
-      );
-      
-      if (result.rows.length === 0) {
-        throw new Error(`User with telegram_id ${telegramId} not found`);
-      }
-      
-      return result.rows[0];
+      return await this.updateRoleWithClient(client, telegramId, role, value);
     });
   }
 

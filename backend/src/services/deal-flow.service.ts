@@ -821,7 +821,6 @@ export class DealFlowService {
 
     return {
       ...dealWithoutWallet,
-      postLink: deal.status === 'posted' ? PostService.buildPostLink(deal.channel_username, deal.telegram_channel_id, deal.message_id) : undefined,
       owner: user !== null ? user?.id === deal.channel_owner_id : false,
       advertiser: advertiserInfo,
       messages,

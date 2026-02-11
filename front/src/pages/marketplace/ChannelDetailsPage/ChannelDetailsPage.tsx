@@ -9,6 +9,7 @@ import {
   Group,
   Icon,
   Image,
+  List,
   ListInput,
   ListItem,
   ListToggler,
@@ -36,7 +37,7 @@ interface ChannelHeaderProps {
   stats?: ChannelStats
 }
 
-const ChannelHeader = ({ channel, stats }: ChannelHeaderProps) => {
+const ChannelHeader = ({channel, stats}: ChannelHeaderProps) => {
   const subscribersCount = stats?.subscribers_count || 0
 
   return (
@@ -54,7 +55,7 @@ const ChannelHeader = ({ channel, stats }: ChannelHeaderProps) => {
           {channel.title}
         </Text>
         {channel.is_verified && (
-          <Icon name="verified" size={20} />
+          <Icon name="verified" size={20}/>
         )}
       </Block>
 
@@ -77,7 +78,7 @@ const ChannelHeader = ({ channel, stats }: ChannelHeaderProps) => {
 }
 
 const AD_FORMATS: { value: AdFormat; label: string }[] = [
-  { value: 'post', label: 'Post' },
+  {value: 'post', label: 'Post'},
   // { value: 'forward', label: 'Forward/Repost' },
   // { value: 'story', label: 'Story' },
 ]
@@ -100,20 +101,15 @@ export const ChannelDetailsPage = () => {
 
   const isChannelOwner = user && channel && user.id === channel.owner_id
 
-  // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
-
-  // Topic selection state
   const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null)
 
-  // Initialize topic from channel data
   useEffect(() => {
     if (channel?.topic_id !== undefined) {
       setSelectedTopicId(channel.topic_id)
     }
   }, [channel?.topic_id])
 
-  // Local state for editing prices (only for channel owner)
   const [editingPrices, setEditingPrices] = useState<Record<AdFormat, string>>({
     post: '',
     forward: '',
@@ -125,13 +121,10 @@ export const ChannelDetailsPage = () => {
     story: false,
   })
 
-  // Local state for editing channel active status
   const [editingActiveStatus, setEditingActiveStatus] = useState<boolean>(false)
 
-  // Initialize prices and active status from channel data when entering edit mode
   useEffect(() => {
     if (channel && isEditing) {
-      // Initialize prices
       if (channel.pricing) {
         const initialPrices: Record<AdFormat, string> = {
           post: '',
@@ -196,7 +189,7 @@ export const ChannelDetailsPage = () => {
             id: channel!.id,
             data: updates,
           })
-          showToast({ type: 'success', message: 'Channel updated successfully' })
+          showToast({type: 'success', message: 'Channel updated successfully'})
         }
 
         setIsEditing(false)
@@ -235,8 +228,7 @@ export const ChannelDetailsPage = () => {
     )
   }
 
-  const displayStats =  channel.stats
-  // For non-owners, only show active pricing
+  const displayStats = channel.stats
   const visiblePricing = isChannelOwner
     ? channel.pricing
     : channel.pricing?.filter((p) => p.is_active)
@@ -286,7 +278,7 @@ export const ChannelDetailsPage = () => {
     // Allow empty string or valid number
     // Remove any trailing zeros after decimal point for better UX while typing
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
-      setEditingPrices((prev) => ({ ...prev, [format]: value }))
+      setEditingPrices((prev) => ({...prev, [format]: value}))
     }
   }
 
@@ -297,12 +289,10 @@ export const ChannelDetailsPage = () => {
     const currentEnabled = isEditing ? priceEnabled[format] : currentPricing?.is_active ?? false
     const newEnabled = !currentEnabled
 
-    // Get price value - use editing state if in edit mode, otherwise use current pricing
     const priceValue = isEditing
       ? editingPrices[format].trim()
       : currentPricing?.price_ton?.toString?.() || ''
 
-    // If enabling, require a valid price
     if (newEnabled) {
       if (!priceValue || isNaN(parseFloat(priceValue)) || parseFloat(priceValue) <= 0) {
         showToast({
@@ -327,7 +317,7 @@ export const ChannelDetailsPage = () => {
 
       // Update local state if in edit mode
       if (isEditing) {
-        setPriceEnabled((prev) => ({ ...prev, [format]: newEnabled }))
+        setPriceEnabled((prev) => ({...prev, [format]: newEnabled}))
       }
 
       showToast({
@@ -348,13 +338,11 @@ export const ChannelDetailsPage = () => {
     const priceValue = editingPrices[format].trim()
     const currentPricing = channel.pricing?.find((p) => p.ad_format === format)
 
-    // Format the value to 2 decimal places
     if (priceValue && !isNaN(parseFloat(priceValue))) {
       const formattedValue = parseFloat(priceValue).toFixed(2)
-      setEditingPrices((prev) => ({ ...prev, [format]: formattedValue }))
+      setEditingPrices((prev) => ({...prev, [format]: formattedValue}))
     }
 
-    // Only save if price changed and is valid
     if (
       priceValue &&
       !isNaN(parseFloat(priceValue)) &&
@@ -368,7 +356,7 @@ export const ChannelDetailsPage = () => {
           price_ton: parseFloat(priceValue),
           is_active: priceEnabled[format],
         })
-        showToast({ type: 'success', message: 'Price updated' })
+        showToast({type: 'success', message: 'Price updated'})
       } catch (error: any) {
         showToast({
           type: 'error',
@@ -390,7 +378,7 @@ export const ChannelDetailsPage = () => {
       <PageLayout>
         <TelegramBackButton/>
 
-        <ChannelHeader channel={channel} stats={displayStats} />
+        <ChannelHeader channel={channel} stats={displayStats}/>
 
         <Block
           margin="top"
@@ -400,16 +388,16 @@ export const ChannelDetailsPage = () => {
           align="center"
           gap={10}
         >
-          <div style={{ flex: 1 }}>
+          <div style={{flex: 1}}>
             <Button
               type="primary"
-              prefix={<Icon name="share" color="primary" size={24} />}
+              prefix={<Icon name="share" color="primary" size={24}/>}
               onClick={handleShareLink}
             >
               Share
             </Button>
           </div>
-          <div style={{ flex: 1 }}>
+          <div style={{flex: 1}}>
             <Button type="accent" onClick={handleCopyLink}>
               Copy Link
             </Button>
@@ -422,7 +410,6 @@ export const ChannelDetailsPage = () => {
               <Group header="STATISTICS">
                 {displayStats.subscribers_count && (
                   <ListItem
-                    padding="6px 16px"
                     text={
                       <Text type="text">
                         👥 {separateNumber(displayStats.subscribers_count)} subscribers
@@ -432,7 +419,6 @@ export const ChannelDetailsPage = () => {
                 )}
                 {displayStats.average_views && (
                   <ListItem
-                    padding="6px 16px"
                     text={
                       <Text type="text">
                         👁️ {separateNumber(displayStats.average_views)} average views
@@ -442,7 +428,6 @@ export const ChannelDetailsPage = () => {
                 )}
                 {displayStats.average_reach && (
                   <ListItem
-                    padding="6px 16px"
                     text={
                       <Text type="text">
                         📊 {separateNumber(displayStats.average_reach)} average reach
@@ -452,7 +437,6 @@ export const ChannelDetailsPage = () => {
                 )}
                 {displayStats.premium_subscribers_count && (
                   <ListItem
-                    padding="6px 16px"
                     text={
                       <Text type="text" color="accent">
                         ⭐ {separateNumber(displayStats.premium_subscribers_count)} premium subscribers
@@ -469,10 +453,10 @@ export const ChannelDetailsPage = () => {
           <Block margin="top" marginValue={24}>
             <Group header="CHANNEL STATUS">
               <ListItem
-                padding="6px 16px"
                 disabled={updateChannelMutation.isPending}
                 text={
-                  <Text type="text" color={isEditing ? (editingActiveStatus ? 'accent' : 'secondary') : (channel.is_active ? 'accent' : 'secondary')}>
+                  <Text type="text"
+                        color={isEditing ? (editingActiveStatus ? 'accent' : 'secondary') : (channel.is_active ? 'accent' : 'secondary')}>
                     {isEditing
                       ? (editingActiveStatus ? 'Channel Active' : 'Channel Inactive')
                       : (channel.is_active ? 'Channel Active' : 'Channel Inactive')
@@ -481,19 +465,15 @@ export const ChannelDetailsPage = () => {
                 }
                 description={
                   <Text type="caption" color="tertiary">
-                    {isEditing
-                      ? (editingActiveStatus
-                          ? 'Channel will be visible in the marketplace'
-                          : 'Channel will be hidden from the marketplace')
-                      : (channel.is_active
-                          ? 'Channel is visible in the marketplace'
-                          : 'Channel is hidden from the marketplace')
+                    {(channel.is_active || editingActiveStatus
+                      ? 'Channel is visible in the marketplace'
+                      : 'Channel is hidden from the marketplace')
                     }
                   </Text>
                 }
                 after={
                   updateChannelMutation.isPending ? (
-                    <Spinner size={16} />
+                    <Spinner size={16}/>
                   ) : isEditing ? (
                     <ListToggler
                       isEnabled={editingActiveStatus}
@@ -513,10 +493,8 @@ export const ChannelDetailsPage = () => {
 
         <Block margin="top" marginValue={24}>
           <Block margin="bottom" marginValue={44}>
-            <Group header="CONFIGURATION">
-              {/* Topic - always visible */}
+            <List header="CONFIGURATION">
               <ListItem
-                padding="6px 16px"
                 text={
                   <BlockNew row align="center" justify="between" gap={8}>
                     <Text type="text" weight="medium">
@@ -525,7 +503,7 @@ export const ChannelDetailsPage = () => {
                     {isChannelOwner && isEditing ? (
                       <AppSelect
                         options={[
-                          { value: '', name: 'No topic' },
+                          {value: '', name: 'No topic'},
                           ...PREDEFINED_TOPICS.map((topic) => ({
                             value: topic.id.toString(),
                             name: topic.name,
@@ -547,7 +525,6 @@ export const ChannelDetailsPage = () => {
                 }
               />
               {(() => {
-                // Only show post format
                 const format = AD_FORMATS.find((f) => f.value === 'post')
                 if (!format) return null
 
@@ -563,7 +540,6 @@ export const ChannelDetailsPage = () => {
                 return (
                   <ListItem
                     key={format.value}
-                    padding="6px 16px"
                     disabled={setPricingMutation.isPending}
                     text={
                       <BlockNew row align="center" justify="between" gap={8} className={styles.priceTextContainer}>
@@ -574,32 +550,33 @@ export const ChannelDetailsPage = () => {
                                 {format.label}
                               </Text>
                             </div>
-                            <ListInput
-                              type="number"
-                              inputMode="decimal"
-                              step="0.01"
-                              min="0"
-                              placeholder="0.00"
-                              value={
-                                editingPrices[format.value]
-                                  ? (() => {
+                            <Block row justify="end" align="center">
+                              <ListInput
+                                type="number"
+                                inputMode="decimal"
+                                step="0.01"
+                                min="0"
+                                placeholder="0.00"
+                                value={
+                                  editingPrices[format.value]
+                                    ? (() => {
                                       const val = editingPrices[format.value]
-                                      // If it's a complete number (doesn't end with '.'), format to 2 decimals
                                       if (val && !val.endsWith('.') && !isNaN(parseFloat(val))) {
                                         return parseFloat(val).toFixed(2)
                                       }
                                       return val
                                     })()
-                                  : ''
-                              }
-                              onChange={(value) => handlePriceChange(format.value, value)}
-                              onBlur={() => handlePriceBlur(format.value)}
-                              disabled={setPricingMutation.isPending}
-                              className={styles.priceInput}
-                            />
-                            <Text type="text" color="secondary">
-                              USDT
-                            </Text>
+                                    : ''
+                                }
+                                onChange={(value) => handlePriceChange(format.value, value)}
+                                onBlur={() => handlePriceBlur(format.value)}
+                                disabled={setPricingMutation.isPending}
+                                className={styles.priceInput}
+                              />
+                              <Text type="text" color="secondary">
+                                USDT
+                              </Text>
+                            </Block>
                           </>
                         ) : (
                           <>
@@ -617,7 +594,7 @@ export const ChannelDetailsPage = () => {
                     }
                     after={
                       <>
-                        {setPricingMutation.isPending && <Spinner size={16} />}
+                        {setPricingMutation.isPending && <Spinner size={16}/>}
                       </>
                     }
                     before={
@@ -643,27 +620,8 @@ export const ChannelDetailsPage = () => {
                   />
                 )
               })()}
-              {/* {isChannelOwner && (
-                <ListItem
-                  padding="6px 16px"
-                  text={
-                    <Text type="text">
-                      {isEditing ? 'Done' : 'Edit'}
-                    </Text>
-                  }
-                  before={
-                    <Icon
-                      name={isEditing ? 'checkmark' : 'plus'}
-                      size={28}
-                      color="accent"
-                    />
-                  }
-                  onClick={handleEditToggle}
-                />
-              )} */}
               {(!isChannelOwner || !isEditing) && (!visiblePricing || visiblePricing.length === 0) && (
                 <ListItem
-                  padding="6px 16px"
                   text={
                     <Text type="text" color="secondary">
                       No pricing available
@@ -671,7 +629,7 @@ export const ChannelDetailsPage = () => {
                   }
                 />
               )}
-            </Group>
+            </List>
           </Block>
         </Block>
 
@@ -680,7 +638,7 @@ export const ChannelDetailsPage = () => {
           <Block margin="top" marginValue="auto">
             <Text type="caption" align="center" color="tertiary">
               To request a post from {channel.title || 'this channel'},
-              <br />
+              <br/>
               click the button below
             </Text>
           </Block>

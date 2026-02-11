@@ -1,17 +1,18 @@
 import {useEffect, useState} from 'react';
 import {
-  Block,
   BlockNew,
   Button,
   ChannelListItem,
   Group,
   Icon,
+  List,
   ListInput,
+  ListItem,
   Page,
   PageLayout,
+  Sheet,
   TelegramBackButton,
   Text,
-  Sheet,
 } from '@components'
 import {FiltersContent} from './ChannelFilters';
 
@@ -82,8 +83,8 @@ export const BrowseChannelsPage = () => {
             </BlockNew>
           </BlockNew>
 
-          <Group>
-            <Block>
+          <List>
+            <ListItem padding="0 16px">
               <ListInput
                 before={<Icon name="searchGlass" size={16} />}
                 showClearButton
@@ -93,8 +94,8 @@ export const BrowseChannelsPage = () => {
                 value={searchInput}
                 onChange={(value) => setSearchInput(value)}
               />
-            </Block>
-          </Group>
+            </ListItem>
+          </List>
 
           {!isMobile && showFilters && (
             <FiltersContent value={filters} onSelect={onFilterChange} />

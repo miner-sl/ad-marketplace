@@ -23,7 +23,7 @@ export const FiltersContent: React.FC<Props> = ({
     limit: 14, // TODO calculate limit based on screen size
   })
   const handleResetFilters = () => {
-    setFilters({ limit: 14 });
+    setFilters({limit: 14});
   }
 
   const handleToggleTopicDropdown = (value?: boolean) => {
@@ -43,7 +43,7 @@ export const FiltersContent: React.FC<Props> = ({
     hapticFeedback('soft');
     if (value === '') {
       setFilters((prev) => {
-        const { [key]: _, ...rest } = prev
+        const {[key]: _, ...rest} = prev
         return rest
       })
       return
@@ -80,10 +80,14 @@ export const FiltersContent: React.FC<Props> = ({
     ? PREDEFINED_TOPICS.find((t) => t.id === filters.topic_id)?.name || 'Select topic'
     : 'Any Topics'
 
-  const handleApply = () =>{
+  const handleApply = () => {
     onSelect(filters);
     hapticFeedback('soft');
   };
+  const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation()
+    handleToggleTopicDropdown();
+  }
   return (
     <BlockNew gap={12} className={styles.filters}>
       <BlockNew gap={8}>
@@ -92,7 +96,7 @@ export const FiltersContent: React.FC<Props> = ({
         </Text>
         <div
           className={cn(styles.orderByContainer)}
-          onClick={() => handleToggleTopicDropdown()}
+          onClick={onClick}
           ref={topicButtonRef}
         >
           <Icon name="sortArrows" size={18} color="tertiary"/>
@@ -121,6 +125,7 @@ export const FiltersContent: React.FC<Props> = ({
           <BlockNew row gap={8}>
             <ListInput
               type="number"
+              min={0}
               placeholder="Min"
               value={filters.min_subscribers?.toString() || ''}
               onChange={(value) => handleFilterChange('min_subscribers', value)}
@@ -128,6 +133,7 @@ export const FiltersContent: React.FC<Props> = ({
             />
             <ListInput
               type="number"
+              min={0}
               placeholder="Max"
               value={filters.max_subscribers?.toString() || ''}
               onChange={(value) => handleFilterChange('max_subscribers', value)}
@@ -171,6 +177,7 @@ export const FiltersContent: React.FC<Props> = ({
         </Text>
         <Group>
           <ListInput
+            min={0}
             type="number"
             placeholder="Minimum views"
             value={filters.min_views?.toString() || ''}

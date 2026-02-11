@@ -1,6 +1,8 @@
-import {useParams} from 'react-router-dom'
-import {useRef, useState} from 'react'
-import {hapticFeedback, openTelegramLink} from '@tma.js/sdk-react'
+import {useParams} from 'react-router-dom';
+import {useRef, useState} from 'react';
+import {openTelegramLink} from '@tma.js/sdk-react';
+import {type SendTransactionResponse, type TonProofItemReply, useTonWallet} from '@tonconnect/ui-react';
+
 import {
   Block,
   BlockNew,
@@ -19,7 +21,9 @@ import {
   TelegramMainButton,
   Text,
   useToast,
-} from '@components'
+} from '@components';
+import {EditableMessageText} from './EditableMessageText';
+
 import {
   type EnhancedDeal,
   useAcceptDealMutation,
@@ -28,16 +32,16 @@ import {
   useRequestCreativeRevisionMutation,
   useUpdateDealMessageMutation,
 } from '@store-new'
-import {EditableMessageText} from './EditableMessageText'
-import styles from './DealDetailsPage.module.scss'
-import {transferTonCall, useClipboard} from "@hooks"
+import {useAuth} from '@context';
+
+import {transferTonCall, useClipboard} from "@hooks";
 import config from '@config'
-import {useAuth} from "@context";
-import {initializeTonConnect, tonConnectUI} from "../../../common/utils/lazy";
-import {type SendTransactionResponse, type TonProofItemReply, useTonWallet} from "@tonconnect/ui-react";
+import {initializeTonConnect, tonConnectUI} from '../../../common/utils/lazy';
 import {requestAPI} from "../../../common/utils/api";
-import {playConfetti, popupManager} from "@utils";
-import type {DealMessage} from "@types";
+import {hapticFeedback, playConfetti, popupManager} from '@utils';
+import type {DealMessage} from '@types';
+
+import styles from './DealDetailsPage.module.scss';
 
 interface DealHeaderProps {
   deal: EnhancedDeal
@@ -49,10 +53,9 @@ type WalletFormStore = {
   ton_proof?: TonProofItemReply;
 };
 
-
 const DealHeader = ({deal}: DealHeaderProps) => {
   if (!deal) {
-    return null
+    return undefined;;
   }
 
   return (
@@ -79,7 +82,7 @@ const DealHeader = ({deal}: DealHeaderProps) => {
         </BlockNew>
       )}
     </BlockNew>
-  )
+  );
 }
 
 const getTONScanUrl = (address: string): string => {
@@ -91,8 +94,6 @@ const getTONScanUrl = (address: string): string => {
 
 export const DealDetailsPage = () => {
   const {id} = useParams<{ id: string }>()
-  // const navigate = useNavigate()
-  // const { user } = useUser()
   const dealId = id ? parseInt(id) : 0
   const {user} = useAuth();
   const [formWallet, setFormWallet] = useState<WalletFormStore>({});
@@ -145,7 +146,7 @@ export const DealDetailsPage = () => {
     //   emojis: ["🎉"],
     // });
     //
-    hapticFeedback.impactOccurred("soft");
+    hapticFeedback("soft");
 
     const popup = await popupManager.openPopup({
       title: 'Payment',
@@ -198,7 +199,7 @@ export const DealDetailsPage = () => {
       const {status} = request;
 
       if (status === "success") {
-        hapticFeedback.impactOccurred('medium');
+        hapticFeedback('medium');
         await playConfetti({
           emojis: ["🎉"],
         });
@@ -383,6 +384,7 @@ export const DealDetailsPage = () => {
   const handleAcceptDeal = async () => {
     if (!user) return
     try {
+      hapticFeedback('soft');
       await acceptDealMutation.mutateAsync({
         id: dealId,
         channel_owner_id: user.id,
@@ -401,10 +403,10 @@ export const DealDetailsPage = () => {
       if (declineDealMutation.isPending) {
         return
       }
+      hapticFeedback('soft');
       setShowDeclineModal(false)
       await declineDealMutation.mutateAsync({id: dealId, reason});
       showToast({message: 'Deal declined successfully', type: 'success'});
-
     } catch (error) {
       showToast({
         message: error instanceof Error ? error.message : 'Failed to decline deal',
@@ -445,6 +447,7 @@ export const DealDetailsPage = () => {
       return
     }
 
+    hapticFeedback('soft');
     try {
       await requestRevisionMutation.mutateAsync({
         dealId: deal.id,
@@ -543,7 +546,7 @@ export const DealDetailsPage = () => {
         <DealHeader deal={deal}/>
         {deal.status === 'pending' && (canInteract || (deal.owner && isChannelOwner)) ? (
           <Block margin="top" marginValue={24}>
-            <BlockNew gap={4} row>
+            <BlockNew gap={8} row>
               <>
                 <ListItem
                   text={

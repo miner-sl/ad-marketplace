@@ -390,19 +390,211 @@ export class DealModel {
     return result.rows;
   }
 
+  /**
+   * Find deal by ID with FOR UPDATE lock (for use within transactions)
+   */
+  static async findByIdForUpdate(client: PoolClient, id: number): Promise<Deal | null> {
+    const result = await client.query(
+      `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
+      [id]
+    );
+    return result.rows[0] || null;
+  }
+
+  /**
+   * Create deal within an existing transaction
+   */
+  static async createWithClient(client: PoolClient, data: {
+    deal_type: DealType;
+    listing_id?: number;
+    campaign_id?: number;
+    channel_id: number;
+    channel_owner_id: number;
+    advertiser_id: number;
+    ad_format: string;
+    price_ton: number;
+    escrow_address?: string;
+    scheduled_post_time?: Date;
+  }): Promise<Deal> {
+    const result = await client.query(
+      `INSERT INTO deals (
+        deal_type, listing_id, campaign_id, channel_id, channel_owner_id,
+        advertiser_id, ad_format, price_ton, escrow_address, scheduled_post_time
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING *`,
+      [
+        data.deal_type,
+        data.listing_id,
+        data.campaign_id,
+        data.channel_id,
+        data.channel_owner_id,
+        data.advertiser_id,
+        data.ad_format,
+        data.price_ton,
+        data.escrow_address ?? null,
+        data.scheduled_post_time || null,
+      ]
+    );
+    return result.rows[0];
+  }
+
+  /**
+   * Update deal status within an existing transaction
+   */
+  static async updateStatusWithClient(
+    client: PoolClient,
+    id: number,
+    status: DealStatus,
+    additionalConditions?: string
+  ): Promise<Deal> {
+    const whereClause = additionalConditions
+      ? `WHERE id = $2 AND ${additionalConditions}`
+      : `WHERE id = $2`;
+    
+    const result = await client.query(
+      `UPDATE deals SET status = $1, updated_at = CURRENT_TIMESTAMP
+       ${whereClause}
+       RETURNING *`,
+      [status, id]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error(`Deal #${id} not found or conditions not met`);
+    }
+
+    return result.rows[0];
+  }
+
+  /**
+   * Update deal status and payment info within an existing transaction
+   */
+  static async updateStatusAndPaymentWithClient(
+    client: PoolClient,
+    id: number,
+    status: DealStatus,
+    txHash: string,
+    condition?: string
+  ): Promise<Deal> {
+    const whereClause = condition
+      ? `WHERE id = $3 AND ${condition}`
+      : `WHERE id = $3`;
+    
+    const result = await client.query(
+      `UPDATE deals 
+       SET status = $1, payment_tx_hash = $2, payment_confirmed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       ${whereClause}
+       RETURNING *`,
+      [status, txHash, id]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error(`Deal #${id} not found or conditions not met`);
+    }
+
+    return result.rows[0];
+  }
+
+  /**
+   * Update deal to completed status with payment tx hash within an existing transaction
+   */
+  static async updateToCompletedWithClient(
+    client: PoolClient,
+    id: number,
+    txHash: string
+  ): Promise<Deal> {
+    const result = await client.query(
+      `UPDATE deals 
+       SET status = 'completed', payment_tx_hash = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2 AND status = 'verified' AND status != 'completed'
+       RETURNING *`,
+      [txHash, id]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error(`Deal #${id} not found or not in verified status`);
+    }
+
+    return result.rows[0];
+  }
+
+  /**
+   * Update deal status to declined within an existing transaction
+   */
+  static async updateToDeclinedWithClient(
+    client: PoolClient,
+    id: number,
+    reason?: string
+  ): Promise<Deal> {
+    const result = await client.query(
+      `UPDATE deals 
+       SET status = 'declined', decline_reason = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND status = 'pending'
+       RETURNING *`,
+      [id, reason || null]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error(`Deal #${id} not found or not in pending status`);
+    }
+
+    return result.rows[0];
+  }
+
+  /**
+   * Update deal status to negotiating within an existing transaction
+   */
+  static async updateToNegotiatingWithClient(
+    client: PoolClient,
+    id: number,
+    condition?: string
+  ): Promise<Deal> {
+    const whereClause = condition
+      ? `WHERE id = $1 AND ${condition}`
+      : `WHERE id = $1`;
+    
+    const result = await client.query(
+      `UPDATE deals 
+       SET status = 'negotiating', updated_at = CURRENT_TIMESTAMP
+       ${whereClause}
+       RETURNING *`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error(`Deal #${id} not found or conditions not met`);
+    }
+
+    return result.rows[0];
+  }
+
   static async updateEscrowAddress(escrowAddress: string, ownerWalletAddress: string, dealId: number): Promise<Deal> {
     const result = await withTx(async (client: PoolClient) => {
-      return await client.query(
-        `UPDATE deals 
-         SET escrow_address = $1, channel_owner_wallet_address = $2, status = 'payment_pending', updated_at = CURRENT_TIMESTAMP
-         WHERE id = $3 AND escrow_address IS NULL
-         RETURNING *`,
-        [escrowAddress, ownerWalletAddress, dealId]
-      );
+      return await this.updateEscrowAddressWithClient(client, escrowAddress, ownerWalletAddress, dealId);
     });
-    if (!result?.rows && result.rows.length === 0) {
+    return result;
+  }
+
+  /**
+   * Update escrow address within an existing transaction
+   */
+  static async updateEscrowAddressWithClient(
+    client: PoolClient,
+    escrowAddress: string,
+    ownerWalletAddress: string,
+    dealId: number
+  ): Promise<Deal> {
+    const result = await client.query(
+      `UPDATE deals 
+       SET escrow_address = $1, channel_owner_wallet_address = $2, status = 'payment_pending', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3 AND escrow_address IS NULL
+       RETURNING *`,
+      [escrowAddress, ownerWalletAddress, dealId]
+    );
+    
+    if (!result?.rows || result.rows.length === 0) {
       throw new Error('Deal status changed during processing');
     }
-    return result.rows.at(0);
+    
+    return result.rows[0];
   }
 }

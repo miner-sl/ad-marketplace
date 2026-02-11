@@ -1,3 +1,4 @@
+import { PoolClient } from 'pg';
 import db from '../db/connection';
 
 export interface DealMessage {
@@ -186,5 +187,79 @@ export class DealRepository {
       [limit]
     );
     return result?.rows || [];
+  }
+
+  /**
+   * Add deal message within an existing transaction
+   */
+  static async addMessageWithClient(
+    client: PoolClient,
+    dealId: number,
+    senderId: number,
+    messageText: string
+  ): Promise<void> {
+    await client.query(
+      `INSERT INTO deal_messages (deal_id, sender_id, message_text)
+       VALUES ($1, $2, $3)`,
+      [dealId, senderId, messageText]
+    );
+  }
+
+  /**
+   * Find latest message by sender within an existing transaction
+   */
+  static async findLatestMessageBySenderWithClient(
+    client: PoolClient,
+    dealId: number,
+    senderId: number
+  ): Promise<{ id: number } | null> {
+    const result = await client.query(
+      `SELECT id FROM deal_messages 
+       WHERE deal_id = $1 AND sender_id = $2 
+       ORDER BY created_at DESC 
+       LIMIT 1`,
+      [dealId, senderId]
+    );
+    return result.rows[0] || null;
+  }
+
+  /**
+   * Update deal message within an existing transaction
+   */
+  static async updateMessageWithClient(
+    client: PoolClient,
+    messageId: number,
+    dealId: number,
+    senderId: number,
+    messageText: string
+  ): Promise<DealMessage> {
+    const result = await client.query(
+      `UPDATE deal_messages 
+       SET message_text = $1 
+       WHERE id = $2 AND deal_id = $3 AND sender_id = $4
+       RETURNING *`,
+      [messageText, messageId, dealId, senderId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error('Failed to update message');
+    }
+
+    return result.rows[0];
+  }
+
+  /**
+   * Update deal status to pending within an existing transaction
+   */
+  static async updateDealStatusToPendingWithClient(
+    client: PoolClient,
+    dealId: number
+  ): Promise<void> {
+    await client.query(
+      `UPDATE deals 
+       SET status = 'pending', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [dealId]
+    );
   }
 }

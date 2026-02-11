@@ -4,6 +4,20 @@ import { withTx } from '../utils/transaction';
 import { User } from '../models/user.types';
 
 export class UserModel {
+  /**
+   * Find user by telegram ID within an existing transaction
+   */
+  static async findByTelegramIdWithClient(client: PoolClient, telegramId: number): Promise<User | null> {
+    const result = await client.query(
+      'SELECT * FROM users WHERE telegram_id = $1',
+      [telegramId]
+    );
+    if (!result?.rows || result.rows.length === 0) {
+      return null;
+    }
+    return result.rows[0] || null;
+  }
+
   static async findByTelegramId(telegramId: number): Promise<User | null> {
     const result = await db.query(
       'SELECT * FROM users WHERE telegram_id = $1',

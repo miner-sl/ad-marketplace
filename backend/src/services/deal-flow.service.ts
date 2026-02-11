@@ -1,25 +1,70 @@
-import {PoolClient} from 'pg';
+import {Address} from "@ton/core";
 
-import { DealModel } from '../repositories/deal-model.repository';
-import { ChannelModel } from '../repositories/channel-model.repository';
-import { UserModel } from '../repositories/user.repository';
-import { TONService } from './ton.service';
-import { CreativeService } from './creative.service';
-import { PostService } from './post.service';
-import { TelegramNotificationQueueService } from './telegram-notification-queue.service';
-import { DealRepository } from '../repositories/deal.repository';
-import { ChannelRepository } from '../repositories/channel.repository';
+import {DealModel} from '../repositories/deal-model.repository';
+import {ChannelModel} from '../repositories/channel-model.repository';
+import {UserModel} from '../repositories/user.repository';
+import {TONService} from './ton.service';
+import {CreativeService} from './creative.service';
+import {CreativeRepository} from '../repositories/creative.repository';
+import {PostService} from './post.service';
+import {TelegramNotificationQueueService} from './telegram-notification-queue.service';
+import {DealRepository} from '../repositories/deal.repository';
+import {ChannelRepository} from '../repositories/channel.repository';
 import {TelegramService} from './telegram.service';
 import {TelegramNotificationService} from './telegram-notification.service';
 
-import { withTx } from '../utils/transaction';
-import db from '../db/connection';
+import {withTx} from '../utils/transaction';
 import logger from '../utils/logger';
-import { distributedLock } from '../utils/lock';
+import {distributedLock} from '../utils/lock';
 import {Deal} from '../models/deal.types';
 import env from '../utils/env';
+import {generateUserIDHash} from "../utils/verifyTonProof";
+import getRedisClient from "../utils/redis";
+
+/**
+ * DTO for submitting payment
+ */
+export interface SubmitPaymentDto {
+  dealId: number;
+  userId: number;
+  wallet?: string;
+  boc?: string;
+}
+
+/**
+ * Result of payment submission
+ */
+export interface SubmitPaymentResult {
+  processed: boolean;
+  message: string;
+}
 
 export class DealFlowService {
+  static async findDeals(userId: number, status?: string, dealType?: string, limit?: number) {
+    let deals;
+
+    if (userId) {
+      const user = await UserModel.findById(userId);
+      if (!user) {
+        return {
+          ok: false,
+          error: 'User not found'
+        }
+      }
+      deals = await DealModel.findByUser(user.id, status as string | undefined);
+    } else {
+      deals = await DealRepository.listDealsWithFilters({
+        status: status as string | undefined,
+        deal_type: dealType as string | undefined,
+        limit: (limit as unknown as number) || 20,
+      });
+    }
+
+    return {
+      ok: true,
+      data: deals.map((deal) => ({...deal, price_ton: parseInt(deal.price_ton) })),
+    };
+  }
   /**
    * Initialize/create a new deal
    * Uses transaction to ensure atomicity when creating deal, setting publish_date, and storing postText
@@ -37,63 +82,38 @@ export class DealFlowService {
     postText?: string;
   }): Promise<any> {
     return await withTx(async (client) => {
-      const channelCheck = await client.query(
-        `SELECT id, owner_id FROM channels WHERE id = $1`,
-        [data.channel_id]
-      );
-
-      if (!channelCheck.rows || channelCheck.rows.length === 0) {
+      const channel = await ChannelRepository.findByIdWithClient(client, data.channel_id);
+      if (!channel) {
         throw new Error(`Channel with id ${data.channel_id} not found`);
       }
 
-      const channel = channelCheck.rows[0];
       if (channel.owner_id !== data.channel_owner_id) {
         throw new Error(`Channel owner mismatch. Channel ${data.channel_id} is owned by user ${channel.owner_id}, not ${data.channel_owner_id}`);
       }
 
-      const userResult = await client.query(
-        'SELECT * FROM users WHERE telegram_id = $1',
-        [data.advertiser_id]
-      );
-
-      if (!userResult.rows || userResult.rows.length === 0) {
+      const advertiser = await UserModel.findByTelegramIdWithClient(client, data.advertiser_id);
+      if (!advertiser) {
         throw new Error(`User with telegram_id ${data.advertiser_id} not found. Please register first.`);
       }
 
-      const advertiserDbId = userResult.rows[0].id;
-
-      const dealResult = await client.query(
-        `INSERT INTO deals (
-          deal_type, listing_id, campaign_id, channel_id, channel_owner_id,
-          advertiser_id, ad_format, price_ton, scheduled_post_time
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        RETURNING *`,
-        [
-          data.deal_type,
-          data.listing_id,
-          data.campaign_id,
-          data.channel_id,
-          data.channel_owner_id,
-          advertiserDbId,
-          data.ad_format,
-          data.price_ton,
-          data.publish_date || null,
-        ]
-      );
-
-      const deal = dealResult.rows[0];
-      const dealId = deal.id;
+      const deal = await DealModel.createWithClient(client, {
+        deal_type: data.deal_type,
+        listing_id: data.listing_id,
+        campaign_id: data.campaign_id,
+        channel_id: data.channel_id,
+        channel_owner_id: data.channel_owner_id,
+        advertiser_id: advertiser.id,
+        ad_format: data.ad_format,
+        price_ton: data.price_ton,
+        scheduled_post_time: data.publish_date,
+      });
 
       if (data.postText) {
-        await client.query(
-          `INSERT INTO deal_messages (deal_id, sender_id, message_text)
-           VALUES ($1, $2, $3)`,
-          [dealId, advertiserDbId, data.postText]
-        );
+        await DealRepository.addMessageWithClient(client, deal.id, advertiser.id, data.postText);
 
         await CreativeService.createWithClient(client, {
-          deal_id: dealId,
-          submitted_by: advertiserDbId,
+          deal_id: deal.id,
+          submitted_by: advertiser.id,
           content_type: 'text',
           content_data: { text: data.postText }
         });
@@ -126,11 +146,7 @@ export class DealFlowService {
       if (!channelOwner) {
         throw new Error('User not have access to this deal');
       }
-      const dealResult = await client.query(
-        `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
-        [dealId]
-      );
-      const deal = dealResult.rows[0];
+      const deal = await DealModel.findByIdForUpdate(client, dealId);
       if (!deal || deal.channel_owner_id !== channelOwner.id) {
         throw new Error('Deal not found or unauthorized');
       }
@@ -166,9 +182,51 @@ export class DealFlowService {
         throw new Error('Channel owner wallet address not set. Please set your wallet address first.');
       }
 
-      const updatedDeal: Deal = await DealModel.updateStatus(dealId, 'payment_pending');
+      const updatedDeal = await DealModel.updateStatusWithClient(client, dealId, 'payment_pending');
       return updatedDeal;
     });
+  }
+
+  /**
+   * Accept deal and send payment invoice notification if escrow address exists
+   */
+  static async acceptDealWithNotify(dealId: number, telegramUserId: number): Promise<Deal> {
+    const deal = await this.acceptDeal(dealId, telegramUserId);
+
+    // Send notification if escrow address exists and deal is in payment_pending status
+    if (deal && deal.escrow_address !== null && deal.status === 'payment_pending') {
+      try {
+        const channelInfo = await ChannelRepository.getBasicInfo(deal.channel_id);
+        const channelName = channelInfo?.title || channelInfo?.username || `Channel #${deal.channel_id}`;
+
+        await TelegramNotificationService.notifyPaymentInvoice(
+          deal.id,
+          deal.advertiser_id,
+          {
+            dealId: deal.id,
+            channelId: deal.channel_id,
+            channelName: channelName,
+            priceTon: parseFloat(deal.price_ton.toString()),
+            adFormat: deal.ad_format,
+            escrowAddress: deal.escrow_address,
+          }
+        );
+
+        logger.info(`Payment invoice notification sent for Deal #${deal.id}`, {
+          dealId: deal.id,
+          advertiserId: deal.advertiser_id,
+        });
+      } catch (notifError: any) {
+        // Log error but don't fail the deal acceptance if notification fails
+        logger.warn('Failed to send payment invoice notification', {
+          error: notifError.message,
+          dealId: deal.id,
+          stack: notifError.stack,
+        });
+      }
+    }
+
+    return deal;
   }
 
   static async generateEscrowAddress(deal: Deal): Promise<any> {
@@ -223,12 +281,7 @@ export class DealFlowService {
       'confirm_payment',
       async () => {
         return await withTx(async (client) => {
-          const dealResult = await client.query(
-            `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
-            [dealId]
-          );
-
-          const deal = dealResult.rows[0];
+          const deal = await DealModel.findByIdForUpdate(client, dealId);
           if (!deal) {
             throw new Error('Deal not found');
           }
@@ -258,41 +311,35 @@ export class DealFlowService {
           }
 
           const finalStatus = deal.scheduled_post_time ? 'scheduled' : 'paid';
-          const updateResult = await client.query(
-            `UPDATE deals 
-            SET status = $1, payment_tx_hash = $2, payment_confirmed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-            WHERE id = $3 AND status = 'payment_pending' AND payment_tx_hash IS NULL
-            RETURNING *`,
-            [finalStatus, txHash, dealId]
-          );
-
-          if (updateResult.rows.length === 0) {
-            const recheck = await client.query(
-              `SELECT * FROM deals WHERE id = $1`,
-              [dealId]
+          try {
+            const updated = await DealModel.updateStatusAndPaymentWithClient(
+              client,
+              dealId,
+              finalStatus,
+              txHash,
+              `status = 'payment_pending' AND payment_tx_hash IS NULL`
             );
-            if (recheck.rows.length > 0) {
-              const currentDeal = recheck.rows[0];
-              if (currentDeal.payment_tx_hash) {
-                logger.info(`Payment was confirmed by another process for Deal #${dealId}`, {
-                  dealId,
-                  existingTxHash: currentDeal.payment_tx_hash,
-                });
-                return currentDeal;
-              }
+
+            await DealRepository.addMessageWithClient(
+              client,
+              dealId,
+              deal.advertiser_id,
+              `Payment confirmed: ${txHash}`
+            );
+
+            return updated;
+          } catch (error: any) {
+            // Check if payment was confirmed by another process
+            const recheck = await DealModel.findById(dealId);
+            if (recheck && recheck.payment_tx_hash) {
+              logger.info(`Payment was confirmed by another process for Deal #${dealId}`, {
+                dealId,
+                existingTxHash: recheck.payment_tx_hash,
+              });
+              return recheck;
             }
             throw new Error('Payment already confirmed or deal status changed');
           }
-
-          const updated = updateResult.rows[0];
-
-          await client.query(
-            `INSERT INTO deal_messages (deal_id, sender_id, message_text)
-            VALUES ($1, $2, $3)`,
-            [dealId, deal.advertiser_id, `Payment confirmed: ${txHash}`]
-          );
-
-          return updated;
         });
       },
       { ttl: 30000 }
@@ -304,12 +351,7 @@ export class DealFlowService {
     contentData: Record<string, any>;
   }): Promise<any> {
     return await withTx(async (client) => {
-      const dealResult = await client.query(
-        `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
-        [dealId]
-      );
-
-      const deal = dealResult.rows[0];
+      const deal = await DealModel.findByIdForUpdate(client, dealId);
       if (!deal) {
         throw new Error('Deal not found');
       }
@@ -327,19 +369,14 @@ export class DealFlowService {
 
       await CreativeService.submit(dealId);
 
-      const updateResult = await client.query(
-        `UPDATE deals 
-         SET status = 'creative_submitted', updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1 AND status = 'paid'
-         RETURNING *`,
-        [dealId]
+      const updated = await DealModel.updateStatusWithClient(
+        client,
+        dealId,
+        'creative_submitted',
+        `status = 'paid'`
       );
 
-      if (updateResult.rows.length === 0) {
-        throw new Error('Deal status changed during creative submission');
-      }
-
-      return updateResult.rows[0];
+      return updated;
     });
   }
 
@@ -348,12 +385,7 @@ export class DealFlowService {
    */
   static async approveCreative(dealId: number, advertiserId: number): Promise<any> {
     return await withTx(async (client) => {
-      const dealResult = await client.query(
-        `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
-        [dealId]
-      );
-
-      const deal = dealResult.rows[0];
+      const deal = await DealModel.findByIdForUpdate(client, dealId);
       if (!deal || deal.advertiser_id !== advertiserId) {
         throw new Error('Deal not found or unauthorized');
       }
@@ -366,25 +398,21 @@ export class DealFlowService {
 
       const finalStatus = deal.payment_confirmed_at ? 'paid' : 'creative_approved';
 
-      const updateResult = await client.query(
-        `UPDATE deals 
-         SET status = $1, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $2 AND status = 'creative_submitted'
-         RETURNING *`,
-        [finalStatus, dealId]
+      const updated = await DealModel.updateStatusWithClient(
+        client,
+        dealId,
+        finalStatus,
+        `status = 'creative_submitted'`
       );
 
-      if (updateResult.rows.length === 0) {
-        throw new Error('Deal status changed during creative approval');
-      }
-
-      await client.query(
-        `INSERT INTO deal_messages (deal_id, sender_id, message_text)
-         VALUES ($1, $2, $3)`,
-        [dealId, advertiserId, 'Creative approved']
+      await DealRepository.addMessageWithClient(
+        client,
+        dealId,
+        advertiserId,
+        'Creative approved'
       );
 
-      return updateResult.rows[0];
+      return updated;
     });
   }
 
@@ -396,48 +424,28 @@ export class DealFlowService {
    */
   static async requestRevision(dealId: number, requestedBy: number, notes: string): Promise<any> {
     const deal = await withTx(async (client) => {
-      const dealResult = await client.query(
-        `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
-        [dealId]
-      );
-
-      const deal = dealResult.rows[0];
-      if (!deal) {
+      const dealRecord = await DealModel.findByIdForUpdate(client, dealId);
+      if (!dealRecord) {
         throw new Error('Deal not found');
       }
 
-      const userResult = await client.query(
-        'SELECT * FROM users WHERE id = $1',
-        [requestedBy]
-      );
-
-      if (!userResult.rows || userResult.rows.length === 0) {
+      const user = await UserModel.findById(requestedBy);
+      if (!user) {
         throw new Error(`User with id ${requestedBy} not found. Please register first.`);
       }
 
-      const requestedByDbId = userResult.rows[0].id;
-
       await CreativeService.requestRevisionWithClient(client, dealId, notes);
 
-      const updateResult = await client.query(
-        `UPDATE deals 
-         SET status = 'negotiating', updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1
-         RETURNING *`,
-        [dealId]
+      const updated = await DealModel.updateToNegotiatingWithClient(client, dealId);
+
+      await DealRepository.addMessageWithClient(
+        client,
+        dealId,
+        user.id,
+        `Revision: ${notes}`
       );
 
-      if (updateResult.rows.length === 0) {
-        throw new Error(`Deal #${dealId} not found`);
-      }
-
-      await client.query(
-        `INSERT INTO deal_messages (deal_id, sender_id, message_text)
-         VALUES ($1, $2, $3)`,
-        [dealId, requestedByDbId, `Revision: ${notes}`]
-      );
-
-      return updateResult.rows[0];
+      return updated;
     });
     if (deal.status === 'negotiating') {
       await TelegramNotificationService.notifyRevisionRequested(deal, requestedBy, notes);
@@ -460,30 +468,22 @@ export class DealFlowService {
     briefText: string;
   }): Promise<any> {
     return await withTx(async (client) => {
-      const dealResult = await client.query(
-        `INSERT INTO deals (
-          deal_type, listing_id, campaign_id, channel_id, channel_owner_id,
-          advertiser_id, ad_format, price_ton
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING *`,
-        [
-          data.deal_type,
-          data.listing_id,
-          data.campaign_id,
-          data.channel_id,
-          data.channel_owner_id,
-          data.advertiser_id,
-          data.ad_format,
-          data.price_ton,
-        ]
-      );
+      const deal = await DealModel.createWithClient(client, {
+        deal_type: data.deal_type,
+        listing_id: data.listing_id,
+        campaign_id: data.campaign_id,
+        channel_id: data.channel_id,
+        channel_owner_id: data.channel_owner_id,
+        advertiser_id: data.advertiser_id,
+        ad_format: data.ad_format,
+        price_ton: data.price_ton,
+      });
 
-      const deal = dealResult.rows[0];
-
-      await client.query(
-        `INSERT INTO deal_messages (deal_id, sender_id, message_text)
-         VALUES ($1, $2, $3)`,
-        [deal.id, data.advertiser_id, data.briefText]
+      await DealRepository.addMessageWithClient(
+        client,
+        deal.id,
+        data.advertiser_id,
+        data.briefText
       );
 
       return deal;
@@ -529,31 +529,27 @@ export class DealFlowService {
       'release_funds',
       async () => {
         return await withTx(async (client) => {
-          const dealCheck = await client.query(
-            `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
-            [dealId]
-          );
-
-          if (dealCheck.rows.length === 0) {
+          const deal = await DealModel.findByIdForUpdate(client, dealId);
+          if (!deal) {
             throw new Error('Deal not found');
           }
-
-          const deal = dealCheck.rows[0];
 
           if (deal.advertiser_id !== advertiserId) {
             throw new Error('Unauthorized');
           }
 
-          if (deal.status !== 'verified') {
-            throw new Error(`Deal is not in verified status. Current status: ${deal.status}`);
-          }
-
+          // Check if already completed first
           if (deal.status === 'completed' && deal.payment_tx_hash) {
             logger.info(`Funds already released for Deal #${dealId}`, {
               dealId,
               existingTxHash: deal.payment_tx_hash,
             });
             return { txHash: deal.payment_tx_hash };
+          }
+
+          // Then check if in verified status
+          if (deal.status !== 'verified') {
+            throw new Error(`Deal is not in verified status. Current status: ${deal.status}`);
           }
 
           if (!deal.escrow_address || !deal.channel_owner_wallet_address) {
@@ -579,74 +575,72 @@ export class DealFlowService {
             false // Already checked idempotency above
           );
 
-          // Update status and record tx hash atomically
-          // Note: We update payment_tx_hash with the release tx hash when completing the deal
-          const updateResult = await client.query(
-            `UPDATE deals 
-             SET status = 'completed', payment_tx_hash = $1, updated_at = CURRENT_TIMESTAMP
-             WHERE id = $2 AND status = 'verified' AND status != 'completed'
-             RETURNING *`,
-            [txHash, dealId]
-          );
-
-          if (updateResult.rows.length === 0) {
+          try {
+            // Update status and record tx hash atomically
+            await DealModel.updateToCompletedWithClient(client, dealId, txHash);
+            return { txHash };
+          } catch (error: any) {
             // Another process released funds between our check and update
             // Re-query to get the existing tx hash
-            const recheck = await client.query(
-              `SELECT payment_tx_hash, status FROM deals WHERE id = $1`,
-              [dealId]
-            );
-            if (recheck.rows.length > 0 && recheck.rows[0].status === 'completed' && recheck.rows[0].payment_tx_hash) {
+            const recheck = await DealModel.findById(dealId);
+            if (recheck && recheck.status === 'completed' && recheck.payment_tx_hash) {
               logger.warn(`Funds were released by another process for Deal #${dealId}`, {
                 dealId,
-                existingTxHash: recheck.rows[0].payment_tx_hash,
+                existingTxHash: recheck.payment_tx_hash,
               });
-              return { txHash: recheck.rows[0].payment_tx_hash };
+              return { txHash: recheck.payment_tx_hash };
             }
             throw new Error('Failed to update deal status. Funds may have been released by another process.');
           }
-
-          return { txHash };
         });
       },
       { ttl: 60000 }
     );
   }
 
+  static async declineDealWithNotification(dealId: number, channelOwnerId: number, reason?: string): Promise<any> {
+    try {
+      const deal = await this.declineDeal(dealId, channelOwnerId, reason);
+      const channelInfo = await DealFlowService.getChannelInfoForDeal(dealId);
+      await TelegramNotificationService.notifyDealDeclined(dealId, deal.advertiser_id, {
+        dealId: deal,
+        channelId: channelInfo.channelId,
+        channelName: channelInfo.channelName,
+        priceTon: deal.price_ton,
+        adFormat: deal.ad_format,
+      });
+    } catch (notifError: any) {
+      // Log but don't fail if notification fails
+      logger.warn('Failed to send decline notification', {
+        error: notifError.message,
+        dealId,
+      });
+    }
+  }
   /**
    * Decline deal
    */
   static async declineDeal(dealId: number, channelOwnerId: number, reason?: string): Promise<any> {
     return await withTx(async (client) => {
-      const dealResult = await client.query(
-        `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
-        [dealId]
-      );
-
-      const deal = dealResult.rows[0];
+      const deal = await DealModel.findByIdForUpdate(client, dealId);
       if (!deal || deal.channel_owner_id !== channelOwnerId) {
         throw new Error('Deal not found or unauthorized');
       }
 
-      await client.query(
-        `UPDATE deals 
-         SET status = 'declined', decline_reason = $2, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1 AND status = 'pending'
-         RETURNING *`,
-        [dealId, reason || null]
-      );
+      const updated = await DealModel.updateToDeclinedWithClient(client, dealId, reason);
 
       const messageText = reason
         ? `Deal declined by channel owner: ${reason}`
         : 'Deal declined by channel owner';
 
-      await client.query(
-        `INSERT INTO deal_messages (deal_id, sender_id, message_text)
-         VALUES ($1, $2, $3)`,
-        [dealId, channelOwnerId, messageText]
+      await DealRepository.addMessageWithClient(
+        client,
+        dealId,
+        channelOwnerId,
+        messageText
       );
 
-      return dealResult.rows[0];
+      return updated;
     });
   }
 
@@ -655,12 +649,7 @@ export class DealFlowService {
    */
   static async sendToDraft(dealId: number, channelOwnerId: number, commentText: string): Promise<any> {
     return await withTx(async (client) => {
-      const dealResult = await client.query(
-        `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
-        [dealId]
-      );
-
-      const deal = dealResult.rows[0];
+      const deal = await DealModel.findByIdForUpdate(client, dealId);
       if (!deal || deal.channel_owner_id !== channelOwnerId) {
         throw new Error('Deal not found or unauthorized');
       }
@@ -669,21 +658,20 @@ export class DealFlowService {
         throw new Error(`Cannot send to draft in status: ${deal.status}`);
       }
 
-      await client.query(
-        `UPDATE deals 
-         SET status = 'negotiating', updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1 AND status = 'pending'
-         RETURNING *`,
-        [dealId]
+      const updated = await DealModel.updateToNegotiatingWithClient(
+        client,
+        dealId,
+        `status = 'pending'`
       );
 
-      await client.query(
-        `INSERT INTO deal_messages (deal_id, sender_id, message_text)
-         VALUES ($1, $2, $3)`,
-        [dealId, channelOwnerId, `📝 Draft feedback: ${commentText}`]
+      await DealRepository.addMessageWithClient(
+        client,
+        dealId,
+        channelOwnerId,
+        `📝 Draft feedback: ${commentText}`
       );
 
-      return dealResult.rows[0];
+      return updated;
     });
   }
 
@@ -700,11 +688,9 @@ export class DealFlowService {
       throw new Error('Unauthorized');
     }
 
-    await db.query(
-      `INSERT INTO deal_messages (deal_id, sender_id, message_text)
-       VALUES ($1, $2, $3)`,
-      [dealId, senderId, messageText]
-    );
+    await withTx(async (client) => {
+      await DealRepository.addMessageWithClient(client, dealId, senderId, messageText);
+    });
   }
 
   /**
@@ -720,66 +706,53 @@ export class DealFlowService {
       throw new Error('Unauthorized');
     }
 
-    const messageResult = await db.query(
-      `SELECT id FROM deal_messages 
-       WHERE deal_id = $1 AND sender_id = $2 
-       ORDER BY created_at DESC 
-       LIMIT 1`,
-      [dealId, senderId]
-    );
-
-    if (!messageResult.rows || messageResult.rows.length === 0) {
-      await db.query(
-        `INSERT INTO deal_messages (deal_id, sender_id, message_text)
-         VALUES ($1, $2, $3)`,
-        [dealId, senderId, messageText]
+    return await withTx(async (client) => {
+      const latestMessage = await DealRepository.findLatestMessageBySenderWithClient(
+        client,
+        dealId,
+        senderId
       );
-      return { message: 'Message created' };
-    }
 
-    const updateResult = await db.query(
-      `UPDATE deal_messages 
-       SET message_text = $1 
-       WHERE id = $2 AND deal_id = $3 AND sender_id = $4
-       RETURNING *`,
-      [messageText, messageResult.rows[0].id, dealId, senderId]
-    );
-
-    if (updateResult.rows.length === 0) {
-      throw new Error('Failed to update message');
-    }
-
-    await db.query(
-      `UPDATE deals 
-       SET status = 'pending', updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1`,
-      [dealId]
-    );
-
-    const recipientId = deal.channel_owner_id === senderId
-      ? deal.advertiser_id
-      : deal.channel_owner_id;
-
-    // Send notification to the other party about the message update
-    try {
-      const recipient = await UserModel.findById(recipientId);
-      if (recipient) {
-        await TelegramNotificationQueueService.queueTelegramMessage(
-          recipient.telegram_id,
-          `✏️ Message updated in Deal #${dealId}:\n\n${messageText}\n\nUse /deal ${dealId} to view.`
-        );
+      if (!latestMessage) {
+        await DealRepository.addMessageWithClient(client, dealId, senderId, messageText);
+        return { message: 'Message created' };
       }
-    } catch (error: any) {
-      // Log error but don't fail the update if notification fails
-      logger.warn('Failed to send notification for updated deal message', {
+
+      const updatedMessage = await DealRepository.updateMessageWithClient(
+        client,
+        latestMessage.id,
         dealId,
         senderId,
-        recipientId,
-        error: error.message,
-      });
-    }
+        messageText
+      );
 
-    return updateResult.rows[0];
+      await DealRepository.updateDealStatusToPendingWithClient(client, dealId);
+
+      const recipientId = deal.channel_owner_id === senderId
+        ? deal.advertiser_id
+        : deal.channel_owner_id;
+
+      // Send notification to the other party about the message update
+      try {
+        const recipient = await UserModel.findById(recipientId);
+        if (recipient) {
+          await TelegramNotificationQueueService.queueTelegramMessage(
+            recipient.telegram_id,
+            `✏️ Message updated in Deal #${dealId}:\n\n${messageText}\n\nUse /deal ${dealId} to view.`
+          );
+        }
+      } catch (error: any) {
+        // Log error but don't fail the update if notification fails
+        logger.warn('Failed to send notification for updated deal message', {
+          dealId,
+          senderId,
+          recipientId,
+          error: error.message,
+        });
+      }
+
+      return updatedMessage;
+    });
   }
 
   /**
@@ -796,21 +769,62 @@ export class DealFlowService {
       throw new Error('Deal not found');
     }
 
-    const channelResult = await db.query(
-      'SELECT id, title, username, telegram_channel_id FROM channels WHERE id = $1',
-      [deal.channel_id]
-    );
-
-    if (channelResult.rows.length === 0) {
+    const channel = await DealRepository.getChannelInfoForDeal(dealId);
+    if (!channel) {
       throw new Error('Channel not found');
     }
 
-    const channel = channelResult.rows[0];
     return {
       channelId: channel.id,
       channelName: channel.title || channel.username || `Channel #${channel.id}`,
       channelUsername: channel.username,
       telegramChannelId: channel.telegram_channel_id,
+    };
+  }
+
+  /**
+   * Get deal by ID with enriched data (messages, creative, advertiser info)
+   * @param dealId - Deal ID
+   * @param telegramUserId - Optional Telegram user ID to check ownership
+   * @returns Enriched deal object with messages, creative, and advertiser info
+   */
+  static async getDealById(dealId: number, telegramUserId?: number): Promise<any> {
+    const deal = await DealModel.findByIdWithChannel(dealId);
+    if (!deal) {
+      throw new Error('Deal not found');
+    }
+
+    let user = null;
+    if (telegramUserId !== undefined && telegramUserId !== null) {
+      const telegramId = typeof telegramUserId === 'string' ? Number(telegramUserId) : telegramUserId;
+      if (!isNaN(telegramId)) {
+        user = await UserModel.findByTelegramId(telegramId);
+      }
+    }
+
+    const messages = await DealRepository.getMessages(deal.id);
+    const creative = await CreativeRepository.findByDeal(deal.id);
+
+    const advertiser = await UserModel.findById(deal.advertiser_id);
+    const advertiserInfo = advertiser ? {
+      id: advertiser.id,
+      telegram_id: Number(advertiser.telegram_id),
+      username: advertiser.username,
+      first_name: advertiser.first_name,
+      last_name: advertiser.last_name,
+      is_channel_owner: advertiser.is_channel_owner,
+      is_advertiser: advertiser.is_advertiser,
+    } : null;
+
+    // Remove sensitive fields before sending the response
+    const { channel_owner_wallet_address, ...dealWithoutWallet } = deal;
+
+    return {
+      ...dealWithoutWallet,
+      owner: user !== null ? user?.id === deal.channel_owner_id : false,
+      advertiser: advertiserInfo,
+      messages,
+      creative,
     };
   }
 
@@ -849,6 +863,83 @@ export class DealFlowService {
       };
     });
   }
+  /**
+   * Submit payment information for a deal
+   * Stores payment data in Redis for verification
+   */
+  static async submitPayment(dto: SubmitPaymentDto): Promise<SubmitPaymentResult> {
+    const deal = await DealModel.findById(dto.dealId);
+
+    if (!deal) {
+      throw new Error('Deal not found');
+    }
+
+    if (deal.status !== 'payment_pending') {
+      throw new Error(`Deal is not in payment_pending status. Current status: ${deal.status}`);
+    }
+
+    if (deal.advertiser_id !== dto.userId) {
+      throw new Error('Only the advertiser can submit payment for this deal');
+    }
+
+    const redis = getRedisClient();
+    const paymentKey = `deal-payment-pending-${dto.dealId}`;
+    const existingPayment = await redis.get(paymentKey);
+
+    if (existingPayment) {
+      logger.info(`Payment already submitted for Deal #${dto.dealId}`, {
+        dealId: dto.dealId,
+        userId: dto.userId,
+      });
+      return {
+        processed: false,
+        message: 'Payment submission already exists',
+      };
+    }
+
+    if (deal.price_ton > 0) {
+      const userHash = generateUserIDHash(dto.userId);
+      const payload = `deal-${deal.id}-${userHash}`;
+
+      const paymentData = {
+        wallet: dto.wallet || '',
+        wallet_raw: dto.wallet ? Address.parse(dto.wallet).toRawString() : '',
+        boc: dto.boc || '',
+        time: Date.now() / 1000,
+        payload: payload,
+      };
+
+      await redis.set(
+        paymentKey,
+        JSON.stringify(paymentData),
+        'EX',
+        3600 // Expire after 1 hour
+      );
+
+      logger.info(`Payment submitted for Deal #${dto.dealId}`, {
+        dealId: dto.dealId,
+        userId: dto.userId,
+        paymentKey,
+        paymentData: { ...paymentData, wallet_raw: paymentData.wallet_raw.substring(0, 20) + '...' },
+      });
+
+      return {
+        processed: false,
+        message: 'Payment submitted and pending verification',
+      };
+    } else {
+      logger.info(`Free deal payment processed immediately for Deal #${dto.dealId}`, {
+        dealId: dto.dealId,
+        userId: dto.userId,
+      });
+
+      return {
+        processed: true,
+        message: 'Payment processed (free deal)',
+      };
+    }
+  }
+
   //
   // /**
   //  * Verify post and release funds

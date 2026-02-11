@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { ChannelModel } from '../repositories/channel-model.repository';
 import { ChannelRepository } from '../repositories/channel.repository';
 import { UserModel } from '../repositories/user.repository';
-import { TelegramService } from '../services/telegram.service';
 import { ChannelService } from '../services/channel.service';
 import { topicsService } from '../services/topics.service';
 import { setChannelPricingSchema, updateChannelStatusSchema, updateChannelSchema, validateChannelSchema } from '../utils/validation';
@@ -131,12 +130,12 @@ export class ChannelsController {
       }
 
       if (result.channel && result.channelInfo) {
-        const stats = await TelegramService.fetchChannelStats(result.channel.telegram_channel_id);
-        await ChannelModel.saveStats(result.channel.id, stats);
-
         if (request.user.telegramId) {
           await UserModel.updateRole(request.user.telegramId, 'channel_owner', true);
         }
+
+        // const stats = await TelegramService.fetchChannelStats(result.channel.telegram_channel_id);
+        // await ChannelModel.saveStats(result.channel.id, stats);
       }
 
       return result.channel;

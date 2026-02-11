@@ -1,3 +1,4 @@
+import { PoolClient } from 'pg';
 import db from '../db/connection';
 
 export interface ChannelBasicInfo {
@@ -77,6 +78,20 @@ export class ChannelRepository {
     }
 
     return channelMap;
+  }
+
+  /**
+   * Get channel by ID within an existing transaction
+   */
+  static async findByIdWithClient(client: PoolClient, channelId: number): Promise<{ id: number; owner_id: number } | null> {
+    const result = await client.query(
+      'SELECT id, owner_id FROM channels WHERE id = $1',
+      [channelId]
+    );
+    if (!result?.rows || result.rows.length === 0) {
+      return null;
+    }
+    return result.rows[0] || null;
   }
 
   /**

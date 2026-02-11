@@ -1,38 +1,20 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { Address } from '@ton/core';
-import { DealModel } from '../repositories/deal-model.repository';
-import { DealRepository } from '../repositories/deal.repository';
-import { CreativeRepository } from '../repositories/creative.repository';
-import { DealFlowService } from '../services/deal-flow.service';
-import { UserModel } from '../repositories/user.repository';
+
+import {DealFlowService, SubmitPaymentDto} from '../services/deal-flow.service';
 import { ChannelModel } from '../repositories/channel-model.repository';
-import { ChannelRepository } from '../repositories/channel.repository';
-import { TelegramNotificationService } from '../services/telegram-notification.service';
-import { generateUserIDHash } from '../utils/verifyTonProof';
-import getRedisClient from '../utils/redis';
+
 import logger from '../utils/logger';
 
 export class DealsController {
   static async listDeals(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { user_id, status, deal_type, limit } = request.query as any;
-      let deals;
 
-      if (user_id) {
-        const user = await UserModel.findById(Number(user_id));
-        if (!user) {
-          return reply.code(404).send({ error: 'User not found' });
-        }
-        deals = await DealModel.findByUser(user.id, status as string | undefined);
-      } else {
-        deals = await DealRepository.listDealsWithFilters({
-          status: status as string | undefined,
-          deal_type: deal_type as string | undefined,
-          limit: (limit as unknown as number) || 20,
-        });
+      const result = await DealFlowService.findDeals(Number(user_id), status, deal_type, Number(limit));
+      if (!result.ok) {
+        return reply.code(404).send({ error: result.error });
       }
-
-      return deals.map((deal) =>({...deal, price_ton: parseInt(deal.price_ton) }));
+      return result.data;
     } catch (error: any) {
       logger.error('Failed to list deals', {
         error: error.message,
@@ -64,52 +46,26 @@ export class DealsController {
   static async getDealById(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = request.params as { id: string };
-      const deal = await DealModel.findByIdWithChannel(parseInt(id));
-      if (!deal) {
-        return reply.code(404).send({ error: 'Deal not found' });
-      }
-
-      let user = null;
       const { user_id } = request.query as any;
-      if (user_id) {
-        const telegramIdStr = typeof user_id === 'string' ? user_id : String(user_id);
-        const telegramId = Number(telegramIdStr);
-        if (!isNaN(telegramId)) {
-          user = await UserModel.findByTelegramId(telegramId);
-        }
-      }
 
-      const messages = await DealRepository.getMessages(deal.id);
-      const creative = await CreativeRepository.findByDeal(deal.id);
+      const telegramUserId = user_id
+        ? (typeof user_id === 'string' ? Number(user_id) : user_id)
+        : undefined;
 
-      const advertiser = await UserModel.findById(deal.advertiser_id);
-      const advertiserInfo = advertiser ? {
-        id: advertiser.id,
-        telegram_id: Number(advertiser.telegram_id),
-        username: advertiser.username,
-        first_name: advertiser.first_name,
-        last_name: advertiser.last_name,
-        is_channel_owner: advertiser.is_channel_owner,
-        is_advertiser: advertiser.is_advertiser,
-      } : null;
+      const deal = await DealFlowService.getDealById(parseInt(id), telegramUserId);
 
-      // TODO: Remove sensitive fields before sending the response
-      // TODO: Select only the required fields in the SQL query
-      const { channel_owner_wallet_address, ...dealWithoutWallet } = deal;
-
-      return {
-        ...dealWithoutWallet,
-        owner: user !== null ? user?.id === deal.channel_owner_id : false,
-        advertiser: advertiserInfo,
-        messages,
-        creative,
-      };
+      return deal;
     } catch (error: any) {
       logger.error('Failed to get deal', {
         error: error.message,
         stack: error.stack,
         dealId: (request.params as { id: string }).id,
       });
+
+      if (error.message === 'Deal not found') {
+        return reply.code(404).send({ error: error.message });
+      }
+
       reply.code(500).send({ error: error.message });
     }
   }
@@ -158,39 +114,7 @@ export class DealsController {
       const { id } = request.params as { id: string };
       const userId = request.user?.telegramId as number;
 
-      console.log(request.user, '\n==================');
-      const deal = await DealFlowService.acceptDeal(parseInt(id), userId);
-
-      if (deal && deal.escrow_address !== null && deal.status === 'payment_pending') {
-        try {
-          const channelInfo = await ChannelRepository.getBasicInfo(deal.channel_id);
-          const channelName = channelInfo?.title || channelInfo?.username || `Channel #${deal.channel_id}`;
-
-          await TelegramNotificationService.notifyPaymentInvoice(
-            deal.id,
-            deal.advertiser_id,
-            {
-              dealId: deal.id,
-              channelId: deal.channel_id,
-              channelName: channelName,
-              priceTon: parseFloat(deal.price_ton.toString()),
-              adFormat: deal.ad_format,
-              escrowAddress: deal.escrow_address,
-            }
-          );
-
-          logger.info(`Payment invoice notification sent for Deal #${deal.id}`, {
-            dealId: deal.id,
-            advertiserId: deal.advertiser_id,
-          });
-        } catch (notifError: any) {
-          logger.warn('Failed to send payment invoice notification', {
-            error: notifError.message,
-            dealId: deal.id,
-            stack: notifError.stack,
-          });
-        }
-      }
+      const deal = await DealFlowService.acceptDealWithNotify(parseInt(id), userId);
 
       return deal;
     } catch (error: any) {
@@ -339,25 +263,7 @@ export class DealsController {
         return reply.code(400).send({ error: 'Deal ID in body does not match URL parameter' });
       }
 
-      const deal = await DealFlowService.declineDeal(Number(id), userId, reason);
-
-      try {
-        const channelInfo = await DealFlowService.getChannelInfoForDeal(Number(id));
-        await TelegramNotificationService.notifyDealDeclined(Number(id), deal.advertiser_id, {
-          dealId: Number(id),
-          channelId: channelInfo.channelId,
-          channelName: channelInfo.channelName,
-          priceTon: deal.price_ton,
-          adFormat: deal.ad_format,
-        });
-      } catch (notifError: any) {
-        // Log but don't fail if notification fails
-        logger.warn('Failed to send decline notification', {
-          error: notifError.message,
-          dealId: id,
-        });
-      }
-
+      const deal = await DealFlowService.declineDealWithNotification(Number(id), userId, reason);
       return deal;
     } catch (error: any) {
       logger.error('Failed to decline deal', {
@@ -389,96 +295,21 @@ export class DealsController {
         });
       }
 
-      const deal = await DealModel.findById(dealIdNum);
-
-      if (!deal) {
-        return reply.code(404).send({
-          status: "failed",
-          error: "Deal not found",
-        });
-      }
-
-      if (deal.status !== 'payment_pending') {
-        return reply.code(400).send({
-          status: "failed",
-          error: `Deal is not in payment_pending status. Current status: ${deal.status}`,
-        });
-      }
-
-      if (deal.advertiser_id !== userId) {
-        return reply.code(403).send({
-          status: "failed",
-          error: "Only the advertiser can submit payment for this deal",
-        });
-      }
-
-      const redis = getRedisClient();
-      const paymentKey = `deal-payment-pending-${dealIdNum}`;
-      const existingPayment = await redis.get(paymentKey);
-
-      if (existingPayment) {
-        logger.info(`Payment already submitted for Deal #${dealIdNum}`, {
-          dealId: dealIdNum,
-          userId,
-        });
-        return reply.send({
-          status: "success",
-          result: {
-            processed: false,
-            message: "Payment submission already exists",
-          },
-        });
-      }
-
       const { wallet, boc } = request.body as { wallet?: string; boc?: string };
 
-      if (deal.price_ton > 0) {
-        const userHash = generateUserIDHash(userId);
-        const payload = `deal-${deal.id}-${userHash}`;
+      const dto: SubmitPaymentDto = {
+        dealId: dealIdNum,
+        userId,
+        wallet,
+        boc,
+      };
 
-        const paymentData = {
-          wallet: wallet || "",
-          wallet_raw: wallet ? Address.parse(wallet).toRawString() : "",
-          boc: boc || "",
-          time: Date.now() / 1000,
-          payload: payload,
-        };
+      const result = await DealFlowService.submitPayment(dto);
 
-        await redis.set(
-          paymentKey,
-          JSON.stringify(paymentData),
-          'EX',
-          3600 // Expire after 1 hour
-        );
-
-        logger.info(`Payment submitted for Deal #${dealIdNum}`, {
-          dealId: dealIdNum,
-          userId,
-          paymentKey,
-          paymentData: { ...paymentData, wallet_raw: paymentData.wallet_raw.substring(0, 20) + '...' },
-        });
-
-        return reply.send({
-          status: "success",
-          result: {
-            processed: false,
-            message: "Payment submitted and pending verification",
-          },
-        });
-      } else {
-        logger.info(`Free deal payment processed immediately for Deal #${dealIdNum}`, {
-          dealId: dealIdNum,
-          userId,
-        });
-
-        return reply.send({
-          status: "success",
-          result: {
-            processed: true,
-            message: "Payment processed (free deal)",
-          },
-        });
-      }
+      return reply.send({
+        status: "success",
+        result,
+      });
     } catch (error: any) {
       logger.error('Failed to submit payment', {
         error: error.message,
@@ -486,6 +317,27 @@ export class DealsController {
         userId: request.user?.id,
         dealId: (request.params as { dealId: string })?.dealId,
       });
+
+      if (error.message === 'Deal not found') {
+        return reply.code(404).send({
+          status: "failed",
+          error: error.message,
+        });
+      }
+
+      if (error.message.includes('payment_pending') || error.message.includes('advertiser')) {
+        return reply.code(400).send({
+          status: "failed",
+          error: error.message,
+        });
+      }
+
+      if (error.message.includes('Only the advertiser')) {
+        return reply.code(403).send({
+          status: "failed",
+          error: error.message,
+        });
+      }
 
       return reply.code(500).send({
         status: "failed",

@@ -9,7 +9,9 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
     preHandler: [authMiddleware, validateQuery(listChannelsQuerySchema)],
   }, ChannelsController.getChannelsByFilters);
 
-  fastify.get('/:id', ChannelsController.getChannelById);
+  fastify.get('/:id', {
+    preHandler: [authMiddleware],
+  }, ChannelsController.getChannelById);
 
   fastify.post('/', {
     preHandler: [authMiddleware, validateBody(createChannelSchema)],

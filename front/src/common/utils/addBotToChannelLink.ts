@@ -5,8 +5,7 @@ export const getBotToChannelLink = (botUsername: string): string => {
 }
 
 export const addBotToChannelLink = (botUsername: string) => {
-  const addBotLink = getBotToChannelLink(botUsername)
-  console.log({ addBotLink });
-  goTo(addBotLink);
+  const link = getBotToChannelLink(botUsername);
+  goTo(link);
 };
 

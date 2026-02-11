@@ -1,6 +1,6 @@
 import cn from 'classnames'
 
-import styles from './Icon.module.scss'
+import styles from './Icon.module.scss';
 import { getIcon } from './helpers'
 import type { IconSize, IconTypeName } from './types'
 

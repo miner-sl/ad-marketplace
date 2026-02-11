@@ -18,7 +18,6 @@ export const FiltersContent: React.FC<Props> = ({
   onSelect,
 }: Props) => {
   const [isTopicDropdownOpen, setIsTopicDropdownOpen] = useState(false);
-
   const topicButtonRef = useRef<HTMLDivElement>(null)
   const [filters, setFilters] = useState<ChannelFilters>(value || {
     limit: 14, // TODO calculate limit based on screen size

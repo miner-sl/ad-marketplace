@@ -2,16 +2,18 @@ import cn from 'classnames'
 import React from 'react'
 import type { ChangeEvent } from 'react'
 
-import styles from './ListInput.module.scss'
 import { Icon } from '../Icon'
 import {hapticFeedback} from "@utils";
+import type {ListInputType} from "./ListInput.types";
+
+import styles from './ListInput.module.scss'
 
 export interface ListInputProps {
   textColor?: 'primary' | 'secondary' | 'tertiary'
   value?: string | number
   onChange?: (value: string) => void
   onBlur?: () => void
-  type?: 'text' | 'number' | 'password' | 'email' | 'tel' | 'url' | 'search'
+  type?: ListInputType
   placeholder?: string
   disabled?: boolean
   className?: string

@@ -10,6 +10,7 @@ import {
   emitEvent,
   miniApp,
   backButton,
+  mainButton,
 } from '@tma.js/sdk-react';
 
 /**
@@ -62,6 +63,7 @@ export async function init(options: {
   }
 
   backButton.mount.ifAvailable();
+  mainButton.mount.ifAvailable();
   initData.restore();
 
   if (miniApp.mount.isAvailable()) {

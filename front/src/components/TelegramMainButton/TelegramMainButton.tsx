@@ -1,7 +1,9 @@
 import { useEffect, memo } from 'react'
 import { useLocation } from 'react-router-dom'
 
-import {isProd} from "../../common/config";
+import { mainButton } from '@tma.js/sdk-react'
+
+import { isProd } from '../../common/config'
 
 interface MainButtonProps {
   text: string
@@ -23,68 +25,43 @@ export const TelegramMainButton = memo(
     textColor,
     isVisible = true,
   }: MainButtonProps) => {
-    const webApp = window.Telegram?.WebApp
     const location = useLocation()
 
     useEffect(() => {
-      if (!webApp?.MainButton) return
-
-      webApp.MainButton.setParams({
+      mainButton.setParams({
         text: text || 'Continue',
-        color,
-        text_color: textColor,
+        ...(color && { bgColor: color as `#${string}` }),
+        ...(textColor && { textColor: textColor as `#${string}` }),
+        isEnabled: !disabled && !loading,
+        isLoaderVisible: loading,
       })
-
-      webApp.MainButton.onClick(onClick)
 
       if (isVisible && text) {
-        webApp.MainButton.show()
+        mainButton.show()
       } else {
-        webApp.MainButton.hide()
+        mainButton.hide()
       }
+
+      const offClick = mainButton.onClick(onClick)
+
       return () => {
-        webApp.MainButton.offClick(onClick)
-        webApp.MainButton.hide()
+        offClick()
+        mainButton.hide()
       }
-    }, [location.pathname])
-
-    useEffect(() => {
-      if (!webApp?.MainButton) return
-
-      webApp.MainButton.setParams({
-        text: text || 'Continue',
-        color,
-        text_color: textColor,
-      })
-
-      if (disabled || loading) {
-        webApp.MainButton.disable()
-      } else {
-        webApp.MainButton.enable()
-      }
-
-      if (loading) {
-        webApp.MainButton.showProgress()
-      } else {
-        webApp.MainButton.hideProgress()
-      }
-    }, [disabled, loading, text])
-
-    useEffect(() => {
-      if (webApp?.MainButton && onClick) {
-        webApp?.MainButton.onClick(onClick)
-
-        return () => {
-          if (webApp?.MainButton) {
-            webApp?.MainButton.offClick(onClick)
-          }
-        }
-      }
-    }, [onClick])
+    }, [
+      location.pathname,
+      text,
+      onClick,
+      disabled,
+      loading,
+      color,
+      textColor,
+      isVisible,
+    ])
 
     if (
-      // webApp?.platform === 'unknown' &&
-      !isProd
+      false
+      // !isProd
       // && isVisible
     ) {
       return (

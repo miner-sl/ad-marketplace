@@ -13,8 +13,7 @@ export type TextTypes = | 'hero'
 
 interface TextProps {
   children: React.ReactNode | string
-  type:
-    TextTypes
+  type?: TextTypes
   align?: 'left' | 'center' | 'right'
   color?: 'primary' | 'tertiary' | 'secondary' | 'accent' | 'danger'
   weight?: 'normal' | 'medium' | 'bold'

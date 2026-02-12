@@ -1,0 +1,77 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to VPS
+        env:
+          SSH_HOST: root@5.129.203.18
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          # Install sshpass for password-based SSH
+          sudo apt-get update
+          sudo apt-get install -y sshpass
+          
+          # Create .ssh directory and add VPS to known hosts
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -H 5.129.203.18 > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          
+          # Connect via SSH and deploy with environment variables passed through
+          sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no $SSH_HOST \
+            GITHUB_TOKEN="$GITHUB_TOKEN" \
+            REPO_OWNER="$REPO_OWNER" \
+            REPO_NAME="$REPO_NAME" \
+            bash << 'REMOTE_SCRIPT'
+            set -e
+            echo "Starting deployment..."
+          
+            # Clone or update repository using HTTPS with token
+            if [ -d "/root/ad-marketplace" ]; then
+              echo "Repository exists, pulling latest changes..."
+              cd /root/ad-marketplace
+              git remote set-url origin https://${GITHUB_TOKEN}@github.com/${REPO_OWNER}/${REPO_NAME}.git
+              git fetch origin
+              git reset --hard origin/main || git reset --hard origin/master
+            else
+              echo "Cloning repository..."
+              git clone https://${GITHUB_TOKEN}@github.com/${REPO_OWNER}/${REPO_NAME}.git /root/ad-marketplace
+              cd /root/ad-marketplace
+            fi
+          
+            # Stop existing containers
+            echo "Stopping existing containers..."
+            docker compose down || true
+          
+            # Start containers with build
+            echo "Building and starting containers..."
+            docker compose up -d --build
+
+            # Show container status
+            echo "Container status:"
+            docker compose ps
+
+            # Clean up old images
+            echo "Cleaning up unused Docker images..."
+            docker image prune -f || true
+          
+            echo "Deployment completed successfully!"
+          REMOTE_SCRIPT

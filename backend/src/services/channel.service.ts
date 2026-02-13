@@ -3,7 +3,7 @@ import { Channel } from '../models/channel.types';
 import { UserModel } from '../repositories/user.repository';
 import { TelegramService } from './telegram.service';
 import { TelegramNotificationService } from './telegram-notification.service';
-import { ChannelRepository } from '../repositories/channel.repository';
+import {ChannelListFilters, ChannelRepository} from '../repositories/channel.repository';
 
 import { topicsService } from './topics.service';
 import { withTx } from '../utils/transaction';
@@ -40,6 +40,34 @@ export interface ChannelStatusUpdateResult {
 }
 
 export class ChannelService {
+
+  static async listChannelsWithFilters(filters: ChannelListFilters): Promise<any[]> {
+    try {
+      if (filters.search) {
+        filters.search = this.normalizeSearchQuery(filters.search);
+      }
+      const channels = await ChannelRepository.listChannelsWithFilters(filters);
+      return channels;
+    } catch (error: any) {
+      return [];
+    }
+  }
+
+  private static normalizeSearchQuery(search: string): string {
+    if (!search) {
+      return search;
+    }
+    if (search.startsWith('https://t.me/')) {
+      return search.substring('https://t.me/'.length);
+    }
+    if (search.startsWith('t.me/')) {
+      return search.substring('t.me/'.length);
+    }
+    if (search.startsWith('@')) {
+      return search.substring(1);
+    }
+    return search;
+  }
   /**
    * Register a new channel for a user
    * Handles all business logic for channel registration including user validation

@@ -45,7 +45,7 @@ export class ChannelsController {
         offset: query.offset || 0,
       };
 
-      const channels = await ChannelRepository.listChannelsWithFilters(filters);
+      const channels = await ChannelService.listChannelsWithFilters(filters);
       return channels;
     } catch (error: any) {
       logger.error('Failed to list channels', {

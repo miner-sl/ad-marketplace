@@ -262,6 +262,8 @@ export class ChannelsController {
         topic: body.topic,
         active: body.active,
         price: body.price,
+        country: body.country,
+        locale: body.locale,
       });
       if (!result.ok) {
         return reply.code(result.status || 500).send({

@@ -28,6 +28,8 @@ export interface UpdateChannelDto {
   active?: boolean;
   price?: number;
   topic?: number | null;
+  country?: string | null;
+  locale?: string | null;
 }
 export interface ChannelStatusUpdateResult {
   success: boolean;
@@ -354,6 +356,8 @@ export class ChannelService {
       is_active?: boolean;
       topic_id?: number | null;
       price_ton?: number;
+      country?: string | null;
+      locale?: string | null;
     } = {};
 
     if (body.active !== undefined) {
@@ -362,6 +366,14 @@ export class ChannelService {
 
     if (body.topic !== undefined) {
       updates.topic_id = body.topic;
+    }
+
+    if (body.country !== undefined) {
+      updates.country = body.country;
+    }
+
+    if (body.locale !== undefined) {
+      updates.locale = body.locale;
     }
 
     if (body.price !== undefined) {

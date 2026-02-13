@@ -53,6 +53,8 @@ export interface Channel {
   is_active: boolean
   topic_id?: number
   topic?: { id: number; name: string }
+  country?: string | null
+  locale?: string | null
   created_at: string
   updated_at: string
   stats?: ChannelStats
@@ -249,6 +251,8 @@ export interface UpdateChannelRequest {
   active?: boolean
   price?: number
   topic?: number | null
+  country?: string | null
+  locale?: LocaleCode | null
 }
 
 export type LocaleCode = 'en' | 'ru' | 'es' | 'it'

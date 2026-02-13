@@ -27,11 +27,28 @@ import {useChannelQuery, useSetChannelPricingMutation, useUpdateChannelMutation}
 import {useClipboard, useTelegramUser} from '@hooks'
 import {useAuth} from '@context'
 import {ROUTES_NAME} from '@routes'
-import type {AdFormat, Channel, ChannelStats} from '@types'
+import type {AdFormat, Channel, ChannelStats, LocaleCode} from '@types'
 import {checkIsMobile, createMembersCount, getChannelLink, hapticFeedback, separateNumber} from '@utils'
 import {PREDEFINED_TOPICS} from "../../../common/constants/topics";
 
 import styles from './ChannelDetailsPage.module.scss'
+
+const COUNTRIES = [
+  { value: 'Russia', name: 'Russia' },
+  { value: 'USA', name: 'USA' },
+  { value: 'India', name: 'India' },
+  { value: 'Brazil', name: 'Brazil' },
+  { value: 'France', name: 'France' },
+  { value: 'Italy', name: 'Italy' },
+  { value: 'Africa', name: 'Africa' },
+]
+
+const LOCALES = [
+  { value: 'en', name: 'English' },
+  { value: 'ru', name: 'Russian' },
+  { value: 'es', name: 'Spanish' },
+  { value: 'it', name: 'Italian' },
+]
 
 interface ChannelHeaderProps {
   channel: Channel
@@ -106,12 +123,23 @@ export const ChannelDetailsPage = () => {
 
   const [isEditing, setIsEditing] = useState(false)
   const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null)
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null)
+  const [selectedLocale, setSelectedLocale] = useState<string | null>(null)
 
   useEffect(() => {
     if (channel?.topic_id !== undefined) {
       setSelectedTopicId(channel.topic_id)
     }
   }, [channel?.topic_id])
+
+  useEffect(() => {
+    if (channel?.country !== undefined) {
+      setSelectedCountry(channel.country ?? null)
+    }
+    if (channel?.locale !== undefined) {
+      setSelectedLocale(channel.locale ?? null)
+    }
+  }, [channel?.country, channel?.locale])
 
   const [editingPrices, setEditingPrices] = useState<Record<AdFormat, string>>({
     post: '',
@@ -160,11 +188,24 @@ export const ChannelDetailsPage = () => {
   const handleEditToggle = async () => {
     if (isEditing) {
       try {
-        const updates: { active?: boolean; price?: number; topic?: number | null } = {}
+        const updates: {
+          active?: boolean
+          price?: number
+          topic?: number | null
+          country?: string | null
+          locale?: LocaleCode | null
+        } = {}
 
         const currentTopicId = channel?.topic_id ?? null
         if (selectedTopicId !== currentTopicId) {
           updates.topic = selectedTopicId
+        }
+
+        if (selectedCountry !== (channel?.country ?? null)) {
+          updates.country = selectedCountry
+        }
+        if (selectedLocale !== (channel?.locale ?? null)) {
+          updates.locale = selectedLocale as LocaleCode | null
         }
 
         const postPrice = editingPrices.post.trim()
@@ -203,19 +244,29 @@ export const ChannelDetailsPage = () => {
         })
       }
     } else {
-      // Initialize topic when entering edit mode
+      // Initialize topic, country, locale when entering edit mode
       if (channel?.topic_id !== undefined) {
         setSelectedTopicId(channel.topic_id)
       } else {
         setSelectedTopicId(null)
       }
+      setSelectedCountry(channel?.country ?? null)
+      setSelectedLocale(channel?.locale ?? null)
       setIsEditing(true)
     }
   }
 
   const handleTopicChange = (topicId: string) => {
-    const id = topicId === '' ? null : parseInt(topicId)
+    const id = topicId === '' ? null : parseInt(topicId, 10)
     setSelectedTopicId(id)
+  }
+
+  const handleCountryChange = (value: string) => {
+    setSelectedCountry(value || null)
+  }
+
+  const handleLocaleChange = (value: string) => {
+    setSelectedLocale(value || null)
   }
 
   if (isLoading || !channel) {
@@ -521,6 +572,58 @@ export const ChannelDetailsPage = () => {
                         {channel.topic_id
                           ? PREDEFINED_TOPICS.find((t) => t.id === channel.topic_id)?.name || 'Unknown'
                           : 'No topic'}
+                      </Text>
+                    )}
+                  </BlockNew>
+                }
+              />
+              <ListItem
+                text={
+                  <BlockNew row align="center" justify="between" gap={8}>
+                    <Text type="text" weight="medium">
+                      Country
+                    </Text>
+                    {isChannelOwner && isEditing ? (
+                      <AppSelect
+                        options={[
+                          { value: '', name: 'No country' },
+                          ...COUNTRIES,
+                        ]}
+                        value={selectedCountry ?? ''}
+                        onChange={handleCountryChange}
+                        placeholder="Select country"
+                        disabled={updateChannelMutation.isPending}
+                      />
+                    ) : (
+                      <Text type="text" color={channel.country ? 'primary' : 'secondary'}>
+                        {channel.country || 'No country'}
+                      </Text>
+                    )}
+                  </BlockNew>
+                }
+              />
+              <ListItem
+                text={
+                  <BlockNew row align="center" justify="between" gap={8}>
+                    <Text type="text" weight="medium">
+                      Locale
+                    </Text>
+                    {isChannelOwner && isEditing ? (
+                      <AppSelect
+                        options={[
+                          { value: '', name: 'No locale' },
+                          ...LOCALES,
+                        ]}
+                        value={selectedLocale ?? ''}
+                        onChange={handleLocaleChange}
+                        placeholder="Select locale"
+                        disabled={updateChannelMutation.isPending}
+                      />
+                    ) : (
+                      <Text type="text" color={channel.locale ? 'primary' : 'secondary'}>
+                        {channel.locale
+                          ? LOCALES.find((l) => l.value === channel.locale)?.name || channel.locale
+                          : 'No locale'}
                       </Text>
                     )}
                   </BlockNew>

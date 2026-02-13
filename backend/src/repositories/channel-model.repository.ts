@@ -225,6 +225,8 @@ export class ChannelModel {
       is_active?: boolean;
       topic_id?: number | null;
       price_ton?: number;
+      country?: string | null;
+      locale?: string | null;
     }
   ): Promise<Channel> {
     return await withTx(async (client) => {
@@ -240,6 +242,16 @@ export class ChannelModel {
       if (updates.topic_id !== undefined) {
         updateFields.push(`topic_id = $${paramIndex++}`);
         updateValues.push(updates.topic_id);
+      }
+
+      if (updates.country !== undefined) {
+        updateFields.push(`country = $${paramIndex++}`);
+        updateValues.push(updates.country);
+      }
+
+      if (updates.locale !== undefined) {
+        updateFields.push(`locale = $${paramIndex++}`);
+        updateValues.push(updates.locale);
       }
 
       updateFields.push(`updated_at = CURRENT_TIMESTAMP`);

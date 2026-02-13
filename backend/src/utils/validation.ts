@@ -139,6 +139,8 @@ export const updateChannelSchema = z.object({
   active: z.boolean().optional(),
   price: z.number().positive().optional(),
   topic: z.number().int().positive().optional().nullable(),
+  country: z.string().optional().nullable(),
+  locale: localesSchema.optional().nullable(),
 });
 
 export const updateWalletAddressSchema = z.object({

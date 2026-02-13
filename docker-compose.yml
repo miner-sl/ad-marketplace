@@ -27,7 +27,7 @@ services:
       context: ./front
       dockerfile: Dockerfile.static
       args:
-        VITE_API_URL: /api
+        VITE_API_URL: https://ad-marketplace:8000/api
     environment:
       NODE_ENV: production
     depends_on:
@@ -40,7 +40,7 @@ services:
     container_name: ad-marketplace-app
     environment:
       NODE_ENV: development
-      PORT: 3000
+      PORT: 8000
       DATABASE_URL: postgresql://admarketplace:admarketplace123@postgres:5432/ad_marketplace
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-}
@@ -52,7 +52,7 @@ services:
       VERIFIED_TIMEOUT_HOURS: ${VERIFIED_TIMEOUT_HOURS:-168}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
     ports:
-      - "3000:3000"
+      - "8000:8000"
     depends_on:
       postgres:
         condition: service_healthy

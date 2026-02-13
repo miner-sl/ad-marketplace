@@ -500,20 +500,20 @@ export class BotController {
       dealInfo += `\n📄 Brief:\n${this.escapeMarkdown(briefPreview)}\n`;
     }
 
-    if (creative) {
-      const creativeData = creative.content_data;
-      dealInfo += `\n📝 Creative Status: ${creative.status}\n`;
-
-      // Show creative text if available
-      if (creativeData && creativeData.text) {
-        const creativeText = creativeData.text;
-        const previewLength = 200;
-        const creativePreview = creativeText.length > previewLength
-          ? creativeText.substring(0, previewLength) + '...'
-          : creativeText;
-        dealInfo += `\n📄 Creative Text:\n${this.escapeMarkdown(creativePreview)}\n`;
-      }
-    }
+    // if (creative) {
+    //   const creativeData = creative.content_data;
+    //   dealInfo += `\n📝 Creative Status: ${creative.status}\n`;
+    //
+    //   // Show creative text if available
+    //   if (creativeData && creativeData.text) {
+    //     const creativeText = creativeData.text;
+    //     const previewLength = 200;
+    //     const creativePreview = creativeText.length > previewLength
+    //       ? creativeText.substring(0, previewLength) + '...'
+    //       : creativeText;
+    //     dealInfo += `\n📄 Creative Text:\n${this.escapeMarkdown(creativePreview)}\n`;
+    //   }
+    // }
 
     // Add action buttons based on deal status and user role
     const buttons: any[] = [];

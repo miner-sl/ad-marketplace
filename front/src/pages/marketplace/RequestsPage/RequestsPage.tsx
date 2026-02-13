@@ -13,7 +13,7 @@ import {
   CampaignCard,
   Button,
   ListInput,
-  ListToggler, useToast,
+  ListToggler, useToast, AppSelect, type AppSelectOption,
 } from '@components';
 import { useDealRequestsQuery, useCampaignsQuery } from '@store-new';
 import { useTelegramUser } from '@hooks';
@@ -24,6 +24,29 @@ import styles from './RequestsPage.module.scss';
 
 const LIMIT = 20
 
+type Locales = 'en' | 'ru' | 'es' | 'it';
+
+const locales: AppSelectOption[] = [
+  {
+    value: '',
+    name: 'Any',
+  }, {
+    value: 'en',
+    name: 'English',
+  },
+  {
+    value: 'ru',
+    name: 'Russian',
+  },
+  {
+    value: 'es',
+    name: 'Spanish',
+  },
+  {
+    value: 'it',
+    name: 'Italian',
+  }
+];
 export const RequestsPage = () => {
   const navigate = useNavigate()
   const telegramUser = useTelegramUser()
@@ -32,7 +55,7 @@ export const RequestsPage = () => {
   const [dateFrom] = useState('')
   const [dateTo] = useState('')
   const [country, setCountry] = useState('')
-  const [locale, setLocale] = useState('')
+  const [locale, setLocale] = useState<Locales>('en');
   const [premiumOnly, setPremiumOnly] = useState(false)
 
   const filters = useMemo(
@@ -165,14 +188,11 @@ export const RequestsPage = () => {
                 <Text type="caption" color="secondary">
                   Locale
                 </Text>
-                <ListInput
-                  type="text"
-                  placeholder="e.g. en"
-                  value={locale}
-                  onChange={(v) => {
-                    setLocale(v)
-                    setPage(1)
-                  }}
+                <AppSelect
+                  options={locales}
+                  value={locale || null}
+                  onChange={(value) => setLocale(value as Locales)}
+                  placeholder="Select a topic"
                 />
               </BlockNew>
               <BlockNew gap={4} align="start">

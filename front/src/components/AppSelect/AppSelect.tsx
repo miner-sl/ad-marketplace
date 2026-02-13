@@ -1,11 +1,13 @@
 import { Icon } from '../Icon'
 import styles from './AppSelect.module.scss'
 
+export type AppSelectOption = {
+  value: string
+  name: string
+};
+
 interface AppSelectProps {
-  options?: {
-    value: string
-    name: string
-  }[]
+  options?: AppSelectOption[]
   onChange?: (value: string) => void
   value?: string | null
   placeholder?: string

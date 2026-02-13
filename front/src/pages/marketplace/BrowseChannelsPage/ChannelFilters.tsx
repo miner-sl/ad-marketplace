@@ -1,12 +1,22 @@
-import React, {useRef, useState} from 'react';
-import cn from 'classnames';
+import React, {useState} from 'react';
 
-import {BlockNew, Button, Dropdown, Group, Icon, ListInput, Text} from '@components';
+import {AppSelect, BlockNew, Button, Group, GroupItem, ListInput, Text} from '@components';
+
 import {PREDEFINED_TOPICS} from '../../../common/constants/topics';
-import type {ChannelFilters} from '@types';
+import {type ChannelFilters, COUNTRIES, LOCALES, type SelectOption} from '@types';
 import {hapticFeedback} from '@utils';
 
 import styles from './BrowseChannelsPage.module.scss';
+
+const countries: SelectOption[] = [{value: '', name: 'Any'}, ...COUNTRIES];
+const locales: SelectOption[] = [{value: '', name: 'Any'}, ...LOCALES];
+const topicDropdownOptions: SelectOption[] = [
+  { name: 'Any', value: '' },
+  ...PREDEFINED_TOPICS.map((topic: { id: number; name: string }) => ({
+    name: topic.name,
+    value: topic.id.toString(),
+  })),
+]
 
 type Props = {
   value?: ChannelFilters;
@@ -17,27 +27,9 @@ export const FiltersContent: React.FC<Props> = ({
   value,
   onSelect,
 }: Props) => {
-  const [isTopicDropdownOpen, setIsTopicDropdownOpen] = useState(false);
-  const topicButtonRef = useRef<HTMLDivElement>(null)
   const [filters, setFilters] = useState<ChannelFilters>(value || {
     limit: 14, // TODO calculate limit based on screen size
   })
-  const handleResetFilters = () => {
-    setFilters({limit: 14});
-  }
-
-  const handleToggleTopicDropdown = (value?: boolean) => {
-    setIsTopicDropdownOpen(value !== undefined ? value : !isTopicDropdownOpen)
-  }
-
-  const topicDropdownOptions = [
-    { label: 'Any Topics', value: '' },
-    ...PREDEFINED_TOPICS.map((topic: { id: number; name: string }) => ({
-      label: topic.name,
-      value: topic.id.toString(),
-    })),
-  ]
-
 
   const handleFilterChange = (key: keyof ChannelFilters, value: string) => {
     hapticFeedback('soft');
@@ -58,10 +50,18 @@ export const FiltersContent: React.FC<Props> = ({
     }
 
     if (key === 'topic_id') {
-      const topicId = value ? parseInt(value) : undefined
+      const topicId = value ? parseInt(value, 10) : undefined
       setFilters((prev) => ({
         ...prev,
         topic_id: topicId,
+      }))
+      return
+    }
+
+    if (key === 'country' || key === 'locale') {
+      setFilters((prev) => ({
+        ...prev,
+        [key]: value,
       }))
       return
     }
@@ -75,48 +75,31 @@ export const FiltersContent: React.FC<Props> = ({
     }
   }
 
-
-  const selectedTopicLabel = filters.topic_id
-    ? PREDEFINED_TOPICS.find((t) => t.id === filters.topic_id)?.name || 'Select topic'
-    : 'Any Topics'
+  const handleResetFilters = () => {
+    hapticFeedback('light');
+    setFilters({limit: 14});
+  }
 
   const handleApply = () => {
     onSelect(filters);
     hapticFeedback('soft');
   };
-  const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    e.stopPropagation()
-    handleToggleTopicDropdown();
-  }
+
   return (
     <BlockNew gap={12} className={styles.filters}>
-      <BlockNew gap={8}>
-        <Text type="caption" color="secondary">
-          Topic
-        </Text>
-        <div
-          className={cn(styles.orderByContainer)}
-          onClick={onClick}
-          ref={topicButtonRef}
-        >
-          <Icon name="sortArrows" size={18} color="tertiary"/>
-          <Text type="text" color="primary">
-            {selectedTopicLabel}
-          </Text>
-          <Dropdown
-            active={isTopicDropdownOpen}
-            options={topicDropdownOptions}
-            selectedValue={filters.topic_id?.toString() || ''}
-            onSelect={(value: string) => {
-              handleToggleTopicDropdown(false);
-              handleFilterChange('topic_id', value)
-            }}
-            onClose={() => handleToggleTopicDropdown(false)}
-            triggerRef={topicButtonRef as React.RefObject<HTMLElement>}
-          />
-        </div>
-      </BlockNew>
-
+      <Group>
+        <GroupItem
+          text="Topic"
+          after={
+            <AppSelect
+              options={topicDropdownOptions}
+              value={filters.topic_id?.toString() || ''}
+              onChange={(value: string) => handleFilterChange('topic_id', value)}
+              placeholder="Any"
+            />
+          }
+        />
+      </Group>
       <BlockNew gap={8}>
         <Text type="caption" color="secondary">
           Subscribers
@@ -186,6 +169,34 @@ export const FiltersContent: React.FC<Props> = ({
           />
         </Group>
       </BlockNew>
+
+      <Group>
+        <GroupItem
+          text="Country"
+          after={
+           <AppSelect
+             options={countries}
+             value={filters.country ?? ''}
+             onChange={(value) => handleFilterChange('country', value)}
+             placeholder="Any"
+           />
+          }
+        />
+      </Group>
+
+      <Group>
+        <GroupItem
+          text="Locale"
+          after={
+            <AppSelect
+              options={locales}
+              value={filters.locale ?? ''}
+              onChange={(value) => handleFilterChange('locale', value)}
+              placeholder="Any"
+            />
+          }
+        />
+      </Group>
 
       <BlockNew row gap={8}>
         <Button

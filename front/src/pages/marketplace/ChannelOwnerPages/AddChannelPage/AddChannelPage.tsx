@@ -18,35 +18,18 @@ import {
   ListItem,
   List,
 } from '@components'
+
 import {useCreateChannelMutation, useValidateChannelMutation,} from '@store-new'
 import {addBotToChannelLink, getBotToChannelLink} from '@utils'
 import {useClipboard} from '@hooks'
 import config from '@config'
 import {PREDEFINED_TOPICS} from '../../../../common/constants/topics'
+import {COUNTRIES, LOCALES} from '@types'
 
 const topics = PREDEFINED_TOPICS.map((topic: { id: number; name: string }) => ({
   name: topic.name,
   value: topic.id.toString(),
 }));
-
-const COUNTRIES = [
-  { value: '', name: 'None' },
-  { value: 'Russia', name: 'Russia' },
-  { value: 'USA', name: 'USA' },
-  { value: 'India', name: 'India' },
-  { value: 'Brazil', name: 'Brazil' },
-  { value: 'France', name: 'France' },
-  { value: 'Italy', name: 'Italy' },
-  { value: 'Africa', name: 'Africa' },
-] as const;1
-
-const LOCALES = [
-  { value: '', name: 'None' },
-  { value: 'en', name: 'English' },
-  { value: 'ru', name: 'Russian' },
-  { value: 'es', name: 'Spanish' },
-  { value: 'it', name: 'Italian' },
-] as const;
 
 const MIN_USERNAME_LENGTH = 4;
 
@@ -293,8 +276,8 @@ export const AddChannelPage = () => {
               text="Country"
               after={
                 <AppSelect
-                  options={[...COUNTRIES]}
-                  value={country}
+                  options={[{ value: '', name: 'None' }, ...COUNTRIES]}
+                  value={country ?? ''}
                   onChange={(value) => setCountry(value || undefined)}
                   placeholder="Select country"
                 />
@@ -308,8 +291,8 @@ export const AddChannelPage = () => {
               text="Locale"
               after={
                 <AppSelect
-                  options={[...LOCALES]}
-                  value={locale}
+                  options={[{ value: '', name: 'None' }, ...LOCALES]}
+                  value={locale ?? ''}
                   onChange={(value) => setLocale(value || undefined)}
                   placeholder="Select locale"
                 />

@@ -19,6 +19,8 @@ export class ChannelsController {
         ad_format?: string;
         topic_id?: number;
         search?: string;
+        country?: string;
+        locale?: string;
         ownerTelegramId?: boolean;
         status?: 'active' | 'inactive' | 'moderation';
         limit?: number;
@@ -33,6 +35,8 @@ export class ChannelsController {
         ad_format: query.ad_format,
         topic_id: query.topic_id,
         search: query.search,
+        country: query.country,
+        locale: query.locale,
         ownerId: query.ownerTelegramId
           ? request.user?.id
           : undefined,

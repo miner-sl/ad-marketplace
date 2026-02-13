@@ -24,6 +24,8 @@ export interface ChannelListFilters {
   topic_id?: number;
   ad_format?: string;
   search?: string;
+  country?: string;
+  locale?: string;
   ownerId?: number;
   status?: 'active' | 'inactive' | 'moderation';
   limit?: number;
@@ -146,6 +148,8 @@ export class ChannelRepository {
       topic_id,
       ad_format, // TODO support multiple formats selected ad_formats: AdFormat[]
       search,
+      country,
+      locale,
       ownerId,
       status,
       limit = 50,
@@ -172,6 +176,14 @@ export class ChannelRepository {
     if (topic_id) {
       query += ` AND c.topic_id = $${paramCount++}`;
       params.push(topic_id);
+    }
+    if (country && country.trim() !== '') {
+      query += ` AND c.country = $${paramCount++}`;
+      params.push(country.trim());
+    }
+    if (locale && locale.trim() !== '') {
+      query += ` AND c.locale = $${paramCount++}`;
+      params.push(locale.trim());
     }
 
     if (min_subscribers !== undefined) {

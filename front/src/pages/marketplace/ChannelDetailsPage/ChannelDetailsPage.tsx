@@ -32,23 +32,7 @@ import {checkIsMobile, createMembersCount, getChannelLink, hapticFeedback, separ
 import {PREDEFINED_TOPICS} from "../../../common/constants/topics";
 
 import styles from './ChannelDetailsPage.module.scss'
-
-const COUNTRIES = [
-  { value: 'Russia', name: 'Russia' },
-  { value: 'USA', name: 'USA' },
-  { value: 'India', name: 'India' },
-  { value: 'Brazil', name: 'Brazil' },
-  { value: 'France', name: 'France' },
-  { value: 'Italy', name: 'Italy' },
-  { value: 'Africa', name: 'Africa' },
-]
-
-const LOCALES = [
-  { value: 'en', name: 'English' },
-  { value: 'ru', name: 'Russian' },
-  { value: 'es', name: 'Spanish' },
-  { value: 'it', name: 'Italian' },
-]
+import { COUNTRIES, LOCALES } from '@types'
 
 interface ChannelHeaderProps {
   channel: Channel
@@ -586,7 +570,7 @@ export const ChannelDetailsPage = () => {
                     {isChannelOwner && isEditing ? (
                       <AppSelect
                         options={[
-                          { value: '', name: 'No country' },
+                          { value: '', name: 'Any' },
                           ...COUNTRIES,
                         ]}
                         value={selectedCountry ?? ''}
@@ -596,7 +580,7 @@ export const ChannelDetailsPage = () => {
                       />
                     ) : (
                       <Text type="text" color={channel.country ? 'primary' : 'secondary'}>
-                        {channel.country || 'No country'}
+                        {channel.country || 'Any'}
                       </Text>
                     )}
                   </BlockNew>
@@ -611,7 +595,7 @@ export const ChannelDetailsPage = () => {
                     {isChannelOwner && isEditing ? (
                       <AppSelect
                         options={[
-                          { value: '', name: 'No locale' },
+                          { value: '', name: 'Any' },
                           ...LOCALES,
                         ]}
                         value={selectedLocale ?? ''}
@@ -623,7 +607,7 @@ export const ChannelDetailsPage = () => {
                       <Text type="text" color={channel.locale ? 'primary' : 'secondary'}>
                         {channel.locale
                           ? LOCALES.find((l) => l.value === channel.locale)?.name || channel.locale
-                          : 'No locale'}
+                          : 'Any'}
                       </Text>
                     )}
                   </BlockNew>

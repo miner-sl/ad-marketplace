@@ -160,6 +160,8 @@ export interface ChannelFilters {
   min_views?: number
   language?: string
   topic_id?: number
+  country?: string
+  locale?: string
   ownerTelegramId?: boolean
   limit?: number
   offset?: number
@@ -264,3 +266,28 @@ export interface CreateChannelRequest {
   country?: string
   locale?: LocaleCode
 }
+
+/** Options for country/locale selects (value + display name) */
+export interface SelectOption {
+  value: string
+  name: string
+}
+
+/** Predefined countries for channel filters and forms */
+export const COUNTRIES: SelectOption[] = [
+  { value: 'Russia', name: 'Russia' },
+  { value: 'USA', name: 'USA' },
+  { value: 'India', name: 'India' },
+  { value: 'Brazil', name: 'Brazil' },
+  { value: 'France', name: 'France' },
+  { value: 'Italy', name: 'Italy' },
+  { value: 'Africa', name: 'Africa' },
+]
+
+/** Predefined locales for channel filters and forms (matches LocaleCode) */
+export const LOCALES: SelectOption[] = [
+  { value: 'en', name: 'English' },
+  { value: 'ru', name: 'Russian' },
+  { value: 'es', name: 'Spanish' },
+  { value: 'it', name: 'Italian' },
+]

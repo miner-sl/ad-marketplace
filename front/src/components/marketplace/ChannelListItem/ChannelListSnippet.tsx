@@ -20,7 +20,7 @@ interface ChannelListItemProps {
   showOwner?: boolean
 }
 
-export const ChannelListItem = ({
+export const ChannelListSnippet = ({
   channel,
   showAdFormats = false,
   showTopic = false,
@@ -85,36 +85,46 @@ export const ChannelListItem = ({
         </BlockNew>
       }
       description={
-        <BlockNew gap={6} row align="center" fadeIn={false}>
-          {subscribersCount > 0 && (
-            <>
-              <Text type="caption2" color="tertiary">
-                {pluralize(['member', 'members', 'members'], subscribersCount)}
+        <BlockNew>
+          <BlockNew gap={6} row align="center" fadeIn={false}>
+            {subscribersCount > 0 && (
+              <>
+                <Text type="caption2" color="tertiary">
+                  {pluralize(['member', 'members', 'members'], subscribersCount)}
+                </Text>
+                <Text type="caption2" color="tertiary">
+                  •
+                </Text>
+              </>
+            )}
+            {postPricing && (
+              <Text type="caption2" color="accent">
+                {postPricing.price_ton} USDT
               </Text>
-              <Text type="caption2" color="tertiary">
-                •
-              </Text>
-            </>
+            )}
+            {showStatus && <ChannelStatusBadge status={channelStatus} />}
+          </BlockNew>
+          {(channel.locale || !channel.country) && (
+            <BlockNew gap={6} row align="center" fadeIn={false}>
+              {channel.locale && (
+                 <>
+                   <Text type="caption2" color="tertiary">
+                     {channel.locale + ((channel.country || (showTopic && topic)) ? ' • ' : '')}
+                   </Text>
+                 </>
+              )}
+              {channel.country && (
+                <Text type="caption2" color="tertiary">
+                  {channel.country + ((showTopic && topic) ? ' • ' : '')}
+                </Text>
+              )}
+              {showTopic && topic && (
+                <Text type="caption2" color="tertiary">
+                  {topic.name}
+                </Text>
+              )}
+            </BlockNew>
           )}
-          {postPricing && (
-            <Text type="caption2" color="accent">
-              {postPricing.price_ton} USDT
-            </Text>
-          )}
-          {showTopic && topic && (
-            <div
-              style={{
-                padding: '2px 4px',
-                borderRadius: '6px',
-                background: 'var(--color-background-tertiary)',
-              }}
-            >
-              <Text type="caption" color="secondary" weight="medium">
-                {topic.name}
-              </Text>
-            </div>
-          )}
-          {showStatus && <ChannelStatusBadge status={channelStatus} />}
         </BlockNew>
       }
       chevron

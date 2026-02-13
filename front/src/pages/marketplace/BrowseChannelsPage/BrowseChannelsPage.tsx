@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react';
 import {
   BlockNew,
   Button,
-  ChannelListItem,
+  ChannelListSnippet,
   Group,
   Icon,
   List,
@@ -112,7 +112,7 @@ export const BrowseChannelsPage = () => {
             <BlockNew id="channels-container">
               <Group>
                 {channels.map((channel: EnhancedChannel) => (
-                  <ChannelListItem
+                  <ChannelListSnippet
                     key={channel.id}
                     channel={channel}
                     showAdFormats

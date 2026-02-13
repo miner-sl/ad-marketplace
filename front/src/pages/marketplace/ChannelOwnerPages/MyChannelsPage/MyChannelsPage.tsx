@@ -6,7 +6,7 @@ import {
   TelegramBackButton,
   Text,
   Group,
-  ChannelListItem,
+  ChannelListSnippet,
   Button,
   Icon,
 } from '@components'
@@ -48,7 +48,7 @@ export const MyChannelsPage = () => {
             <BlockNew id="channels-container">
               <Group>
                 {myChannels.map((channel: EnhancedChannel) => (
-                  <ChannelListItem
+                  <ChannelListSnippet
                     key={channel.id}
                     channel={channel}
                     showAdFormats

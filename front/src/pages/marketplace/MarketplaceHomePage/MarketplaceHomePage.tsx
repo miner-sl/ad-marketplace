@@ -4,7 +4,7 @@ import {useNavigate} from 'react-router-dom'
 import {
   BlockNew,
   Button,
-  ChannelListItem,
+  ChannelListSnippet,
   Group,
   Page,
   PageLayout,
@@ -68,7 +68,7 @@ export const MarketplaceHomePage = () => {
         <Group>
           {channels.map((channel) => {
             return (
-              <ChannelListItem
+              <ChannelListSnippet
                 key={channel.id}
                 channel={channel}
                 showAdFormats

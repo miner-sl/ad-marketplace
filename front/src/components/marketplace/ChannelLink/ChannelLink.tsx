@@ -1,20 +1,22 @@
-import { openTelegramLink } from '@tma.js/sdk-react'
+import {openTelegramLink} from '@tma.js/sdk-react'
 import {BlockNew, Text, type TextTypes} from '@components'
-import type { Channel } from '@types'
-import { getChannelLink } from '@utils'
+import type {Channel} from '@types'
+import {getChannelLink} from '@utils'
 
 interface ChannelLinkProps {
   channel?: Channel | undefined
   showLabel?: boolean
   textType?: TextTypes
-  weight?: 'normal' | 'medium' | 'bold'
+  weight?: 'normal' | 'medium' | 'bold',
+  children?: React.ReactNode
 }
 
 export const ChannelLink = ({
   channel,
   showLabel = true,
   textType = 'text',
-  weight = 'normal'
+  weight = 'normal',
+  children
 }: ChannelLinkProps) => {
   if (!channel) {
     return undefined;
@@ -29,6 +31,12 @@ export const ChannelLink = ({
     }
   }
 
+  if (children) {
+    return (
+      <BlockNew onClick={handleChannelClick}>{children}</BlockNew>
+    );
+  }
+
   return (
     <BlockNew row>
       {channelLink ? (
@@ -38,11 +46,11 @@ export const ChannelLink = ({
           color="accent"
           onClick={handleChannelClick}
         >
-          {showLabel ? `Channel: ${channelName}` : channelName}
+          {showLabel ? `${channelName}` : channelName}
         </Text>
       ) : (
         <Text type={textType} weight={weight}>
-          {showLabel ? `Channel: ${channelName}` : channelName}
+          {showLabel ? `${channelName}` : channelName}
         </Text>
       )}
     </BlockNew>

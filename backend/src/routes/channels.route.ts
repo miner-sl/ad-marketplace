@@ -31,7 +31,7 @@ const channelsRouter: FastifyPluginAsync = async (fastify) => {
 
   fastify.post('/validate', {
     preHandler: [authMiddleware, validateBody(validateChannelSchema)],
-  }, ChannelsController.validateChannelAdmin);
+  }, ChannelsController.validateChannel);
 
   fastify.get('/topics', ChannelsController.getAllTopics);
 };

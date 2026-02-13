@@ -1,4 +1,4 @@
-import { MarketplaceService } from '@services'
+import {MarketplaceService, type ValidateChannelResponse} from '@services'
 import type {
   Channel,
   ChannelFilters,
@@ -56,7 +56,7 @@ export const channelsAPI = {
     return data
   },
 
-  validateChannel: async (channelName: string): Promise<{ isAdmin: boolean }> => {
+  validateChannel: async (channelName: string): Promise<ValidateChannelResponse> => {
     const { data, ok, error } = await MarketplaceService.validateChannel(channelName)
     if (!ok || !data) {
       throw new Error(error || 'Failed to validate channel')

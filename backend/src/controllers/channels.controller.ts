@@ -77,8 +77,8 @@ export class ChannelsController {
         });
       }
 
-      const { username, price_ton } = request.body as any;
-      const topic_id = (request.body as any)?.topic_id ? parseInt((request.body as any).topic_id) : undefined;
+      const { username, price_ton, topic_id: topicIdRaw, country, locale } = request.body as any;
+      const topic_id = topicIdRaw != null ? parseInt(String(topicIdRaw), 10) : undefined;
 
       if (!username || !price_ton) {
         return reply.code(400).send({
@@ -91,7 +91,9 @@ export class ChannelsController {
         request.user.telegramId,
         username,
         price_ton,
-        topic_id
+        topic_id,
+        country,
+        locale
       );
 
       if (!result.success) {
@@ -120,7 +122,6 @@ export class ChannelsController {
               error: result.error,
               message: result.message || 'Failed to register channel',
             });
-
           default:
             return reply.code(500).send({
               error: 'UNKNOWN_ERROR',
@@ -284,7 +285,7 @@ export class ChannelsController {
     }
   }
 
-  static async validateChannelAdmin(request: FastifyRequest, reply: FastifyReply) {
+  static async validateChannel(request: FastifyRequest, reply: FastifyReply) {
     try {
       if (!request.user?.id) {
         return reply.code(401).send({
@@ -311,11 +312,9 @@ export class ChannelsController {
       //   });
       // }
 
-      const isAdmin = await ChannelService.validateChannelAdmin(channelName);
+      const result = await ChannelService.validateChannel(channelName);
 
-      return {
-        isAdmin,
-      };
+      return result;
     } catch (error: any) {
       logger.error('Channel validation endpoint error', {
         error: error.message,

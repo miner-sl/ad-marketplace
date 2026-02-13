@@ -45,6 +45,16 @@ export class ChannelRepository {
     return result.rows[0]?.owner_id || null;
   }
 
+  static async findByChannelUsername(username: string): Promise<ChannelInfo | null> {
+    const result = await db.query(
+      'SELECT id, title, username FROM channels WHERE username = $1',
+      [username]
+    );
+    if (!result?.rows || result.rows.length === 0) {
+      return null;
+    }
+    return result.rows[0] || null;
+  }
   /**
    * Get channel basic info (title, username) by ID
    */

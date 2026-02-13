@@ -6,6 +6,7 @@ import {
   Block,
   BlockNew,
   Button,
+  ChannelLink,
   Group,
   Icon,
   Image,
@@ -42,22 +43,24 @@ const ChannelHeader = ({channel, stats}: ChannelHeaderProps) => {
 
   return (
     <>
-      <Block align="center">
-        <Image
-          size={112}
-          src={null}
-          borderRadius={50}
-          fallback={channel.title}
-        />
-      </Block>
-      <Block margin="top" marginValue={12} row justify="center" align="center" gap={4}>
-        <Text type="title2" align="center" weight="bold">
-          {channel.title}
-        </Text>
-        {channel.is_verified && (
-          <Icon name="verified" size={20}/>
-        )}
-      </Block>
+      <ChannelLink channel={channel}>
+        <Block align="center">
+          <Image
+            size={112}
+            src={null}
+            borderRadius={50}
+            fallback={channel.title}
+          />
+        </Block>
+        <Block margin="top" marginValue={12} row justify="center" align="center" gap={4}>
+          <Text type="title2" align="center" weight="bold">
+            @{channel.title}
+          </Text>
+          {channel.is_verified && (
+            <Icon name="verified" size={20}/>
+          )}
+        </Block>
+      </ChannelLink>
 
       {subscribersCount > 0 && (
         <Block margin="top" marginValue={8}>
@@ -315,7 +318,6 @@ export const ChannelDetailsPage = () => {
         is_active: newEnabled,
       })
 
-      // Update local state if in edit mode
       if (isEditing) {
         setPriceEnabled((prev) => ({...prev, [format]: newEnabled}))
       }
@@ -493,7 +495,7 @@ export const ChannelDetailsPage = () => {
 
         <Block margin="top" marginValue={24}>
           <Block margin="bottom" marginValue={44}>
-            <List header="CONFIGURATION">
+            <List header="Info">
               <ListItem
                 text={
                   <BlockNew row align="center" justify="between" gap={8}>

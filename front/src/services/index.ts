@@ -74,6 +74,8 @@ export async function apiRequest<T>(
   }
 }
 
+export type ValidateChannelResponse = { ok: boolean, message?: string };
+
 export const MarketplaceService = {
   // Channels
   getChannels: async (filters?: ChannelFilters): Promise<ApiResponse<Channel[]>> => {
@@ -122,11 +124,11 @@ export const MarketplaceService = {
 
   validateChannel: async (
     channelName: string
-  ): Promise<ApiResponse<{ isAdmin: boolean }>> => {
-    return await apiRequest<{ isAdmin: boolean }>('/channels/validate', {
+  ): Promise<ApiResponse<ValidateChannelResponse>> => {
+    return await apiRequest<ValidateChannelResponse>('/channels/validate', {
       method: 'POST',
       body: JSON.stringify({ channelName }),
-    })
+    });
   },
 
   createChannel: async (

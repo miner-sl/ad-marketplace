@@ -30,7 +30,8 @@ import {
   campaignsAPI,
   dealsAPI,
 } from './api'
-import config from "@config";
+import config from '@config';
+import type {ValidateChannelResponse} from '@services';
 
 export interface EnhancedChannel extends Omit<Channel, 'topic'> {
   activeAdFormats: AdFormat[]
@@ -120,8 +121,8 @@ export const useChannelStatsQuery = (id: number) => {
 
 export const useValidateChannelMutation = () => {
   return useMutation({
-    mutationFn: (channelName: string) => channelsAPI.validateChannel(channelName),
-  })
+    mutationFn: (channelName: string): Promise<ValidateChannelResponse> => channelsAPI.validateChannel(channelName),
+  });
 }
 
 export const useCreateChannelMutation = () => {

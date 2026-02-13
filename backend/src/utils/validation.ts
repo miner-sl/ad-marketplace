@@ -1,11 +1,17 @@
 import { z } from 'zod';
 
+const localesSchema = z.enum(['en', 'ru', 'es', 'it'])
+
+export type Locales = z.infer<typeof localesSchema>
+
 export const createChannelSchema = z.object({
   username: z.string().min(1).refine((val) => val.startsWith('@') || !val.includes(' '), {
     message: 'Username must start with @ or be a valid Telegram username',
   }),
   price_ton: z.number().positive(),
   topic_id: z.number().int().positive().optional(),
+  country: z.string().optional(),
+  locale: localesSchema.optional(),
 });
 
 export const createDealSchema = z.object({

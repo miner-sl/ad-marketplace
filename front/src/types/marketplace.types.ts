@@ -251,8 +251,12 @@ export interface UpdateChannelRequest {
   topic?: number | null
 }
 
+export type LocaleCode = 'en' | 'ru' | 'es' | 'it'
+
 export interface CreateChannelRequest {
   username: string
   price_ton: number
   topic_id?: number
+  country?: string
+  locale?: LocaleCode
 }

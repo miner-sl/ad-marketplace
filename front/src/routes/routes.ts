@@ -31,4 +31,6 @@ export const ROUTES_NAME = {
   ONBOARDING: '/onboarding',
   LOGIN: '/login',
   PROFILE: '/profile',
+  TRANSACTIONS: '/transactions',
+  ANALYTICS: '/analytics',
 }

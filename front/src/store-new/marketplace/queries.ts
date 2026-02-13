@@ -1,36 +1,37 @@
-import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query'
+import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {useAuth} from '@context'
-import {TANSTACK_GC_TIME, TANSTACK_KEYS, TANSTACK_TTL} from '@utils'
+import {
+  collapseAddress,
+  createMembersCount,
+  separateNumber,
+  TANSTACK_GC_TIME,
+  TANSTACK_KEYS,
+  TANSTACK_TTL
+} from '@utils'
 import type {
+  AdFormat,
+  Campaign,
+  CampaignFilters,
   Channel,
   ChannelFilters,
   ChannelListing,
-  Campaign,
-  CampaignFilters,
+  ChannelPricing,
+  CreateCampaignRequest,
+  CreateChannelListingRequest,
+  CreateChannelRequest,
+  CreateDealRequest,
   Deal,
   DealFilters,
+  DealMessage,
   DealRequestsFilters,
   DealRequestsResponse,
-  CreateChannelRequest,
-  CreateChannelListingRequest,
-  CreateCampaignRequest,
-  CreateDealRequest,
-  SubmitCreativeRequest,
   SetChannelPricingRequest,
+  SubmitCreativeRequest,
   UpdateChannelRequest,
-  AdFormat,
-  ChannelPricing, DealMessage,
 } from '@types'
 import {PREDEFINED_TOPICS} from '../../common/constants/topics'
-import {collapseAddress, separateNumber, createMembersCount} from '@utils'
 
-import {
-  channelsAPI,
-  channelListingsAPI,
-  campaignsAPI,
-  dealsAPI,
-} from './api'
-import config from '@config';
+import {campaignsAPI, channelListingsAPI, channelsAPI, dealsAPI,} from './api'
 import type {ValidateChannelResponse} from '@services';
 
 export interface EnhancedChannel extends Omit<Channel, 'topic'> {
@@ -325,13 +326,14 @@ function buildPostLink(channelUsername: string | undefined, telegramChannelId: n
   return '';
 }
 
-function buildTonscanTxLink(txHash: string | undefined) {
+export function buildTonscanTxLink(txHash: string | undefined) {
   if (!txHash) return undefined;
 
-  const baseUrl = config?.isDev
-    ? 'https://testnet.tonscan.org'
-    : 'https://tonscan.org';
+  // const baseUrl = config?.isDev
+  //   ? 'https://testnet.tonscan.org'
+  //   : 'https://tonscan.org';
 
+  const baseUrl = 'https://tonscan.org';
   const encodedHash = encodeURIComponent(txHash);
   return `${baseUrl}/tx/${encodedHash}`;
 }

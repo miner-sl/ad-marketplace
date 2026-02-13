@@ -1,5 +1,6 @@
-import { useNavigate } from 'react-router-dom'
-import { openTelegramLink } from '@tma.js/sdk-react'
+import { useNavigate } from 'react-router-dom';
+import { openTelegramLink } from '@tma.js/sdk-react';
+
 import {
   BlockNew,
   PageLayout,
@@ -9,31 +10,36 @@ import {
   Image,
   Group,
   GroupItem,
-} from '@components'
-import { useAuth } from '@context'
-import styles from './ProfilePage.module.scss'
+} from '@components';
+import { useAuth } from '@context';
+import { ROUTES_NAME } from '@routes';
+
+import type {User} from "@types";
+
+function formatNameOfUser(user: User) {
+  return user.first_name || user.firstName
+    ? `${user.first_name || user.firstName}${
+      user.last_name || user.lastName
+        ? ` ${user.last_name || user.lastName}`
+        : ''
+    }`
+    : user.username || 'User';
+}
 
 export function ProfilePage() {
-  const { user, logout, isTelegramMiniApp } = useAuth()
-  const navigate = useNavigate()
+  const { user, logout, isTelegramMiniApp } = useAuth();
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
-    await logout()
-    navigate('/')
+    await logout();
+    navigate('/');
   }
 
   if (!user) {
-    return null
+    return undefined;
   }
 
-  const displayName =
-    user.first_name || user.firstName
-      ? `${user.first_name || user.firstName}${
-          user.last_name || user.lastName
-            ? ` ${user.last_name || user.lastName}`
-            : ''
-        }`
-      : user.username || 'User'
+  const displayName = formatNameOfUser(user);
 
   const avatarFallback = (user.first_name || user.firstName || user.username || 'U')
     .charAt(0)
@@ -51,8 +57,8 @@ export function ProfilePage() {
   return (
     <Page>
       <PageLayout>
-        <BlockNew gap={2} className={styles.container}>
-          <BlockNew gap={12} className={styles.header}>
+        <BlockNew gap={2}>
+          <BlockNew gap={12} align="center">
             <Image
               src={user.photoUrl || undefined}
               size={112}
@@ -62,9 +68,14 @@ export function ProfilePage() {
             <BlockNew gap={4}>
               <Text type="title1" weight="bold" align="center">
                 {displayName}
+                {user.isPremium && (
+                  <Text as="span" type="text" weight="bold" color="accent">
+                    {' ⭐'}
+                  </Text>
+                )}
               </Text>
               {user.username && (
-                <span 
+                <span
                   onClick={handleUsernameClick}
                   style={{ cursor: 'pointer' }}
                 >
@@ -76,7 +87,21 @@ export function ProfilePage() {
             </BlockNew>
           </BlockNew>
 
-          <BlockNew margin="top" marginValue={24}>
+          <BlockNew gap={12} margin="top" marginValue={24}>
+            <Group header="WALLET">
+              <GroupItem
+                text="Transactions"
+                description="View transaction history"
+                chevron
+                onClick={() => navigate(ROUTES_NAME.TRANSACTIONS)}
+              />
+              <GroupItem
+                text="Analytics"
+                description="Wallet balance summary"
+                chevron
+                onClick={() => navigate(ROUTES_NAME.ANALYTICS)}
+              />
+            </Group>
             <Group header="USER INFORMATION">
               {(user.telegram_id || user.telegramId) && (
                 <GroupItem
@@ -113,17 +138,6 @@ export function ProfilePage() {
                   after={
                     <Text type="text" weight="medium">
                       {user.languageCode.toUpperCase()}
-                    </Text>
-                  }
-                />
-              )}
-
-              {user.isPremium && (
-                <GroupItem
-                  text="Status"
-                  after={
-                    <Text type="text" weight="medium" color="accent">
-                      ⭐ Premium
                     </Text>
                   }
                 />

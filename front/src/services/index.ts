@@ -377,6 +377,15 @@ export const MarketplaceService = {
     })
   },
 
+  getTransactions: async (): Promise<ApiResponse<import('@types').LedgerTransactionRow[]>> => {
+    return await apiRequest<import('@types').LedgerTransactionRow[]>('/user/transactions')
+  },
+
+  getTransactionAnalytics: async (params?: { since?: string }): Promise<ApiResponse<import('@types').LedgerAnalyticsByUser>> => {
+    const query = params?.since ? `?since=${encodeURIComponent(params.since)}` : ''
+    return await apiRequest<import('@types').LedgerAnalyticsByUser>(`/user/transactions/analytics${query}`)
+  },
+
   // Auth methods
   loginWithTelegramMiniApp: async (initData: string): Promise<LoginResponse> => {
     const response = await apiRequest<{

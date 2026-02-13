@@ -1,1 +1,1 @@
-export * from './ChannelListSnippet.tsx'
+export * from './ChannelListSnippet'

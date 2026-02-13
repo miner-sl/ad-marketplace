@@ -14,6 +14,14 @@ const userRouter: FastifyPluginAsync = async (fastify) => {
     preHandler: [validateQuery(getUserMeQuerySchema)],
   }, UserController.getCurrentUser);
 
+  fastify.get('/transactions', {
+    preHandler: [authMiddleware],
+  }, UserController.getTransactions);
+
+  fastify.get('/transactions/analytics', {
+    preHandler: [authMiddleware],
+  }, UserController.getTransactionAnalytics);
+
   fastify.post('/register', UserController.registerUser);
 
   fastify.post('/update-wallet-address', {

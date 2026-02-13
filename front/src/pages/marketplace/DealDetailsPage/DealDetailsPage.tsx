@@ -16,6 +16,7 @@ import {
   Image,
   List,
   ListItem,
+  ListLinkView,
   Page,
   PageLayout,
   Sheet,
@@ -37,11 +38,11 @@ import {
 } from '@store-new'
 import { useAuth } from '@context';
 
-import { transferTonCall, useClipboard } from "@hooks";
-import config from '@config'
+import { transferTonCall } from '@hooks';
 import { initializeTonConnect, tonConnectUI } from '../../../common/utils/lazy';
-import { requestAPI } from "../../../common/utils/api";
-import { confirmActionPopup, goTo, hapticFeedback, playConfetti, popupManager } from '@utils';
+import { requestAPI } from '../../../common/utils/api';
+import { confirmActionPopup, hapticFeedback, playConfetti, popupManager } from '@utils';
+import { getTONScanUrl } from '../../../common/config';
 import type { DealMessage } from '@types';
 
 import styles from './DealDetailsPage.module.scss';
@@ -89,55 +90,6 @@ const DealHeader = ({ deal }: DealHeaderProps) => {
   );
 }
 
-const getTONScanUrl = (address: string): string => {
-  const baseUrl = config.isDev
-    ? 'https://testnet.tonscan.org'
-    : 'https://tonscan.org';
-  return `${baseUrl}/address/${address}`;
-}
-
-
-
-const ListLinkView = ({
-  title,
-  value,
-  link,
-  copyText = 'Copied to clipboard'
-}: { link: string, value: string, title: string, copyText: string }) => {
-  const { copy } = useClipboard();
-
-  const handleEscrowAddressClick = () => {
-    goTo(link);
-  }
-
-  return (
-    <ListItem
-      text={title}
-      after={
-        <BlockNew row align="center" gap={8}>
-          <div onClick={handleEscrowAddressClick} className={styles.clickable}>
-            <Text
-              type="text"
-              color="accent"
-            >
-              {value}
-            </Text>
-          </div>
-          <Icon
-            name="share"
-            size={20}
-            color="accent"
-            className={styles.clickable}
-            onClick={(e) => {
-              e.stopPropagation()
-              copy(link, copyText)
-            }}
-          />
-        </BlockNew>
-      }
-    />
-  )
-}
 
 export const DealDetailsPage = () => {
   const { id } = useParams<{ id: string }>()

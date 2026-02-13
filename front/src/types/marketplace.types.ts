@@ -291,3 +291,34 @@ export const LOCALES: SelectOption[] = [
   { value: 'es', name: 'Spanish' },
   { value: 'it', name: 'Italian' },
 ]
+
+/** Ledger entry type for transaction list */
+export type LedgerEntryType =
+  | 'payment_to_escrow'
+  | 'release_to_owner'
+  | 'refund_to_advertiser'
+  | 'platform_fee'
+
+/** Single row from user transactions API */
+export interface LedgerTransactionRow {
+  type: 'Incoming' | 'Outgoing'
+  from: string | null
+  to: string | null
+  amount: string
+  entry_type: LedgerEntryType
+  tx_hash: string | null
+  confirmed_at: string | null
+  deal_id: number | null
+}
+
+export interface LedgerTransactionDTO extends LedgerTransactionRow{
+  txLink: string | undefined
+}
+
+/** User transaction analytics from API */
+export interface LedgerAnalyticsByUser {
+  total_received: string
+  total_sent: string
+  net_balance_change: string
+  transaction_count: string
+}

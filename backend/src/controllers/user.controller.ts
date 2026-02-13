@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { UserModel } from '../repositories/user.repository';
+import { LedgerRepository } from '../repositories/ledger.repository';
 import logger from '../utils/logger';
 
 export class UserController {
@@ -116,6 +117,51 @@ export class UserController {
         userId: request.user?.id,
       });
       reply.code(500).send({ error: error.message });
+    }
+  }
+
+  static async getTransactions(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const userId = request.user?.id;
+      if (!userId) {
+        return reply.code(401).send({ error: 'Unauthorized', message: 'User ID not found' });
+      }
+      const transactions = await LedgerRepository.findTransactionsByUserId(userId);
+      return reply.send(transactions);
+    } catch (error: any) {
+      logger.error('Failed to get user transactions', {
+        error: error.message,
+        stack: error.stack,
+        userId: request.user?.id,
+      });
+      return reply.code(500).send({ error: error.message });
+    }
+  }
+
+  static async getTransactionAnalytics(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const userId = request.user?.id;
+      if (!userId) {
+        return reply.code(401).send({ error: 'Unauthorized', message: 'User ID not found' });
+      }
+      const { since } = request.query as { since?: string };
+      const sinceDate = since ? new Date(since) : undefined;
+      const analytics = await LedgerRepository.findAnalyticsByUserId(userId, {
+        since: sinceDate,
+      });
+      return reply.send(analytics ?? {
+        total_received: '0',
+        total_sent: '0',
+        net_balance_change: '0',
+        transaction_count: '0',
+      });
+    } catch (error: any) {
+      logger.error('Failed to get user transaction analytics', {
+        error: error.message,
+        stack: error.stack,
+        userId: request.user?.id,
+      });
+      return reply.code(500).send({ error: error.message });
     }
   }
 }

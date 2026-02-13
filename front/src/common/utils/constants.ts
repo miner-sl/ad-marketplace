@@ -4,6 +4,8 @@ export const TANSTACK_KEYS = {
   AUTH: ['auth'],
   USER: ['user'],
   USER_ME: (telegramId: number) => ['user', 'me', telegramId],
+  USER_TRANSACTIONS: ['user', 'transactions'],
+  USER_TRANSACTIONS_ANALYTICS: (since?: string) => ['user', 'transactions', 'analytics', since ?? 'all'],
   CHATS_POPULAR: (sortBy: ChatsPopularOrderBy) => ['chats', 'popular', sortBy],
   CHAT: (slug: string) => ['chat', slug],
   ADMIN_CHATS: ['admin', 'chats'],
@@ -25,6 +27,8 @@ export const TANSTACK_TTL = {
   AUTH: 5 * 60 * 1000, // 5 minute
   USER: 1 * 60 * 1000, // 1 minute
   USER_ME: 5 * 60 * 1000, // 5 minutes
+  USER_TRANSACTIONS: 60 * 1000, // 1 minute
+  USER_TRANSACTIONS_ANALYTICS: 60 * 1000, // 1 minute
   CHATS_POPULAR: 5 * 60 * 1000, // 5 minute
   ADMIN_CHATS: 5 * 60 * 1000, // 5 minute
   CHAT: 5 * 60 * 1000, // 5 minute

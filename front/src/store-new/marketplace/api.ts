@@ -7,6 +7,8 @@ import type {
   CampaignFilters,
   Deal,
   DealFilters,
+  DealRequestsFilters,
+  DealRequestsResponse,
   CreateChannelRequest,
   UpdateChannelRequest,
   CreateChannelListingRequest,
@@ -207,8 +209,11 @@ export const dealsAPI = {
     return data
   },
 
-  getDealRequests: async (telegramId: number, limit?: number): Promise<Deal[]> => {
-    const { data, ok, error } = await MarketplaceService.getDealRequests(telegramId, limit)
+  getDealRequests: async (
+    telegramId: number,
+    filters?: DealRequestsFilters
+  ): Promise<DealRequestsResponse> => {
+    const { data, ok, error } = await MarketplaceService.getDealRequests(telegramId, filters)
     if (!ok || !data) {
       throw new Error(error || 'Failed to fetch deal requests')
     }

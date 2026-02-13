@@ -63,7 +63,17 @@ export const listDealsQuerySchema = z.object({
 
 export const dealRequestsQuerySchema = z.object({
   telegram_id: z.string().regex(/^\d+$/).transform(Number),
+  channel: z.string().regex(/^\d+$/).transform(Number).optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).optional(),
+  page: z.string().regex(/^\d+$/).transform(Number).optional(),
+  date_from: z.string().optional(),
+  date_to: z.string().optional(),
+  country: z.string().optional(),
+  locale: z.string().optional(),
+  premium_only: z
+    .union([z.literal('true'), z.literal('false'), z.boolean()])
+    .optional()
+    .transform((v) => (v == null ? undefined : v === true || v === 'true')),
 });
 
 export const listChannelsQuerySchema = z.object({

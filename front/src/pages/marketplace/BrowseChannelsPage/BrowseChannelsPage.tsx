@@ -10,7 +10,7 @@ import {
   ListItem,
   Page,
   PageLayout,
-  Sheet,
+  Sheet, Spinner,
   TelegramBackButton,
   Text,
 } from '@components'
@@ -102,9 +102,12 @@ export const BrowseChannelsPage = () => {
           )}
 
           {channelsLoading ? (
-            <Text type="text" color="secondary" align="center">
-              Loading channels...
-            </Text>
+            <BlockNew row gap={8}>
+              <Spinner size={18} />
+              <Text type="text" color="secondary" align="center">
+                Loading channels...
+              </Text>
+            </BlockNew>
           ) : channels && channels.length > 0 ? (
             <BlockNew id="channels-container">
               <Group>

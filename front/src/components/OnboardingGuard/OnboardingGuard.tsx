@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useTelegramUser } from '@hooks'
 import { ROUTES_NAME } from '@routes'
 import { useUserMeQuery } from "@store-new"
-import { Skeleton } from "@components"
+import {BlockNew, Spinner} from "@components"
 import { getStoredTelegramUserId, clearStoredTelegramUserId, clearToken } from '@utils'
 
 interface OnboardingGuardProps {
@@ -56,7 +56,11 @@ export const OnboardingGuard = ({ children }: OnboardingGuardProps) => {
   }, [isLoading, isRegistered, navigate, location.pathname, telegramUser?.id])
 
   if (isLoading || !telegramUser?.id) {
-    return <Skeleton />
+    return (
+      <BlockNew align="center" justify="center" marginValue={24}>
+        <Spinner size={24} />
+      </BlockNew>
+    );
   }
 
   if (!isRegistered && location.pathname !== ROUTES_NAME.ONBOARDING) {

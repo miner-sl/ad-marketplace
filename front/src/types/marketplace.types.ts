@@ -4,8 +4,8 @@ export type DealStatus =
   | 'approved'
   | 'payment_pending'
   | 'paid'
-  | 'creative_submitted'
-  | 'creative_approved'
+  // | 'creative_submitted'
+  // | 'creative_approved'
   | 'scheduled'
   | 'posted'
   | 'verified'
@@ -179,6 +179,23 @@ export interface DealFilters {
   deal_type?: DealType
   limit?: number
   offset?: number
+}
+
+export interface DealRequestsFilters {
+  channelId?: number
+  limit?: number
+  page?: number
+  dateFrom?: string
+  dateTo?: string
+  country?: string
+  locale?: string
+  premiumOnly?: boolean
+}
+
+export interface DealRequestsResponse {
+  data: Deal[]
+  allAmount: number
+  page: number
 }
 
 export interface CreateChannelListingRequest {

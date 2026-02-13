@@ -246,14 +246,34 @@ export const MarketplaceService = {
     return await apiRequest<Deal>(`/deals/${id}${queryParams}`)
   },
 
-  getDealRequests: async (telegramId: number, limit?: number): Promise<ApiResponse<Deal[]>> => {
+  getDealRequests: async (
+    telegramId: number,
+    params?: {
+      channelId?: number
+      limit?: number
+      page?: number
+      dateFrom?: string
+      dateTo?: string
+      country?: string
+      locale?: string
+      premiumOnly?: boolean
+    }
+  ): Promise<ApiResponse<{ data: Deal[]; allAmount: number; page: number }>> => {
     const queryParams = new URLSearchParams({
       telegram_id: telegramId.toString(),
     })
-    if (limit) {
-      queryParams.append('limit', limit.toString())
-    }
-    return await apiRequest<Deal[]>(`/deals/requests?${queryParams.toString()}`)
+    if (params?.channelId != null) queryParams.append('channel', String(params.channelId))
+    if (params?.limit != null) queryParams.append('limit', String(params.limit))
+    if (params?.page != null) queryParams.append('page', String(params.page))
+    if (params?.dateFrom) queryParams.append('date_from', params.dateFrom)
+    if (params?.dateTo) queryParams.append('date_to', params.dateTo)
+    if (params?.country) queryParams.append('country', params.country)
+    if (params?.locale) queryParams.append('locale', params.locale)
+    if (params?.premiumOnly === true) queryParams.append('premium_only', 'true')
+
+    return await apiRequest<{ data: Deal[]; allAmount: number; page: number }>(
+      `/deals/requests?${queryParams.toString()}`
+    )
   },
 
   createDeal: async (request: CreateDealRequest): Promise<ApiResponse<Deal>> => {

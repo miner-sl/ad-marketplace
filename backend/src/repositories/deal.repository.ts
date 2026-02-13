@@ -45,19 +45,97 @@ export class DealRepository {
     return result?.rows || [];
   }
 
+  /** Allowed statuses for "pending" deals list */
+  static readonly PENDING_DEAL_STATUSES = ['pending', 'negotiating', 'payment_pending'] as const;
+
   /**
-   * Get pending deals for channel owner
+   * Get pending deals for channel owner (optionally filtered; with pagination and total count)
    */
-  static async findPendingForChannelOwner(ownerId: number, limit: number = 20): Promise<any[]> {
+  static async findPendingForChannelOwner(
+    ownerId: number,
+    options: {
+      limit?: number;
+      page?: number;
+      channelId?: number | null;
+      statuses?: (typeof DealRepository.PENDING_DEAL_STATUSES)[number][] | null;
+      dateFrom?: string | null; // ISO date, filter by d.created_at
+      dateTo?: string | null;
+      country?: string | null; // reserved, no column yet
+      locale?: string | null; // advertiser language_code
+      premiumOnly?: boolean | null;
+    } = {}
+  ): Promise<{ rows: any[]; allAmount: number }> {
+    const {
+      limit = 20,
+      page = 1,
+      channelId,
+      statuses,
+      dateFrom,
+      dateTo,
+      locale,
+      premiumOnly,
+    } = options;
+    const filterByChannel = typeof channelId === 'number' && Number.isFinite(channelId);
+    const filterByStatus = Array.isArray(statuses) && statuses.length > 0;
+    const filterByDateFrom = typeof dateFrom === 'string' && dateFrom.length > 0;
+    const filterByDateTo = typeof dateTo === 'string' && dateTo.length > 0;
+    const filterByLocale = typeof locale === 'string' && locale.length > 0;
+    const filterByPremium = premiumOnly === true;
+    const needAdvertiserJoin = filterByLocale || filterByPremium;
+    const offset = Math.max(0, (Math.max(1, page) - 1) * limit);
+
+    const params: (number | string | string[] | boolean)[] = [ownerId];
+    const conditions: string[] = ['c.owner_id = $1'];
+
+    if (filterByChannel) {
+      params.push(channelId!);
+      conditions.push(`d.channel_id = $${params.length}`);
+    }
+    if (filterByStatus) {
+      params.push(statuses!);
+      conditions.push(`d.status = ANY($${params.length})`);
+    } else {
+      conditions.push("(d.status = 'pending' OR d.status = 'negotiating' OR d.status = 'payment_pending')");
+    }
+    if (filterByDateFrom) {
+      params.push(dateFrom);
+      conditions.push(`d.created_at >= $${params.length}::timestamp`);
+    }
+    if (filterByDateTo) {
+      params.push(dateTo);
+      conditions.push(`d.created_at <= $${params.length}::timestamp`);
+    }
+    if (needAdvertiserJoin) {
+      if (filterByLocale) {
+        params.push(locale);
+        conditions.push(`u.language_code = $${params.length}`);
+      }
+      if (filterByPremium) {
+        conditions.push('u.is_premium = true');
+      }
+    }
+
+    params.push(limit, offset);
+    const limitIdx = params.length - 1;
+    const offsetIdx = params.length;
+
+    const joinClause = needAdvertiserJoin
+      ? ' INNER JOIN users u ON d.advertiser_id = u.id'
+      : '';
+    let sql = `SELECT d.*, COUNT(*) OVER() AS all_amount FROM deals d
+     INNER JOIN channels c ON d.channel_id = c.id${joinClause}
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY d.created_at DESC
+     LIMIT $${limitIdx} OFFSET $${offsetIdx}`;
+
     const result = await db.query(
-      `SELECT d.* FROM deals d
-       INNER JOIN channels c ON d.channel_id = c.id
-       WHERE c.owner_id = $1 AND (d.status = 'pending' OR d.status='negotiating' OR d.status='payment_pending')
-       ORDER BY d.created_at DESC
-       LIMIT $2`,
-      [ownerId, limit]
+      sql,
+      params
     );
-    return result?.rows || [];
+    const rows = result?.rows || [];
+    const allAmount = rows.length > 0 ? Number(rows[0].all_amount) : 0;
+    const rowsWithoutCount = rows.map(({ all_amount, ...r }) => r);
+    return { rows: rowsWithoutCount, allAmount: 200 };
   }
 
   /**

@@ -3,7 +3,7 @@ import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import '@styles/index.scss'
 
 import AppRouter from "@routes";
-import {ErrorBoundary, SkeletonElement, ToastProvider, AppHeader} from "@components";
+import {ErrorBoundary, ToastProvider, AppHeader, Spinner} from "@components";
 import {LoginPage} from "@pages";
 
 import {AuthProvider, ThemeProvider, useAuth} from "@context";
@@ -17,7 +17,7 @@ function InnerApp () {
   if (loading) {
     return (
       <div className="container" style={{ paddingTop: '100px' }}>
-        <SkeletonElement />
+        <Spinner size={24} />
       </div>
     );
   }

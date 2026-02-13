@@ -8,7 +8,7 @@ import {
   Group,
   Page,
   PageLayout,
-  Skeleton,
+  Spinner,
   TelegramMainButton,
   Text,
 } from '@components'
@@ -31,12 +31,12 @@ export const MarketplaceHomePage = () => {
   //   setActiveTab(value as 'channels' | 'campaigns')
   // }
 
-  const { data: channels, isLoading: channelsLoading } = useChannelsQuery({
+  const {data: channels, isLoading: channelsLoading} = useChannelsQuery({
     limit: 14,
   })
 
   // const { data: campaigns, isLoading: campaignsLoading } = useCampaignsQuery({
-  const { isLoading: campaignsLoading } = useCampaignsQuery({
+  const {isLoading: campaignsLoading} = useCampaignsQuery({
     status: 'active',
     limit: 14,
   })
@@ -94,95 +94,97 @@ export const MarketplaceHomePage = () => {
   return (
     <Page back={false}>
       <PageLayout>
-      <TelegramMainButton text="Add Bot To Channel" onClick={handleAddChat} />
+        <TelegramMainButton text="Add Bot To Channel" onClick={handleAddChat}/>
 
-      <BlockNew gap={12} className={styles.chatsBlock}>
-        {/*<BlockNew>*/}
-        {/*  <BlockNew marginValue={8} row gap={8} justify="between" align="center">*/}
-        {/*    <Text type="text" color="secondary">*/}
-        {/*      Connect channel owners with advertisers*/}
-        {/*    </Text>*/}
-        {/*  </BlockNew>*/}
-        {/*</BlockNew>*/}
+        <BlockNew gap={12} className={styles.chatsBlock}>
+          {/*<BlockNew>*/}
+          {/*  <BlockNew marginValue={8} row gap={8} justify="between" align="center">*/}
+          {/*    <Text type="text" color="secondary">*/}
+          {/*      Connect channel owners with advertisers*/}
+          {/*    </Text>*/}
+          {/*  </BlockNew>*/}
+          {/*</BlockNew>*/}
 
-        <BlockNew gap={4}>
-          <BlockNew gap={8} row>
-            <Button
-              size='small'
-              type="secondary"
-              onClick={() => navigate('/browse_channels')}
-            >
-              Browse Channels
-            </Button>
-            <Button
-              size='small'
-              type="secondary"
-              onClick={() => navigate('/requests')}
-            >
-              Ads Requests
-            </Button>
+          <BlockNew gap={4}>
+            <BlockNew gap={8} row>
+              <Button
+                size='small'
+                type="secondary"
+                onClick={() => navigate('/browse_channels')}
+              >
+                Browse Channels
+              </Button>
+              <Button
+                size='small'
+                type="secondary"
+                onClick={() => navigate('/requests')}
+              >
+                Ads Requests
+              </Button>
+            </BlockNew>
+            <BlockNew gap={8} row>
+              <Button
+                size='small'
+                type="secondary"
+                onClick={() => navigate(ROUTES_NAME.MARKETPLACE_ADVERTISER_MY_DEALS)}
+              >
+                My Deals
+              </Button>
+              <Button
+                size='small'
+                type="secondary"
+                onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CHANNELS)}
+              >
+                My Channels
+              </Button>
+              <Button
+                size='small'
+                type="secondary"
+                onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CAMPAIGNS)}
+              >
+                My Campaigns
+              </Button>
+            </BlockNew>
           </BlockNew>
-          <BlockNew gap={8} row>
-            <Button
-              size='small'
-              type="secondary"
-              onClick={() => navigate(ROUTES_NAME.MARKETPLACE_ADVERTISER_MY_DEALS)}
-            >
-              My Deals
-            </Button>
-            <Button
-              size='small'
-              type="secondary"
-              onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CHANNELS)}
-            >
-              My Channels
-            </Button>
-            <Button
-              size='small'
-              type="secondary"
-              onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CAMPAIGNS)}
-            >
-              My Campaigns
-            </Button>
-          </BlockNew>
-        </BlockNew>
 
-        {/*<BlockNew justify="between" align="center" row padding="0 16px">*/}
-        {/*  <TabsContainer*/}
-        {/*    tabs={tabs}*/}
-        {/*    activeTab={activeTab}*/}
-        {/*    onChangeTab={handleChangeActiveTab as (value: string) => void}*/}
-        {/*  />*/}
-        {/*  {currentUser && (*/}
-        {/*    <Button*/}
-        {/*      type="primary"*/}
-        {/*      onClick={*/}
-        {/*        activeTab === 'channels' ? handleCreateListing : handleCreateCampaign*/}
-        {/*      }*/}
-        {/*    >*/}
-        {/*      {activeTab === 'channels' ? 'List Your Channel' : 'Create Campaign'}*/}
-        {/*    </Button>*/}
-        {/*  )}*/}
-        {/*</BlockNew>*/}
+          {/*<BlockNew justify="between" align="center" row padding="0 16px">*/}
+          {/*  <TabsContainer*/}
+          {/*    tabs={tabs}*/}
+          {/*    activeTab={activeTab}*/}
+          {/*    onChangeTab={handleChangeActiveTab as (value: string) => void}*/}
+          {/*  />*/}
+          {/*  {currentUser && (*/}
+          {/*    <Button*/}
+          {/*      type="primary"*/}
+          {/*      onClick={*/}
+          {/*        activeTab === 'channels' ? handleCreateListing : handleCreateCampaign*/}
+          {/*      }*/}
+          {/*    >*/}
+          {/*      {activeTab === 'channels' ? 'List Your Channel' : 'Create Campaign'}*/}
+          {/*    </Button>*/}
+          {/*  )}*/}
+          {/*</BlockNew>*/}
 
-        {isLoading ? (
-            <Skeleton />
-        ) : (
+          {isLoading ? (
+            <BlockNew align="center" marginValue={12}>
+              <Spinner size={24}/>
+            </BlockNew>
+          ) : (
             <div
-                className={styles.contentSlider}
-                style={{
-                  // transform: `translateX(-${activeTabIndex * 50}%)`,
-                  // width: `${contentSlides.length * 100}%`,
-                }}
+              className={styles.contentSlider}
+              style={{
+                // transform: `translateX(-${activeTabIndex * 50}%)`,
+                // width: `${contentSlides.length * 100}%`,
+              }}
             >
               {contentSlides.map((slide, index) => (
-                  <div className={styles.contentSlide} key={index}>
-                    {slide}
-                  </div>
+                <div className={styles.contentSlide} key={index}>
+                  {slide}
+                </div>
               ))}
             </div>
-        )}
-      </BlockNew>
+          )}
+        </BlockNew>
       </PageLayout>
     </Page>
   )

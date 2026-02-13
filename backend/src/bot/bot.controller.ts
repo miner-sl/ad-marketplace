@@ -258,7 +258,7 @@ export class BotController {
    */
   static async handleIncomingRequests(ctx: Context) {
     try {
-      const deals = await DealFlowService.findDealRequestByTelegramId(ctx.from!.id, 20);
+      const { data: deals } = await DealFlowService.findDealRequestByTelegramId(ctx.from!.id, { limit: 20 });
 
       if (deals.length === 0) {
         return ctx.reply('No pending requests at the moment.');

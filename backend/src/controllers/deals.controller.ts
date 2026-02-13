@@ -26,11 +26,31 @@ export class DealsController {
 
   static async getDealRequests(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const { telegram_id, limit: limitValue } = request.query as any;
+      const {
+        telegram_id,
+        channel: channelId,
+        limit: limitValue,
+        page: pageValue,
+        date_from: dateFrom,
+        date_to: dateTo,
+        country,
+        locale,
+        premium_only: premiumOnly = false,
+      } = request.query as any;
       const dealsLimit = limitValue ?? 20;
+      const page = pageValue != null ? Math.max(1, parseInt(String(pageValue), 10) || 1) : 1;
 
-      const deals = await DealFlowService.findDealRequestByTelegramId(telegram_id, dealsLimit);
-      return deals;
+      const result = await DealFlowService.findDealRequestByTelegramId(telegram_id, {
+        limit: dealsLimit,
+        page,
+        channelId: channelId != null ? Number(channelId) : undefined,
+        dateFrom: dateFrom ?? undefined,
+        dateTo: dateTo ?? undefined,
+        country: country ?? undefined,
+        locale: locale ?? undefined,
+        premiumOnly: premiumOnly === 'true' || premiumOnly === true,
+      });
+      return result;
     } catch (error: any) {
       if (error.message === 'User not found') {
         return reply.code(404).send({ error: error.message });

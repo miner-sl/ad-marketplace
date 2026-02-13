@@ -1,1 +1,1 @@
-export type ListInputType = 'text' | 'number' | 'password' | 'email' | 'tel' | 'url' | 'search';
+export type ListInputType = 'text' | 'number' | 'password' | 'email' | 'tel' | 'url' | 'search' | 'date';

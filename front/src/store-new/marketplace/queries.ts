@@ -9,6 +9,8 @@ import type {
   CampaignFilters,
   Deal,
   DealFilters,
+  DealRequestsFilters,
+  DealRequestsResponse,
   CreateChannelRequest,
   CreateChannelListingRequest,
   CreateCampaignRequest,
@@ -404,10 +406,13 @@ export const useDealQuery = (id: number, userId?: number) => {
   })
 }
 
-export const useDealRequestsQuery = (telegramId: number | undefined, limit?: number) => {
-  return useQuery<Deal[]>({
-    queryKey: [...TANSTACK_KEYS.DEAL_REQUESTS(telegramId || 0)],
-    queryFn: () => dealsAPI.getDealRequests(telegramId!, limit),
+export const useDealRequestsQuery = (
+  telegramId: number | undefined,
+  filters?: DealRequestsFilters
+) => {
+  return useQuery<DealRequestsResponse>({
+    queryKey: [...TANSTACK_KEYS.DEAL_REQUESTS(telegramId || 0), filters ?? {}],
+    queryFn: () => dealsAPI.getDealRequests(telegramId!, filters),
     enabled: !!telegramId,
     gcTime: TANSTACK_GC_TIME,
     staleTime: TANSTACK_TTL.DEAL_REQUESTS || 30000,

@@ -34,7 +34,7 @@ export const AddChannelPage = () => {
   const navigate = useNavigate()
   const {showToast} = useToast()
   const [username, setUsername] = useState('')
-  const [priceTon, setPriceTon] = useState('')
+  const [priceTon, setPriceTon] = useState('30');
   const [topicId, setTopicId] = useState<number | undefined>(undefined)
   const [botAdded, setBotAdded] = useState(false)
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
@@ -221,6 +221,7 @@ export const AddChannelPage = () => {
                     inputMode="numeric"
                     textColor="tertiary"
                     value={priceTon}
+                    min={0}
                     onChange={setPriceTon}
                   />
                 }

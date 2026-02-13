@@ -601,7 +601,6 @@ export class DealFlowService {
   static async declineDealWithNotification(dealId: number, channelOwnerId: number, reason?: string): Promise<any> {
     try {
       const deal = await this.declineDeal(dealId, channelOwnerId, reason);
-      console.log({deal})
       const channelInfo = await DealFlowService.getChannelInfoForDeal(dealId);
       await TelegramNotificationService.notifyDealDeclined(dealId, deal.advertiser_id, {
         dealId: deal,
@@ -830,38 +829,67 @@ export class DealFlowService {
 
   /**
    * Find deal requests for a channel owner by Telegram ID
-   * Returns deals extended with channel info as nested channel field
+   * Returns deals extended with channel info and pagination meta
    */
-  static async findDealRequestByTelegramId(telegramId: number, limit: number = 20): Promise<any[]> {
+  static async findDealRequestByTelegramId(
+    telegramId: number,
+    options: {
+      limit?: number;
+      page?: number;
+      channelId?: number;
+      dateFrom?: string | null;
+      dateTo?: string | null;
+      country?: string | null;
+      locale?: string | null;
+      premiumOnly?: boolean | null;
+    } = {}
+  ): Promise<{ data: any[]; allAmount: number; page: number }> {
+    const {
+      limit = 20,
+      page = 1,
+      channelId,
+      dateFrom,
+      dateTo,
+      country,
+      locale,
+      premiumOnly = false,
+    } = options;
     const user = await UserModel.findByTelegramId(telegramId);
     if (!user) {
       throw new Error('User not found');
     }
 
-    const deals = await DealRepository.findPendingForChannelOwner(user.id, limit);
+    const { rows: deals, allAmount } = await DealRepository.findPendingForChannelOwner(user.id, {
+      limit,
+      page,
+      channelId,
+      dateFrom,
+      dateTo,
+      country,
+      locale,
+      premiumOnly,
+    });
 
     if (deals.length === 0) {
-      return [];
+      return { data: [], allAmount: 0, page };
     }
 
-    const channelIds = deals.map(deal => deal.channel_id);
-    const dealIds = deals.map(deal => deal.id);
-
+    const channelIds = deals.map((deal: any) => deal.channel_id);
     const channelsMap = await ChannelRepository.findBasicInfoByIds(channelIds);
-    const briefsMap = await DealRepository.findBriefsByDealIds(dealIds);
 
-    return deals.map(deal => {
+    let data = deals.map((deal: any) => {
       const channel = channelsMap.get(deal.channel_id);
-      const briefText = briefsMap.get(deal.id) || null;
-
       const isOwner = deal.channel_owner_id === user.id;
-
       return {
         ...deal,
         channel: channel ? { ...channel, owner: isOwner } : null,
-        brief: briefText,
       };
     });
+
+    // for (let i = 0; i < 10; i++) {
+    //   data = data.concat(data);
+    // }
+    return { data, allAmount, page };
   }
   /**
    * Submit payment information for a deal

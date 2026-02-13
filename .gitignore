@@ -11,3 +11,4 @@ backend/.env
 .vscode/
 .idea/
 front/src/components/TextEditor
+backend/src/stats.ts

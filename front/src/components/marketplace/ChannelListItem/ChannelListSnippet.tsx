@@ -99,10 +99,15 @@ export const ChannelListSnippet = ({
             )}
             {postPricing && (
               <Text type="caption2" color="accent">
-                {postPricing.price_ton} USDT
+                {postPricing.price_ton} USDT {(showStatus || channel.subscribers_count && channel.subscribers_count > 0) ? ' • ' : ''}
               </Text>
             )}
             {showStatus && <ChannelStatusBadge status={channelStatus} />}
+            {channel.subscribers_count  && channel.subscribers_count > 0 && (
+              <Text type="caption2" color="tertiary">
+                {pluralize(['sub', 'subs', 'subs'], channel.subscribers_count)}
+              </Text>
+            )}
           </BlockNew>
           {(channel.locale || !channel.country) && (
             <BlockNew gap={6} row align="center" fadeIn={false}>

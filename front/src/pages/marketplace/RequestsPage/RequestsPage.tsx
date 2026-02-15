@@ -12,13 +12,13 @@ import {
   DealStatusBadge,
   CampaignCard,
   Button,
-  ListInput,
-  ListToggler, useToast, AppSelect, type AppSelectOption,
+  ListToggler, AppSelect, type AppSelectOption,
 } from '@components';
 import { useDealRequestsQuery, useCampaignsQuery } from '@store-new';
 import { useTelegramUser } from '@hooks';
 import { ROUTES_NAME } from '@routes';
 import { pluralize, hapticFeedback } from '@utils';
+import type {Deal} from "@types";
 
 import styles from './RequestsPage.module.scss';
 
@@ -54,7 +54,8 @@ export const RequestsPage = () => {
   const [page, setPage] = useState(1)
   const [dateFrom] = useState('')
   const [dateTo] = useState('')
-  const [country, setCountry] = useState('')
+  const country = undefined;
+  // const [country, setCountry] = useState('')
   const [locale, setLocale] = useState<Locales>('en');
   const [premiumOnly, setPremiumOnly] = useState(false)
 
@@ -100,7 +101,6 @@ export const RequestsPage = () => {
   const hasPrevPage = currentPage > 1
   const isLoadingMore = dealsLoading;
 
-  const { showToast } = useToast();
   const { data: campaigns } = useCampaignsQuery({
     status: 'active',
   })
@@ -140,7 +140,7 @@ export const RequestsPage = () => {
           </BlockNew>
 
           <BlockNew padding="0 16px">
-            <BlockNew row gap={8} marginValue={8} >
+            <BlockNew row gap={16} marginValue={8} >
               {/*<BlockNew gap={4}>*/}
               {/*  <Text type="caption" color="secondary">*/}
               {/*    From*/}
@@ -167,24 +167,24 @@ export const RequestsPage = () => {
               {/*    }}*/}
               {/*  />*/}
               {/*</BlockNew>*/}
-              <BlockNew gap={4} align="start">
-                <Text type="caption" color="secondary">
-                  Country
-                </Text>
-                <ListInput
-                  type="text"
-                  placeholder="Country"
-                  value={country}
-                  onChange={(v) => {
-                    setCountry(v)
-                    setPage(1);
-                    showToast({
-                      message: 'Todo',
-                    })
-                  }}
-                />
-              </BlockNew>
-              <BlockNew gap={4} align="start">
+              {/*<BlockNew gap={4} align="start">*/}
+              {/*  <Text type="caption" color="secondary">*/}
+              {/*    Country*/}
+              {/*  </Text>*/}
+              {/*  <ListInput*/}
+              {/*    type="text"*/}
+              {/*    placeholder="Country"*/}
+              {/*    value={country}*/}
+              {/*    onChange={(v) => {*/}
+              {/*      setCountry(v)*/}
+              {/*      setPage(1);*/}
+              {/*      showToast({*/}
+              {/*        message: 'Todo',*/}
+              {/*      })*/}
+              {/*    }}*/}
+              {/*  />*/}
+              {/*</BlockNew>*/}
+              <BlockNew gap={4} row align="start">
                 <Text type="caption" color="secondary">
                   Locale
                 </Text>
@@ -195,7 +195,7 @@ export const RequestsPage = () => {
                   placeholder="Select a topic"
                 />
               </BlockNew>
-              <BlockNew gap={4} align="start">
+              <BlockNew gap={4} row align="start">
                 <Text type="caption" color="secondary">
                   Only Premium User
                 </Text>
@@ -217,7 +217,7 @@ export const RequestsPage = () => {
           ) : incomingRequests.length > 0 ? (
             <BlockNew id="requests-container">
               <Group>
-                {incomingRequests.map((deal: any) => {
+                {incomingRequests.map((deal: Deal) => {
                   const channelName = deal.channel?.title || `@${deal.channel?.username || 'channel'}`
                   const subscribersCount = deal.channel?.stats?.subscribers_count || 0
 

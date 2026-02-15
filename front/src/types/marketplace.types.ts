@@ -59,6 +59,7 @@ export interface Channel {
   updated_at: string
   stats?: ChannelStats
   pricing?: ChannelPricing[]
+  subscribers_count?: number
 }
 
 export interface ChannelListing {

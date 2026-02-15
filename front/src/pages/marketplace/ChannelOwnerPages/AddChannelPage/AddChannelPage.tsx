@@ -30,6 +30,8 @@ const topics = PREDEFINED_TOPICS.map((topic: { id: number; name: string }) => ({
   name: topic.name,
   value: topic.id.toString(),
 }));
+const countries = [{ value: '', name: 'Any' }].concat(COUNTRIES);
+const locals = [{ value: '', name: 'None' }].concat(LOCALES);
 
 const MIN_USERNAME_LENGTH = 4;
 
@@ -181,7 +183,7 @@ export const AddChannelPage = () => {
                     setValidateError(undefined);
                   }}
                   delay={1000}
-                  placeholder="Enter Channel Name"
+                  placeholder="Enter Channel Username"
                   type="text"
                   showClearButton={Boolean(validateError && !validateChannelMutation.isPending)}
                 />
@@ -211,7 +213,7 @@ export const AddChannelPage = () => {
                           size="small"
                           onClick={handleAddBot}
                         >
-                          Add {config.botName} as Admin
+                          Add As Admin
                         </Button>
                         <Button
                           type="secondary"
@@ -258,7 +260,7 @@ export const AddChannelPage = () => {
           <Block margin="top" marginValue={4}>
             <ListItem
               padding='8px 16px'
-              text="Channel Topic"
+              text="Topic"
               after={
                 <AppSelect
                   options={topics}
@@ -276,7 +278,7 @@ export const AddChannelPage = () => {
               text="Country"
               after={
                 <AppSelect
-                  options={[{ value: '', name: 'None' }, ...COUNTRIES]}
+                  options={countries}
                   value={country ?? ''}
                   onChange={(value) => setCountry(value || undefined)}
                   placeholder="Select country"
@@ -291,7 +293,7 @@ export const AddChannelPage = () => {
               text="Locale"
               after={
                 <AppSelect
-                  options={[{ value: '', name: 'None' }, ...LOCALES]}
+                  options={locals}
                   value={locale ?? ''}
                   onChange={(value) => setLocale(value || undefined)}
                   placeholder="Select locale"

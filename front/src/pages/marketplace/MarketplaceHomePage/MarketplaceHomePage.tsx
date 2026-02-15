@@ -1,19 +1,8 @@
-import {useCallback} from 'react';
 import {useNavigate} from 'react-router-dom';
 
-import {
-  BlockNew,
-  Button,
-  ChannelListSnippet,
-  Group,
-  Page,
-  PageLayout,
-  Spinner,
-  TelegramMainButton,
-  Text,
-} from '@components';
-import { useChannelsQuery,} from '@store-new';
-import { ROUTES_NAME } from '@routes';
+import {BlockNew, Button, ChannelListSnippet, Group, Page, PageLayout, Spinner, Text,} from '@components';
+import {useChannelsQuery,} from '@store-new';
+import {ROUTES_NAME} from '@routes';
 
 import styles from './MarketplaceHomePage.module.scss';
 
@@ -31,10 +20,10 @@ export const MarketplaceHomePage = () => {
   //   limit: 14,
   // })
 
-  const handleAddChat = useCallback(
-    () => navigate('/admin/add-telegram-chat'),
-    []
-  )
+  // const handleAddChat = useCallback(
+  //   () => navigate('/admin/add-telegram-chat'),
+  //   []
+  // )
 
   const campaignsLoading = false;
   const isLoading = channelsLoading || campaignsLoading;
@@ -65,7 +54,7 @@ export const MarketplaceHomePage = () => {
   return (
     <Page back={false}>
       <PageLayout>
-        <TelegramMainButton text="Add Bot To Channel" onClick={handleAddChat}/>
+        {/*<TelegramMainButton text="Add Bot To Channel" onClick={handleAddChat}/>*/}
 
         <BlockNew gap={12} className={styles.chatsBlock}>
 

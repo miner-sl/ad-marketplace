@@ -15,7 +15,8 @@
 
 .dropdownActive {
   overflow-y: scroll;
-  height: 320px;
+  height: fit-content;
+  max-height: 320px;
 
   opacity: 1;
   visibility: visible;

@@ -1,7 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { ChannelModel } from '../repositories/channel-model.repository';
-import { ChannelRepository } from '../repositories/channel.repository';
+import {ChannelListFilters, ChannelRepository} from '../repositories/channel.repository';
 import { UserModel } from '../repositories/user.repository';
 import { ChannelService } from '../services/channel.service';
 import { topicsService } from '../services/topics.service';
@@ -23,11 +23,13 @@ export class ChannelsController {
         locale?: string;
         ownerTelegramId?: boolean;
         status?: 'active' | 'inactive' | 'moderation';
+        sort_field?: 'subscribers_count';
+        sort_direction?: 'asc' | 'desc';
         limit?: number;
         offset?: number;
       };
 
-      const filters = {
+      const filters: ChannelListFilters = {
         min_subscribers: query.min_subscribers,
         max_subscribers: query.max_subscribers,
         min_price: query.min_price,
@@ -41,6 +43,10 @@ export class ChannelsController {
           ? request.user?.id
           : undefined,
         status: query.status,
+        sort:
+          query.sort_field && query.sort_direction
+            ? { field: query.sort_field, direction: query.sort_direction }
+            : { field: 'subscribers_count', direction: 'desc' },
         limit: query.limit || 50,
         offset: query.offset || 0,
       };

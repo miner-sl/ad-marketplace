@@ -5,7 +5,7 @@ import { Icon } from '../Icon'
 import { Text } from '../Text'
 import styles from './Dropdown.module.scss'
 
-type DropdownOption = {
+export type DropdownOption = {
   label: string
   value: string
 }
@@ -78,7 +78,10 @@ export const Dropdown = ({
             <li
               key={value}
               className={cn(styles.item, isSelected && styles.itemActive)}
-              onClick={() => handleSelect(value)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSelect(value);
+              }}
             >
               <Icon
                 name="checkmark"

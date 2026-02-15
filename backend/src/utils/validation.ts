@@ -117,6 +117,8 @@ export const listChannelsQuerySchema = z.object({
     z.boolean().optional()
   ),
   status: z.enum(['active', 'inactive', 'moderation']).optional(),
+  sort_field: z.enum(['subscribers_count']).optional(),
+  sort_direction: z.enum(['asc', 'desc']).optional(),
   limit: z.preprocess(
     (val) => (typeof val === 'string' ? parseInt(val, 10) : val ?? 50),
     z.number().int().positive().default(50)

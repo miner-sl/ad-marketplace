@@ -151,6 +151,15 @@ export interface Creative {
   updated_at: string
 }
 
+export type SortDirection = 'asc' | 'desc'
+
+export type SortField = 'subscribers_count';
+
+export interface ChannelSort {
+  field: SortField;
+  direction: SortDirection
+}
+
 export interface ChannelFilters {
   search?: string
   min_subscribers?: number
@@ -166,6 +175,7 @@ export interface ChannelFilters {
   ownerTelegramId?: boolean
   limit?: number
   offset?: number
+  sort?: ChannelSort
 }
 
 export interface CampaignFilters {

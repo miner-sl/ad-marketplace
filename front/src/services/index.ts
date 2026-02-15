@@ -82,11 +82,16 @@ export const MarketplaceService = {
     let queryParams = ''
     if (filters) {
       const params = new URLSearchParams()
-      Object.entries(filters).forEach(([key, value]) => {
+      const { sort, ...rest } = filters
+      Object.entries(rest).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
           params.append(key, String(value))
         }
       })
+      if (sort?.field && sort?.direction) {
+        params.append('sort_field', sort.field)
+        params.append('sort_direction', sort.direction)
+      }
       queryParams = params.toString() ? '?' + params.toString() : ''
     }
     return await apiRequest<Channel[]>(`/channels${queryParams}`)

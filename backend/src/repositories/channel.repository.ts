@@ -16,6 +16,8 @@ export interface ChannelInfo {
   telegram_channel_id?: number;
 }
 
+export type Sort = { field: 'subscribers_count', direction: 'asc' | 'desc' };
+
 export interface ChannelListFilters {
   min_subscribers?: number;
   max_subscribers?: number;
@@ -28,6 +30,7 @@ export interface ChannelListFilters {
   locale?: string;
   ownerId?: number;
   status?: 'active' | 'inactive' | 'moderation';
+  sort?: Sort;
   limit?: number;
   offset?: number;
 }
@@ -152,6 +155,7 @@ export class ChannelRepository {
       locale,
       ownerId,
       status,
+      sort,
       limit = 50,
       offset = 0,
     } = filters;
@@ -245,7 +249,14 @@ export class ChannelRepository {
       )`;
     }
 
-    query += ` ORDER BY c.created_at DESC LIMIT $${paramCount++} OFFSET $${paramCount++}`;
+    const sortField = sort?.field === 'subscribers_count' ? 'cs.subscribers_count' : null;
+    const sortDirection = sort?.direction === 'asc' ? 'ASC' : 'DESC';
+    if (sortField) {
+      query += ` ORDER BY ${sortField} ${sortDirection} NULLS LAST, c.id ASC`;
+    } else {
+      query += ` ORDER BY c.created_at DESC`;
+    }
+    query += ` LIMIT $${paramCount++} OFFSET $${paramCount++}`;
     params.push(limit, offset);
 
     const channelsResult = await db.query(query, params);

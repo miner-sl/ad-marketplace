@@ -1,8 +1,9 @@
-import {useEffect, useState} from 'react';
+import {type RefObject, useEffect, useRef, useState} from 'react';
 import {
   BlockNew,
   Button,
   ChannelListSnippet,
+  Dropdown, type DropdownOption,
   Group,
   Icon,
   List,
@@ -23,12 +24,20 @@ import {hapticFeedback} from "@utils";
 
 import styles from './BrowseChannelsPage.module.scss';
 
+const SORT_OPTIONS: DropdownOption[]= [
+  { label: 'Popular', value: 'subscribers_count:desc' },
+  { label: 'UnPopular', value: 'subscribers_count:asc' },
+];
+
 export const BrowseChannelsPage = () => {
   const isMobile = window.matchMedia('(max-width: 768px)').matches;
   const [filters, setFilters] = useState<ChannelFilters>({
     limit: 14, // TODO calculate limit based on screen size
+    sort: { field: 'subscribers_count', direction: 'desc' },
   });
   const [showFilters, setShowFilters] = useState(false)
+  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false)
+  const sortButtonRef = useRef<HTMLDivElement>(null)
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebounce(searchInput, 500)
 
@@ -49,7 +58,10 @@ export const BrowseChannelsPage = () => {
   const { data: channels, isLoading: channelsLoading } = useChannelsQuery(filters)
 
   const onFilterChange = (value: ChannelFilters) => {
-    setFilters(value);
+    setFilters((prev) => ({
+      ...value,
+      sort: value.sort ?? prev.sort ?? { field: 'subscribers_count', direction: 'desc' },
+    }));
     setShowFilters(false);
   }
 
@@ -60,7 +72,28 @@ export const BrowseChannelsPage = () => {
 
   const onResetFilters = () => {
     hapticFeedback('soft');
-    setFilters({limit: 14});
+    setFilters({ limit: 14, sort: { field: 'subscribers_count', direction: 'desc' } });
+  };
+
+  const sortValue = filters.sort
+    ? `${filters.sort.field}:${filters.sort.direction}`
+    : 'subscribers_count:desc';
+
+  const handleSortSelect = (value: string) => {
+    if (channelsLoading) {
+      return;
+    }
+    hapticFeedback('soft');
+    setIsSortDropdownOpen(false);
+    const [field, direction] = value.split(':') as [string, 'asc' | 'desc'];
+    // @ts-ignore
+    setFilters((prev: ChannelFilters) => ({ ...prev, sort: { field, direction } }));
+    setIsSortDropdownOpen(false);
+  };
+
+  const toggleSortDropdown = () => {
+    hapticFeedback('soft');
+    setIsSortDropdownOpen((v) => !v);
   };
 
   return (
@@ -69,28 +102,51 @@ export const BrowseChannelsPage = () => {
         <TelegramBackButton />
         <BlockNew gap={16} className={styles.container}>
           <BlockNew>
-            <BlockNew row justify="between" align="center">
-              <Text type="title2" weight="bold">
-                Browse Channels
-              </Text>
-              <Button
-                size="small"
-                type="secondary"
-                onClick={onToggleFilters}
-              >
-                {showFilters ? 'Hide' : 'Filters'}
-              </Button>
+            <BlockNew row justify="between" align="center" gap={8}>
+              <BlockNew>
+                <Text type="title2" weight="bold">
+                  Channels
+                </Text>
+              </BlockNew>
+              <BlockNew row gap={8} justify="end">
+                <div
+                  className={styles.orderByContainer}
+                  onClick={toggleSortDropdown}
+                  ref={sortButtonRef}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && toggleSortDropdown()}
+                >
+                  <Icon name="sortArrows" size={18} color="secondary"/>
+                  <Dropdown
+                    active={isSortDropdownOpen}
+                    options={SORT_OPTIONS}
+                    selectedValue={sortValue}
+                    onSelect={handleSortSelect}
+                    onClose={() => setIsSortDropdownOpen(false)}
+                    triggerRef={sortButtonRef as RefObject<HTMLElement>}
+                  />
+                </div>
+
+                <Button
+                  size="small"
+                  type="secondary"
+                  onClick={onToggleFilters}
+                >
+                  {showFilters ? 'Hide' : 'Filters'}
+                </Button>
+              </BlockNew>
             </BlockNew>
           </BlockNew>
 
           <List>
             <ListItem padding="0 16px">
               <ListInput
-                before={<Icon name="searchGlass" size={16} />}
+                before={<Icon name="searchGlass" size={16}/>}
                 showClearButton
                 textColor="secondary"
                 type="text"
-                placeholder="Search by channel name or username..."
+                placeholder="Search by name or username"
                 value={searchInput}
                 onChange={(value) => setSearchInput(value)}
               />
@@ -98,12 +154,12 @@ export const BrowseChannelsPage = () => {
           </List>
 
           {!isMobile && showFilters && (
-            <FiltersContent value={filters} onSelect={onFilterChange} />
+            <FiltersContent value={filters} onSelect={onFilterChange}/>
           )}
 
           {channelsLoading ? (
             <BlockNew row gap={8}>
-              <Spinner size={18} />
+              <Spinner size={18}/>
               <Text type="text" color="secondary" align="center">
                 Loading channels...
               </Text>

@@ -41,8 +41,7 @@ interface EnvConfig {
 }
 
 function getEnvVar(name: string, required: boolean = true, defaultValue?: any): any {
-  let env1 = process.env;
-  console.log({env1})
+  const env1 = process.env;
   const value = env1[name];
 
   if (!value && required && defaultValue === undefined) {

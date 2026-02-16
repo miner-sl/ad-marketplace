@@ -1,6 +1,6 @@
 # Ad Marketplace - Telegram Mini App Backend
 
-
+[@NonNano_bot](https://t.me/NonNano_Bot)
 ## Setup & Installation
 ###  Local Development
 
@@ -24,7 +24,8 @@ See `backend/.env.docker.example` for all required variables:
 2. **Install dependencies**
    ```bash
    cd backend && npm install
-   cd front && npm install
+   cp .env.example .env
+   cd ../front && npm install
    ```
 
 3. **Set up environment variables**
@@ -35,14 +36,14 @@ See `backend/.env.docker.example` for all required variables:
 
 4. **Set up database**
    ```bash
-   docker-compose up -d
+   cd .. && docker-compose up -d
    ```
 
 5**Start server**
    ```bash
    # Development
    cd backend && npm run dev
-   cd frontend && npm run dev:https
+   cd front && npm run dev:https
    ```
 
 ### at bot farther setup url to frontend. something like that `Network: https://192.168.31.146:5173/`

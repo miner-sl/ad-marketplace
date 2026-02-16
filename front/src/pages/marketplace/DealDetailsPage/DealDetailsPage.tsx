@@ -142,6 +142,7 @@ export const DealDetailsPage = () => {
     //   message: 'TODO implement from tonwallet, currently mocked transaction indexer by default ton transactions'
     // })
     hapticFeedback("soft");
+     await handlePayment();
 
     await popupManager.openPopup({
       title: 'Payment',

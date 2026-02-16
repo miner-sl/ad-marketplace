@@ -4,6 +4,7 @@ import {beginCell} from "@ton/core";
 import {generateUserIDHash} from "../utils/verifyTonProof";
 import {DealModel} from "../repositories/deal-model.repository";
 import logger from "../utils/logger";
+import {UserModel} from "../repositories/user.repository";
 
 const contestTransactionCreateSchema = z.preprocess(
   (data: any) => {
@@ -69,7 +70,7 @@ export class TransactionController {
       }
 
       const validationResult = contestTransactionCreateSchema.safeParse(request.body);
-      
+
       if (!validationResult.success) {
         return reply.code(400).send({
           status: "failed",
@@ -99,6 +100,12 @@ export class TransactionController {
         .storeUint(0, 32)
         .storeStringTail(dealIdentifier)
         .endCell();
+
+      const telegramId = request?.user?.telegramId;
+      const wallet = validationResult.data?.wallet;
+      if (telegramId && wallet) {
+        await UserModel.updateWalletAddress(telegramId, wallet);
+      }
 
       return reply.send({
         status: "success",

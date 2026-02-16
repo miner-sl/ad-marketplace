@@ -4,7 +4,8 @@ import { z } from 'zod';
 export function validateBody(schema: z.ZodSchema) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      schema.parse(request.body);
+      const parsed = schema.parse(request.body);
+      (request as any).body = parsed;
     } catch (error) {
       if (error instanceof z.ZodError) {
         return reply.status(400).send({

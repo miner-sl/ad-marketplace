@@ -4,6 +4,7 @@ import {DealFlowService, SubmitPaymentDto} from '../services/deal-flow.service';
 import { ChannelModel } from '../repositories/channel-model.repository';
 
 import logger from '../utils/logger';
+import {authService} from "../services/auth.service";
 
 export class DealsController {
   static async listDeals(request: FastifyRequest, reply: FastifyReply) {
@@ -94,27 +95,24 @@ export class DealsController {
     try {
       const {
         pricing_id,
-        advertiser_id,
         publish_date,
         postText,
       } = request.body as any;
-
+      const userId = request?.user?.id;
+      if (!userId) {
+        return reply.code(400).send({
+          error: 'Invalid user',
+          message: 'Telegram ID not found in token',
+        });
+      }
       if (!pricing_id) {
         return reply.code(400).send({ error: 'pricing_id is required' });
       }
 
-      const pricing = await ChannelModel.getPricingById(pricing_id);
-      if (!pricing) {
-        return reply.code(404).send({ error: 'Pricing not found' });
-      }
-
       const result = await DealFlowService.initializeDeal({
         deal_type: 'listing',
-        channel_id: pricing.channel_id,
-        channel_owner_id: pricing.owner_id,
-        advertiser_id,
-        ad_format: pricing.ad_format,
-        price_ton: pricing.price_ton,
+        pricing_id,
+        advertiser_id: userId,
         publish_date: publish_date ? new Date(publish_date) : undefined,
         postText,
       });

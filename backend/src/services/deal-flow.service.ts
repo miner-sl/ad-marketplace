@@ -17,7 +17,6 @@ import {withTx} from '../utils/transaction';
 import logger from '../utils/logger';
 import {distributedLock} from '../utils/lock';
 import {Deal} from '../models/deal.types';
-import env from '../utils/env';
 import {generateUserIDHash} from "../utils/verifyTonProof";
 import getRedisClient from "../utils/redis";
 
@@ -63,9 +62,10 @@ export class DealFlowService {
     return {
       ok: true,
       // @ts-ignore
-      data: deals.map((deal) => ({...deal, price_ton: parseInt(deal.price_ton) })),
+      data: deals.map((deal) => ({...deal, price_ton: parseInt(deal.price_ton)})),
     };
   }
+
   /**
    * Initialize/create a new deal
    * Uses transaction to ensure atomicity when creating deal, setting publish_date, and storing postText
@@ -74,22 +74,30 @@ export class DealFlowService {
     deal_type: 'listing' | 'campaign';
     listing_id?: number;
     campaign_id?: number;
-    channel_id: number;
-    channel_owner_id: number;
     advertiser_id: number;
-    ad_format: string;
-    price_ton: number;
+    pricing_id: number;
     publish_date?: Date;
     postText?: string;
   }): Promise<any> {
     return await withTx(async (client) => {
-      const channel = await ChannelRepository.findByIdWithClient(client, data.channel_id);
+      const pricing = await ChannelModel.getPricingById(data.pricing_id);
+      if (!pricing) {
+        throw new Error(`Pricing not found`);
+      }
+      const {
+        channel_id,
+        owner_id: channel_owner_id,
+        ad_format,
+        price_ton,
+      } = pricing;
+
+      const channel = await ChannelRepository.findByIdWithClient(client, channel_id);
       if (!channel) {
-        throw new Error(`Channel with id ${data.channel_id} not found`);
+        throw new Error(`Channel with id ${channel_id} not found`);
       }
 
-      if (channel.owner_id !== data.channel_owner_id) {
-        throw new Error(`Channel owner mismatch. Channel ${data.channel_id} is owned by user ${channel.owner_id}, not ${data.channel_owner_id}`);
+      if (channel.owner_id !== channel_owner_id) {
+        throw new Error(`Channel owner mismatch. Channel ${channel_id} is owned by user ${channel.owner_id}, not ${channel_owner_id}`);
       }
 
       const advertiser = await UserModel.findByTelegramIdWithClient(client, data.advertiser_id);
@@ -101,11 +109,11 @@ export class DealFlowService {
         deal_type: data.deal_type,
         listing_id: data.listing_id,
         campaign_id: data.campaign_id,
-        channel_id: data.channel_id,
-        channel_owner_id: data.channel_owner_id,
+        channel_id: channel_id,
+        channel_owner_id: channel_owner_id,
         advertiser_id: advertiser.id,
-        ad_format: data.ad_format,
-        price_ton: data.price_ton,
+        ad_format: ad_format,
+        price_ton: price_ton,
         scheduled_post_time: data.publish_date,
       });
 
@@ -116,10 +124,19 @@ export class DealFlowService {
           deal_id: deal.id,
           submitted_by: advertiser.id,
           content_type: 'text',
-          content_data: { text: data.postText }
+          content_data: {text: data.postText}
         });
       }
 
+      if (advertiser.telegram_id) {
+        await TelegramNotificationService.notifyNewAdRequest(deal.id, deal.channel_owner_id, {
+          dealId: deal.id,
+          channelId: channel_owner_id,
+          priceTon: deal.price_ton,
+          adFormat: deal.ad_format,
+          briefPreview: data.postText,
+        });
+      }
       return deal;
     });
   }
@@ -340,7 +357,7 @@ export class DealFlowService {
           }
         });
       },
-      { ttl: 30000 }
+      {ttl: 30000}
     );
   }
 
@@ -542,7 +559,7 @@ export class DealFlowService {
               dealId,
               existingTxHash: deal.payment_tx_hash,
             });
-            return { txHash: deal.payment_tx_hash };
+            return {txHash: deal.payment_tx_hash};
           }
 
           // Then check if in verified status
@@ -576,7 +593,7 @@ export class DealFlowService {
           try {
             // Update status and record tx hash atomically
             await DealModel.updateToCompletedWithClient(client, dealId, txHash);
-            return { txHash };
+            return {txHash};
           } catch (error: any) {
             // Another process released funds between our check and update
             // Re-query to get the existing tx hash
@@ -586,13 +603,13 @@ export class DealFlowService {
                 dealId,
                 existingTxHash: recheck.payment_tx_hash,
               });
-              return { txHash: recheck.payment_tx_hash };
+              return {txHash: recheck.payment_tx_hash};
             }
             throw new Error('Failed to update deal status. Funds may have been released by another process.');
           }
         });
       },
-      { ttl: 60000 }
+      {ttl: 60000}
     );
   }
 
@@ -615,6 +632,7 @@ export class DealFlowService {
       });
     }
   }
+
   /**
    * Decline deal
    */
@@ -713,7 +731,7 @@ export class DealFlowService {
 
       if (!latestMessage) {
         await DealRepository.addMessageWithClient(client, dealId, senderId, messageText);
-        return { message: 'Message created' };
+        return {message: 'Message created'};
       }
 
       const updatedMessage = await DealRepository.updateMessageWithClient(
@@ -814,7 +832,7 @@ export class DealFlowService {
       is_advertiser: advertiser.is_advertiser,
     } : null;
 
-    const { channel_owner_wallet_address, ...dealWithoutWallet } = deal;
+    const {channel_owner_wallet_address, ...dealWithoutWallet} = deal;
 
     return {
       ...dealWithoutWallet,
@@ -857,7 +875,7 @@ export class DealFlowService {
       throw new Error('User not found');
     }
 
-    const { rows: deals, allAmount } = await DealRepository.findPendingForChannelOwner(user.id, {
+    const {rows: deals, allAmount} = await DealRepository.findPendingForChannelOwner(user.id, {
       limit,
       page,
       channelId,
@@ -869,7 +887,7 @@ export class DealFlowService {
     });
 
     if (deals.length === 0) {
-      return { data: [], allAmount: 0, page };
+      return {data: [], allAmount: 0, page};
     }
 
     const channelIds = deals.map((deal: any) => deal.channel_id);
@@ -880,15 +898,16 @@ export class DealFlowService {
       const isOwner = deal.channel_owner_id === user.id;
       return {
         ...deal,
-        channel: channel ? { ...channel, owner: isOwner } : null,
+        channel: channel ? {...channel, owner: isOwner} : null,
       };
     });
 
     // for (let i = 0; i < 10; i++) {
     //   data = data.concat(data);
     // }
-    return { data, allAmount, page };
+    return {data, allAmount, page};
   }
+
   /**
    * Submit payment information for a deal
    * Stores payment data in Redis for verification
@@ -946,7 +965,7 @@ export class DealFlowService {
         dealId: dto.dealId,
         userId: dto.userId,
         paymentKey,
-        paymentData: { ...paymentData, wallet_raw: paymentData.wallet_raw.substring(0, 20) + '...' },
+        paymentData: {...paymentData, wallet_raw: paymentData.wallet_raw.substring(0, 20) + '...'},
       });
 
       return {

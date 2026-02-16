@@ -1,50 +1,53 @@
 # Ad Marketplace - Telegram Mini App Backend
 
-A Node.js backend for a Telegram Mini App marketplace connecting channel owners and advertisers with TON blockchain escrow functionality.
 
-## Features
-### 1. Done
-- [X] distributed lock (redis)
-- [X] jwt auth
-- [X] channel topic
-- [X] tg notification queue (?)
-- [X] scheduler post verification, auto publication
-- [X] setup post publication time
-- [X] check that user really admin before send to their address money
-- [X] channel topic
+## Setup & Installation
+###  Local Development
 
-### 2. TODO
-- [ ] connect wallet by channel owner
-- [ ] scheduler for generate escrow wallet at ton
-- [ ] role [admin moderator, channel owner, ads buyer]
-- [ ] channel verification and advertiser verification
-- [ ] use tg stats for gather stats
-- [ ] recheck every 30 days admin rights user + bot , subs count, 
-- [ ] transactions history
-- [ ] integrate i18n
-- [ ] channel geo/country, language, budget range, format
-- [ ] SEARCH: vectorize channels fields and sort relevance by cosine distance
-- [ ] store images before publish
-- [ ] dashboard (revenue by month, channel page views, in favorites, in favorites, placemnets, earned)
-- [ ] transaction history 
-- [ ] channels catalog with basket or fast buy flow (select type, place order, wait moderation)
-- [ ] super admin for moderate channels
-- [ ] Store escrow wallet secret in KMS/HSM/encrypted at database (?)
-- [ ] sleek ui
-- [ ] ads payments by advertiser (integrate tonconnect)
-- [ ] support all telegram message entities in post (emoji, animated/premium emoji, markdown formatting and etc)
-https://core.telegram.org/type/MessageEntity
-- [ ] fix transactions operation
-- [ ] telegram post analytics
-- [ ] use usdt for prices
-- [ ] refunds money to channel owner
-- [ ] Release funds to channel owner check transaction really exist
-- [ ] /check payments without mock transactions
-- [ ] check edit post text,
-- [ ] attach media, photos, formatted with telegram entities
-- [ ] mini app
-- [ ] deploy to vps workflow
+See `backend/.env.docker.example` for all required variables:
 
+- `TELEGRAM_BOT_USERNAME`
+- `TELEGRAM_BOT_TOKEN`: Your Telegram bot token (get at bot farther)
+- `JWT_SECRET`
+- `DATABASE_URL`: PostgreSQL connection string
+- `TON_NETWORK`: `testnet` or `mainnet`
+- `TON_API_KEY`: TON API key for blockchain queries
+- `DEAL_TIMEOUT_HOURS`: Deal timeout (default: 72)
+- `MIN_POST_DURATION_HOURS`: Minimum post duration before release (default: 24)
+
+1. **Clone repository**
+   ```bash
+   git clone <repository-url>
+   cd ad-marketplace
+   ```
+
+2. **Install dependencies**
+   ```bash
+   cd backend && npm install
+   cd front && npm install
+   ```
+
+3. **Set up environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+
+4. **Set up database**
+   ```bash
+   docker-compose up -d
+   
+   npm run migrate
+   ```
+
+5**Start server**
+   ```bash
+   # Development
+   cd backend && npm run dev
+   cd frontend && npm run dev:https
+   ```
+
+### at bot farther setup url to frontend. something like that `Network: https://192.168.31.146:5173/`
 
 ## Features
 
@@ -135,120 +138,6 @@ Alternative paths:
 - Verifies post exists and is unchanged
 - Releases or refunds based on verification result
 
-## Setup & Installation
-
-### Prerequisites
-
-- Node.js 18+ (or Docker & Docker Compose)
-- PostgreSQL 12+ (or use Docker Compose)
-- Telegram Bot Token (from [@BotFather](https://t.me/BotFather))
-- TON API key (from [TON Center](https://toncenter.com) or similar)
-
-### Option 1: Docker Compose (Recommended)
-
-1. **Clone repository**
-   ```bash
-   git clone <repository-url>
-   cd ad-marketplace
-   ```
-
-2. **Set up environment variables**
-   ```bash
-   cp .env.docker.example .env
-   # Edit .env with your configuration (at minimum: TELEGRAM_BOT_TOKEN, TON_API_KEY)
-   ```
-
-3. **Start services**
-   ```bash
-   # Start PostgreSQL and app
-   docker-compose up -d
-   
-   # View logs
-   docker-compose logs -f app
-   ```
-
-4. **Run migrations** (first time only)
-   ```bash
-   docker-compose exec app npm run migrate
-   ```
-
-5. **Access the application**
-   - API: http://localhost:3000
-   - PostgreSQL: localhost:5432
-
-**Stop services:**
-```bash
-docker-compose down
-```
-
-**Stop and remove volumes (clean slate):**
-```bash
-docker-compose down -v
-```
-
-### Option 2: Local Development
-
-1. **Clone repository**
-   ```bash
-   git clone <repository-url>
-   cd ad-marketplace
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Set up environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
-
-4. **Set up database**
-   ```bash
-   # Create PostgreSQL database
-   createdb ad_marketplace
-   
-   # Or use Docker for just PostgreSQL:
-   docker-compose up -d postgres
-   
-   # Run migrations
-   npm run migrate
-   ```
-
-5. **Build TypeScript**
-   ```bash
-   npm run build
-   ```
-
-6. **Start server**
-   ```bash
-   # Development
-   npm run dev
-   
-   # Production
-   npm start
-   ```
-
-### Environment Variables
-
-See `.env.example` for all required variables:
-
-- `TELEGRAM_BOT_TOKEN`: Your Telegram bot token
-- `DATABASE_URL`: PostgreSQL connection string
-- `TON_NETWORK`: `testnet` or `mainnet`
-- `TON_API_KEY`: TON API key for blockchain queries
-- `DEAL_TIMEOUT_HOURS`: Deal timeout (default: 72)
-- `MIN_POST_DURATION_HOURS`: Minimum post duration before release (default: 24)
-
-## API Документация
-
-### Swagger UI
-
-Интерактивная документация API доступна по адресу:
-- **Development**: http://localhost:3000/api-docs
-- **Production**: https://your-domain.com/api-docs
 
 ### Документация
 
@@ -280,33 +169,6 @@ See `.env.example` for all required variables:
 - `POST /api/campaigns` - Создать кампанию
 - `PUT /api/campaigns/:id` - Обновить кампанию
 
-## Telegram Bot Commands
-
-- `/start` - Start using the bot
-- `/help` - Show help message
-- `/mydeals` - View your deals
-- `/mychannels` - View your channels
-- `/mycampaigns` - View your campaigns
-- `/deal <id>` - View deal details
-
-## Deployment
-### Docker Production Deployment
-
-1. **Set up production environment**
-   ```bash
-   cp .env.docker.example .env
-   # Fill in production values
-   ```
-
-2. **Build and start**
-   ```bash
-   docker-compose -f docker-compose.prod.yml up -d --build
-   ```
-
-3. **Run migrations**
-   ```bash
-   docker-compose -f docker-compose.prod.yml exec app npm run migrate
-   ```
 
 ### Webhook Setup (Production)
 
@@ -316,72 +178,6 @@ TELEGRAM_WEBHOOK_URL=https://your-domain.com/webhook
 ```
 
 The server will automatically set the webhook on startup in production mode.
-
-### Database Migrations
-
-#### Initial Schema Setup
-Run initial schema migration (first time only):
-```bash
-# Local
-npm run migrate
-
-# Docker
-docker-compose exec app npm run migrate
-```
-
-#### Running Incremental Migrations
-For adding new fields or tables to existing databases:
-```bash
-# Local
-npm run migrate:run
-
-# Docker
-docker-compose exec app npm run migrate:run
-```
-
-#### Quick Fix: Add Missing wallet_address Field
-If you get an error about missing `wallet_address` column, you can run this SQL directly:
-```bash
-# Option 1: Run migration script
-npm run migrate:run
-
-# Option 2: Run SQL directly
-psql -U your_user -d your_database -f src/db/add_wallet_address.sql
-
-# Option 3: Execute SQL manually
-psql -U your_user -d your_database
-ALTER TABLE users ADD COLUMN IF NOT EXISTS wallet_address VARCHAR(255);
-ALTER TABLE deals ADD COLUMN IF NOT EXISTS channel_owner_wallet_address VARCHAR(255);
-```
-
-### Environment
-
-Set `NODE_ENV=production` for production deployment.
-
-### Docker Commands
-
-```bash
-# Start services
-docker-compose up -d
-
-# Stop services
-docker-compose down
-
-# View logs
-docker-compose logs -f
-
-# Rebuild after code changes
-docker-compose up -d --build
-
-# Access database
-docker-compose exec postgres psql -U admarketplace -d ad_marketplace
-
-# Run migrations
-docker-compose exec app npm run migrate
-
-# Execute commands in app container
-docker-compose exec app npm run <command>
-```
 
 ## Key Design Decisions
 
@@ -427,9 +223,47 @@ docker-compose exec app npm run <command>
 9. **Mini-App Frontend**: Full-featured Telegram Mini App UI
 10. **Analytics Dashboard**: Channel performance analytics
 
-## Testing
 
-```bash
-# Run tests (when implemented)
-npm test
-```
+
+## Features
+### 1. Done
+- [X] distributed lock (redis)
+- [X] jwt auth
+- [X] channel topic
+- [X] tg notification queue (?)
+- [X] scheduler post verification, auto publication
+- [X] setup post publication time
+- [X] check that user really admin before send to their address money
+- [X] channel topic
+
+### 2. TODO
+- [ ] connect wallet by channel owner
+- [ ] scheduler for generate escrow wallet at ton
+- [ ] role [admin moderator, channel owner, ads buyer]
+- [ ] channel verification and advertiser verification
+- [ ] use tg stats for gather stats
+- [ ] recheck every 30 days admin rights user + bot , subs count,
+- [ ] transactions history
+- [ ] integrate i18n
+- [ ] channel geo/country, language, budget range, format
+- [ ] SEARCH: vectorize channels fields and sort relevance by cosine distance
+- [ ] store images before publish
+- [ ] dashboard (revenue by month, channel page views, in favorites, in favorites, placemnets, earned)
+- [ ] transaction history
+- [ ] channels catalog with basket or fast buy flow (select type, place order, wait moderation)
+- [ ] super admin for moderate channels
+- [ ] Store escrow wallet secret in KMS/HSM/encrypted at database (?)
+- [ ] sleek ui
+- [ ] ads payments by advertiser (integrate tonconnect)
+- [ ] support all telegram message entities in post (emoji, animated/premium emoji, markdown formatting and etc)
+  https://core.telegram.org/type/MessageEntity
+- [ ] fix transactions operation
+- [ ] telegram post analytics
+- [ ] use usdt for prices
+- [ ] refunds money to channel owner
+- [ ] Release funds to channel owner check transaction really exist
+- [ ] /check payments without mock transactions
+- [ ] check edit post text,
+- [ ] attach media, photos, formatted with telegram entities
+- [ ] mini app
+- [ ] deploy to vps workflow

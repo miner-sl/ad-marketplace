@@ -1,7 +1,6 @@
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: ad-marketplace-db
     environment:
       POSTGRES_USER: admarketplace
       POSTGRES_PASSWORD: admarketplace123
@@ -19,54 +18,40 @@ services:
       retries: 5
     networks:
       - ad-marketplace-network
-
-  frontend:
-    ports:
-      - "3000:3000"
-    build:
-      context: ./front
-      dockerfile: Dockerfile.static
-      args:
-        VITE_API_URL: https://ad-marketplace:8000/api
-    environment:
-      NODE_ENV: production
-    depends_on:
-      - app
-
-  app:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: ad-marketplace-app
-    environment:
-      NODE_ENV: development
-      PORT: 8000
-      DATABASE_URL: postgresql://admarketplace:admarketplace123@postgres:5432/ad_marketplace
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-}
-      TON_NETWORK: ${TON_NETWORK:-testnet}
-      TON_API_KEY: ${TON_API_KEY}
-      TON_WALLET_MNEMONIC: ${TON_WALLET_MNEMONIC:-}
-      DEAL_TIMEOUT_HOURS: ${DEAL_TIMEOUT_HOURS:-72}
-      MIN_PUBLICATION_DURATION_DAYS: ${MIN_PUBLICATION_DURATION_DAYS:-7}
-      VERIFIED_TIMEOUT_HOURS: ${VERIFIED_TIMEOUT_HOURS:-168}
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
-    ports:
-      - "8000:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - ./backend/src:/app/src
-      - ./backend/dist:/app/dist
-      - /app/node_modules
-    networks:
-      - ad-marketplace-network
-    command: npm run dev
+#
+#  backend:
+#    build:
+#      context: ./backend
+#      dockerfile: Dockerfile
+#    env_file:
+#      - ./backend/.env
+#    environment:
+#      NODE_ENV: production
+#      PORT: 8000
+#      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
+#      DATABASE_URL: postgresql://admarketplace:admarketplace123@postgres:5432/ad_marketplace
+#      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+#      TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-}
+#      TON_NETWORK: ${TON_NETWORK:-testnet}
+#      TON_API_KEY: ${TON_API_KEY}
+#      DEAL_TIMEOUT_HOURS: ${DEAL_TIMEOUT_HOURS:-72}
+#      MIN_PUBLICATION_DURATION_DAYS: ${MIN_PUBLICATION_DURATION_DAYS:-7}
+#      VERIFIED_TIMEOUT_HOURS: ${VERIFIED_TIMEOUT_HOURS:-168}
+#      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+#    ports:
+#      - "3000:3000"
+#    depends_on:
+#      postgres:
+#        condition: service_healthy
+#    volumes:
+#      - ./backend/src:/app/src
+#      - ./backend/dist:/app/dist
+#      - /app/node_modules
+#    networks:
+#      - ad-marketplace-network
 
   redis:
     image: redis:8-alpine
-    container_name: auction-redis
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
@@ -84,7 +69,32 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+#  frontend:
+#    ports:
+#      - "8000:8000"
+#    build:
+#      context: ./front
+#      dockerfile: Dockerfile.static
+#      args:
+#        VITE_API_URL: https://ad-marketplace:8000/api
+#    environment:
+#      NODE_ENV: production
+#    depends_on:
+#      - backend
 #
+#  nginx:
+#    build:
+#      context: .
+#      dockerfile: nginx.Dockerfile
+#    ports:
+#      - "9000:80"
+#    volumes:
+#      - frontend_dist:/usr/share/nginx/html:ro
+#    depends_on:
+#      - backend
+#      - frontend
+##
 #  cron:
 #    build:
 #      context: ./backend
@@ -96,7 +106,6 @@ services:
 #      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
 #      TON_NETWORK: ${TON_NETWORK:-testnet}
 #      TON_API_KEY: ${TON_API_KEY}
-#      TON_WALLET_MNEMONIC: ${TON_WALLET_MNEMONIC:-}
 #      DEAL_TIMEOUT_HOURS: ${DEAL_TIMEOUT_HOURS:-72}
 #      MIN_PUBLICATION_DURATION_DAYS: ${MIN_PUBLICATION_DURATION_DAYS:-7}
 #      VERIFIED_TIMEOUT_HOURS: ${VERIFIED_TIMEOUT_HOURS:-168}
@@ -120,6 +129,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  frontend_dist:
 
 networks:
   ad-marketplace-network:

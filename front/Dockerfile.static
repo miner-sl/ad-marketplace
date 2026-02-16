@@ -9,6 +9,7 @@ ENV VITE_API_URL=$VITE_API_URL
 
 # Copy package.json only (not package-lock.json) to avoid npm optional deps bug
 COPY package.json ./
+COPY package-lock.json ./
 
 # Install dependencies with workaround for npm optional deps bug
 RUN npm cache clean --force && \

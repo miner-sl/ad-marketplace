@@ -28,7 +28,6 @@ interface EnvConfig {
   // TON
   TON_NETWORK: 'mainnet' | 'testnet';
   TON_API_KEY?: string;
-  TON_WALLET_MNEMONIC?: string;
 
   // Deal Settings
   DEAL_TIMEOUT_HOURS: number;
@@ -42,7 +41,9 @@ interface EnvConfig {
 }
 
 function getEnvVar(name: string, required: boolean = true, defaultValue?: any): any {
-  const value = process.env[name];
+  let env1 = process.env;
+  console.log({env1})
+  const value = env1[name];
 
   if (!value && required && defaultValue === undefined) {
     logger.error(`Missing required environment variable: ${name}`);
@@ -85,7 +86,6 @@ export const env: EnvConfig = {
 
   TON_NETWORK: (getEnvVar('TON_NETWORK', false, 'testnet') as any) || 'testnet',
   TON_API_KEY: getEnvVar('TON_API_KEY', false),
-  TON_WALLET_MNEMONIC: getEnvVar('TON_WALLET_MNEMONIC', false),
 
   DEAL_TIMEOUT_HOURS: getNumberEnvVar('DEAL_TIMEOUT_HOURS', false, 240), // 10 days default (240 hours)
   MIN_POST_DURATION_HOURS: getNumberEnvVar('MIN_POST_DURATION_HOURS', false, 24),

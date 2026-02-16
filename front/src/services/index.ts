@@ -386,6 +386,13 @@ export const MarketplaceService = {
     return await apiRequest<import('@types').LedgerTransactionRow[]>('/user/transactions')
   },
 
+  updateWalletAddress: async (walletAddress: string): Promise<ApiResponse<{ success: boolean; user?: unknown }>> => {
+    return await apiRequest<{ success: boolean; user?: unknown }>('/user/update-wallet-address', {
+      method: 'POST',
+      body: JSON.stringify({ wallet_address: walletAddress }),
+    })
+  },
+
   getTransactionAnalytics: async (params?: { since?: string }): Promise<ApiResponse<import('@types').LedgerAnalyticsByUser>> => {
     const query = params?.since ? `?since=${encodeURIComponent(params.since)}` : ''
     return await apiRequest<import('@types').LedgerAnalyticsByUser>(`/user/transactions/analytics${query}`)

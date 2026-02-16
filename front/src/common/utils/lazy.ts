@@ -1,5 +1,7 @@
-import type {TonConnectUI} from "@tonconnect/ui-react";
-import config from "@config";
+import type { TonConnectUI } from '@tonconnect/ui-react';
+import config from '@config';
+import { MarketplaceService } from '@services';
+import { getToken } from '@utils';
 
 // const status = {
 //   cropper: false,
@@ -54,6 +56,11 @@ export const initializeTonConnect = async () => {
     // Handle bridge connection errors gracefully
     if (tonConnectUI) {
       tonConnectUI.onStatusChange((wallet) => {
+        if (wallet?.account?.address && getToken()) {
+          MarketplaceService.updateWalletAddress(wallet.account.address).catch((err) => {
+            console.warn('Failed to sync wallet address to backend', err);
+          });
+        }
         if (wallet) {
           console.log('TON Connect: Wallet connected', wallet);
         }

@@ -13,51 +13,36 @@ export const MarketplaceHomePage = () => {
     limit: 5,
   });
 
-  // const { data: campaigns, isLoading: campaignsLoading } = useCampaignsQuery({
-  // const {isLoading: campaignsLoading} = useCampaignsQuery({
-  //   status: 'active',
-  //   limit: 14,
-  // })
-
-  // const handleAddChat = useCallback(
-  //   () => navigate('/admin/add-telegram-chat'),
-  //   []
-  // )
-
   const campaignsLoading = false;
   const isLoading = channelsLoading || campaignsLoading;
 
   const contentSlides = [
     <BlockNew id="channels-container">
-      <Group header="Channels">
 
-        {(!channels || channels.length === 0) ? (
-          <Text type="text" color="secondary" align="center">
-            No channels available
-          </Text>
-        ) : (
-          <>
-            {channels.map((channel) => {
-              return (
-                <ChannelListSnippet
-                  key={channel.id}
-                  channel={channel}
-                  showAdFormats
-                  showTopic
-                  // showOwner
-                />
-              )
-            })}
-          </>
-        )}
-      </Group>
+      {(!channels || channels.length === 0) ? (
+        <Text type="text" color="secondary" align="center">
+          No channels available
+        </Text>
+      ) : (
+        <Group header="Channels">
+          {channels.map((channel) => {
+            return (
+              <ChannelListSnippet
+                key={channel.id}
+                channel={channel}
+                showAdFormats
+                showTopic
+              />
+            )
+          })}
+        </Group>
+      )}
 
     </BlockNew>,
   ];
   return (
     <Page back={false}>
       <PageLayout>
-        {/*<TelegramMainButton text="Add Bot To Channel" onClick={handleAddChat}/>*/}
 
         <Text>
           TODO: Implement real TonWallet payment for escrow. Replace mocks in transaction indexer by real API.

@@ -338,6 +338,7 @@ export function buildTonscanTxLink(txHash: string | undefined) {
   return `${baseUrl}/tx/${encodedHash}`;
 }
 
+const postLinkStatus = new Set(['posted', 'verified', 'confirmed']);
 
 export const useDealQuery = (id: number, userId?: number) => {
   return useQuery<Deal, Error, EnhancedDeal>({
@@ -388,7 +389,7 @@ export const useDealQuery = (id: number, userId?: number) => {
 
       return {
         ...deal,
-        postLink: deal.status === 'posted' && deal.channel && deal.post_message_id ?
+        postLink: postLinkStatus.has(deal.status) && deal.channel && deal.post_message_id ?
           buildPostLink(deal.channel?.username, deal.channel.telegram_channel_id, deal.post_message_id)
           : undefined,
         revisionMessages,

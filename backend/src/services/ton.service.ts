@@ -7,6 +7,7 @@ import logger from '../utils/logger';
 import db from '../db/connection';
 import crypto from 'crypto';
 import {tonClient} from "../utils/ton";
+import {DealStatus} from "../models/deal.types";
 
 dotenv.config();
 
@@ -863,7 +864,7 @@ export class TONService {
         );
 
         if (dealCheck.rows.length > 0) {
-          const deal = dealCheck.rows[0];
+          const deal: {payment_tx_hash: string, status: DealStatus} = dealCheck.rows[0];
 
           // If deal is completed and has payment_tx_hash, funds were already released
           if (deal.status === 'completed' && deal.payment_tx_hash) {

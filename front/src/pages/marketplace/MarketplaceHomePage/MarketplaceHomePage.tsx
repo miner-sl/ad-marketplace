@@ -1,18 +1,17 @@
 import {useNavigate} from 'react-router-dom';
 
-import {BlockNew, Button, ChannelListSnippet, Group, Page, PageLayout, Spinner, Text,} from '@components';
+import {BlockNew, ChannelListSnippet, Group, GroupItem, Page, PageLayout, Spinner, Text,} from '@components';
 import {useChannelsQuery,} from '@store-new';
 import {ROUTES_NAME} from '@routes';
 
 import styles from './MarketplaceHomePage.module.scss';
 
 export const MarketplaceHomePage = () => {
-  const navigate = useNavigate()
-
+  const navigate = useNavigate();
 
   const {data: channels, isLoading: channelsLoading} = useChannelsQuery({
     limit: 5,
-  })
+  });
 
   // const { data: campaigns, isLoading: campaignsLoading } = useCampaignsQuery({
   // const {isLoading: campaignsLoading} = useCampaignsQuery({
@@ -30,12 +29,14 @@ export const MarketplaceHomePage = () => {
 
   const contentSlides = [
     <BlockNew id="channels-container">
+        <Group header="Channels">
+
       {(!channels || channels.length === 0) ? (
         <Text type="text" color="secondary" align="center">
           No channels available
         </Text>
       ) : (
-        <Group>
+         <>
           {channels.map((channel) => {
             return (
               <ChannelListSnippet
@@ -47,8 +48,10 @@ export const MarketplaceHomePage = () => {
               />
             )
           })}
-        </Group>
+         </>
       )}
+        </Group>
+
     </BlockNew>,
   ];
   return (
@@ -56,50 +59,17 @@ export const MarketplaceHomePage = () => {
       <PageLayout>
         {/*<TelegramMainButton text="Add Bot To Channel" onClick={handleAddChat}/>*/}
 
-        <BlockNew gap={12} className={styles.chatsBlock}>
+        <BlockNew margin="0 0 16px">
+          <Group header="MARKETPLACE">
+            <GroupItem text="Browse Channels" chevron onClick={() => navigate('/browse_channels')} />
+            <GroupItem text="Requests" chevron onClick={() => navigate('/requests')} />
+            <GroupItem text="My Deals" chevron onClick={() => navigate(ROUTES_NAME.MARKETPLACE_ADVERTISER_MY_DEALS)} />
+            <GroupItem text="My Channels" chevron onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CHANNELS)} />
+            <GroupItem text="My Campaigns" chevron onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CAMPAIGNS)} />
+          </Group>
+        </BlockNew>
 
-          <BlockNew gap={4}>
-            <BlockNew gap={8} row>
-              <Button
-                size='small'
-                type="secondary"
-                onClick={() => navigate('/browse_channels')}
-              >
-                Browse Channels
-              </Button>
-              <Button
-                size='small'
-                type="secondary"
-                onClick={() => navigate('/requests')}
-              >
-                Ads Requests
-              </Button>
-            </BlockNew>
-            <BlockNew gap={8} row>
-              <Button
-                size='small'
-                type="secondary"
-                onClick={() => navigate(ROUTES_NAME.MARKETPLACE_ADVERTISER_MY_DEALS)}
-              >
-                My Deals
-              </Button>
-              <Button
-                size='small'
-                type="secondary"
-                onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CHANNELS)}
-              >
-                My Channels
-              </Button>
-              <Button
-                size='small'
-                type="secondary"
-                onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CAMPAIGNS)}
-              >
-                My Campaigns
-              </Button>
-            </BlockNew>
-          </BlockNew>
-
+        <BlockNew gap={12} className={`${styles.chatsBlock} ${styles.contentWithBottomBar}`}>
 
           {isLoading ? (
             <BlockNew align="center" marginValue={12}>
@@ -121,6 +91,26 @@ export const MarketplaceHomePage = () => {
             </div>
           )}
         </BlockNew>
+
+        {/*<BottomBar>*/}
+        {/*  <BottomBar.Row>*/}
+        {/*    <BottomBar.Item onClick={() => navigate('/browse_channels')}>*/}
+        {/*      Channels*/}
+        {/*    </BottomBar.Item>*/}
+        {/*    <BottomBar.Item onClick={() => navigate('/requests')}>*/}
+        {/*      Requests*/}
+        {/*    </BottomBar.Item>*/}
+        {/*    <BottomBar.Item onClick={() => navigate(ROUTES_NAME.MARKETPLACE_ADVERTISER_MY_DEALS)}>*/}
+        {/*      My Deals*/}
+        {/*    </BottomBar.Item>*/}
+        {/*    <BottomBar.Item onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CHANNELS)}>*/}
+        {/*      My Channels*/}
+        {/*    </BottomBar.Item>*/}
+        {/*    <BottomBar.Item onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CAMPAIGNS)}>*/}
+        {/*      My Campaigns*/}
+        {/*    </BottomBar.Item>*/}
+        {/*  </BottomBar.Row>*/}
+        {/*</BottomBar>*/}
       </PageLayout>
     </Page>
   )

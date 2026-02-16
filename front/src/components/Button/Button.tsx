@@ -7,6 +7,7 @@ interface ButtonProps {
   children?: React.ReactNode
   disabled?: boolean
   prefix?: ReactNode
+  postfix?: ReactNode
   onClick?(): void
   type?:
     | 'basic'
@@ -23,6 +24,7 @@ export const Button = ({
   children,
   onClick,
   disabled,
+  postfix,
   prefix,
   type = 'basic',
   size = 'medium',
@@ -44,6 +46,7 @@ export const Button = ({
     >
       {prefix ? <div className={styles.prefix}>{prefix}</div> : null}
       {children}
+      {postfix ? <div className={styles.postfix}>{postfix}</div> : null}
     </div>
   )
 }

@@ -33,10 +33,10 @@ export const MyChannelsPage = () => {
             <Button
               type="accent"
               size="small"
+              prefix={<Icon name="plus" color="accent" size={28} />}
               onClick={() => navigate('/marketplace/channel-owner/add-channel')}
             >
-              <Icon name="plus" size={16} />
-              <span style={{ marginLeft: 4 }}>Add Channel</span>
+              Add Channel
             </Button>
           </BlockNew>
 

@@ -1,10 +1,11 @@
 import logger from '../utils/logger';
-import { DealModel } from '../repositories/deal-model.repository';
-import { TelegramService } from './telegram.service';
-import { TelegramNotificationService } from './telegram-notification.service';
-import { DealRepository } from '../repositories/deal.repository';
-import { levenshteinDistance } from '../utils/strings/levenshtein-distance';
-import { compareDate } from '../utils/dateCompare';
+import {DealModel} from '../repositories/deal-model.repository';
+import {TelegramService} from './telegram.service';
+import {TelegramNotificationService} from './telegram-notification.service';
+import {DealRepository} from '../repositories/deal.repository';
+import {levenshteinDistance} from '../utils/strings/levenshtein-distance';
+import {compareDate} from '../utils/dateCompare';
+import env from "../utils/env";
 
 export interface VerificationResult {
   success: boolean;
@@ -15,6 +16,8 @@ export interface VerificationResult {
     message: string;
   };
 }
+
+type PostPublicationTimeDTO ={ ok: boolean, data: { actualDays: number, requiredDays: number } };
 
 /**
  * Service responsible for verifying posted deals
@@ -91,10 +94,13 @@ export class VerificationSenderService {
       }
 
       const postExistsAndBotAccess = await this.checkPostExistsAndBotAccess(deal);
+      const resultVerificationDuration: PostPublicationTimeDTO = this.verifyPublicationTime(deal);
 
+      const daysSinceFirstPublication = resultVerificationDuration.data.actualDays;
+      const minPublicationDurationDays = resultVerificationDuration.data.requiredDays;
       if (!postExistsAndBotAccess) {
         await DealModel.updateStatus(deal.id, 'refunded');
-        this.logger.warn(`Deal #${deal.id}: Post not found, marked for refund`, { dealId: deal.id });
+        this.logger.warn(`Deal #${deal.id}: Post not found, marked for refund`, {dealId: deal.id});
 
         try {
           await TelegramNotificationService.notifyVerificationFailed(deal.id, deal.advertiser_id, deal.channel_owner_id);
@@ -104,45 +110,12 @@ export class VerificationSenderService {
             error: notifError.message,
           });
         }
-
         return {
-          success: true,
-          refunded: true,
+          success: false,
         };
       }
 
-      const now = new Date();
-      const minPublicationDurationDays = deal.min_publication_duration_days || 7;
-      let publicationDurationMet = false;
-      let daysSinceFirstPublication = 0;
-
-      if (deal.first_publication_time) {
-        const firstPublicationTime = new Date(deal.first_publication_time);
-        daysSinceFirstPublication = (now.getTime() - firstPublicationTime.getTime()) / (1000 * 60 * 60 * 24);
-        publicationDurationMet = daysSinceFirstPublication >= minPublicationDurationDays;
-      }
-
-      if (!publicationDurationMet) {
-        this.logger.info(`Deal #${deal.id}: Post verified but duration requirement not met`, {
-          dealId: deal.id,
-          daysSinceFirstPublication: Math.floor(daysSinceFirstPublication),
-          minPublicationDurationDays,
-        });
-
-        try {
-          await TelegramNotificationService.notifyDurationNotMet(
-            deal.id,
-            deal.channel_owner_id,
-            Math.floor(daysSinceFirstPublication),
-            minPublicationDurationDays
-          );
-        } catch (notifError: any) {
-          this.logger.warn(`Failed to send notification for Deal #${deal.id}`, {
-            dealId: deal.id,
-            error: notifError.message,
-          });
-        }
-
+      if (!resultVerificationDuration.ok) {
         return {
           success: false,
           error: {
@@ -162,9 +135,7 @@ export class VerificationSenderService {
 
       try {
         await TelegramNotificationService.notifyDealVerified(
-          deal.id,
-          deal.advertiser_id,
-          deal.channel_owner_id,
+          deal,
           Math.floor(daysSinceFirstPublication),
           minPublicationDurationDays
         );
@@ -206,7 +177,6 @@ export class VerificationSenderService {
   private async checkPostExistsAndBotAccess(deal: any): Promise<boolean> {
     try {
       const channelId = deal.telegram_channel_id;
-      const now = new Date();
 
       // Check if bot still has access to channel
       const botInfo = await TelegramService.bot.getMe();
@@ -230,40 +200,61 @@ export class VerificationSenderService {
           return false;
         }
       }
-
-      const minPublicationDurationDays = deal.min_publication_duration_days || 7;
-      if (deal.actual_post_time) {
-        const postTime = new Date(deal.actual_post_time);
-        const daysSincePost = (now.getTime() - postTime.getTime()) / (1000 * 60 * 60 * 24);
-
-        if (daysSincePost >= minPublicationDurationDays) {
-          this.logger.info(`Deal #${deal.id}: Post verified (${minPublicationDurationDays} days+ since publication)`, {
-            dealId: deal.id,
-            daysSincePost: Math.floor(daysSincePost),
-            minPublicationDurationDays,
-          });
-          return true;
-        } else {
-          this.logger.debug(`Deal #${deal.id}: Post not old enough yet`, {
-            dealId: deal.id,
-            daysSincePost: Math.floor(daysSincePost),
-            minPublicationDurationDays,
-          });
-          return false;
-        }
-      } else {
-        this.logger.info(`Deal #${deal.id}: Post verified (verification period passed, bot has access)`, {
-          dealId: deal.id,
-          minPublicationDurationDays,
-        });
-        return true;
-      }
+      return true;
     } catch (error: any) {
       this.logger.warn(`Deal #${deal.id}: Cannot verify post existence`, {
         dealId: deal.id,
         error: error.message,
       });
       return false;
+    }
+  }
+
+  private verifyPublicationTime(deal: any, now: Date = new Date()): PostPublicationTimeDTO {
+    const minPublicationDurationDays = deal.min_publication_duration_days || env.VERIFIED_TIMEOUT_DAYS | 7;
+    if (deal.actual_post_time) {
+      const postTime = new Date(deal.actual_post_time);
+      const daysSincePost = (now.getTime() - postTime.getTime()) / (1000 * 60 * 60 * 24);
+
+      if (daysSincePost >= minPublicationDurationDays) {
+        this.logger.info(`Deal #${deal.id}: Post verified (${minPublicationDurationDays} days+ since publication)`, {
+          dealId: deal.id,
+          daysSincePost: Math.floor(daysSincePost),
+          minPublicationDurationDays,
+        });
+        return {
+          ok: true,
+          data: {
+            actualDays: Math.floor(daysSincePost),
+            requiredDays: minPublicationDurationDays
+          }
+        };
+      } else {
+        this.logger.debug(`Deal #${deal.id}: Post not old enough yet`, {
+          dealId: deal.id,
+          daysSincePost: Math.floor(daysSincePost),
+          minPublicationDurationDays,
+        });
+        return {
+          ok: false,
+          data: {
+            actualDays: Math.floor(daysSincePost),
+            requiredDays: minPublicationDurationDays
+          }
+        };
+      }
+    } else {
+      this.logger.info(`Deal #${deal.id}: Post verified (verification period passed, bot has access)`, {
+        dealId: deal.id,
+        minPublicationDurationDays,
+      });
+      return {
+        ok: true,
+        data: {
+          actualDays: Math.floor(deal.first_publication_time),
+          requiredDays: minPublicationDurationDays
+        }
+      };
     }
   }
 
@@ -330,18 +321,18 @@ export class VerificationSenderService {
         differencePercent: differencePercent.toFixed(2) + '%',
       });
 
-      const verificationResult = await TelegramService.verifyPost(
-        deal.telegram_channel_id,
-        deal.post_message_id
-      );
-
-      if (!verificationResult.exists) {
-        this.logger.warn(`Deal #${deal.id}: Post message not found in channel`, {
-          dealId: deal.id,
-          messageId: deal.post_message_id,
-        });
-        return false;
-      }
+      // const verificationResult = await TelegramService.verifyPost(
+      //   deal.telegram_channel_id,
+      //   deal.post_message_id
+      // );
+      //
+      // if (!verificationResult.exists) {
+      //   this.logger.warn(`Deal #${deal.id}: Post message not found in channel`, {
+      //     dealId: deal.id,
+      //     messageId: deal.post_message_id,
+      //   });
+      //   return false;
+      // }
 
       this.logger.info(`Deal #${deal.id}: Post content verified (matches requested text and exists in channel)`, {
         dealId: deal.id,

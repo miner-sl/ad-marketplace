@@ -47,7 +47,7 @@ export class AutoReleaseSchedulerService {
 
     // Run refund job every 6 hours (offset by 3 hours from release job)
     this.refundJob = cron.schedule('0 3,9,15,21 * * *', async () => {
-      await this.processRefundsForDeclinedDeals();
+      await this.processRefundsForDeclinedOrVerificationFailedDeals();
     });
 
     this.logger.info('AutoReleaseSchedulerService: Auto-release job started (runs every 6 hours)');
@@ -157,7 +157,7 @@ export class AutoReleaseSchedulerService {
    * Process declined deals that require refund to advertiser
    * Uses a flag to prevent concurrent processing
    */
-  private async processRefundsForDeclinedDeals(): Promise<void> {
+  private async processRefundsForDeclinedOrVerificationFailedDeals(): Promise<void> {
     if (this.isProcessingRefunds) {
       this.logger.debug('AutoReleaseSchedulerService: Already processing refunds, skipping');
       return;
@@ -166,7 +166,7 @@ export class AutoReleaseSchedulerService {
     this.isProcessingRefunds = true;
 
     try {
-      const deals = await DealModel.findDeclinedDealsForRefund(this.batchSize);
+      const deals = await DealModel.findDeclinedOrVerificationFailedDeals(this.batchSize);
 
       if (deals.length === 0) {
         return;
@@ -184,7 +184,6 @@ export class AutoReleaseSchedulerService {
       for (const deal of deals) {
         try {
           const advertiser = usersMap.get(deal.advertiser_id);
-          // const channelOwner = usersMap.get(deal.channel_owner_id);
 
           if (!advertiser) {
             this.logger.warn(`Deal #${deal.id}: Missing advertiser data`, {

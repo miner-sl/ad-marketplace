@@ -5,6 +5,7 @@ import { buildBotAdminLink } from '../utils/telegram';
 import env from '../utils/env';
 import logger from '../utils/logger';
 import {Deal} from '../models/deal.types';
+import {PostService} from "./post.service";
 
 export interface NotificationData {
   dealId: number;
@@ -471,24 +472,24 @@ export class TelegramNotificationService {
     try {
       const advertiser = await UserModel.findById(advertiserId);
       const channelOwner = await UserModel.findById(channelOwnerId);
-
       if (advertiser) {
         await TelegramNotificationQueueService.queueTelegramMessage(
           advertiser.telegram_id,
-          `❌ Deal #${dealId} verification failed!\n\n` +
-          `The post was not found or was removed.\n` +
-          `Funds will be refunded to you.\n\n` +
-          `Use /deal ${dealId} to view details.`
+          `❌ Deal #${dealId} failed verification\n` +
+          `⚠️ Post deleted early\n` +
+          `💰 Refund process initiated\n` +
+          `/deal ${dealId}`
         );
       }
 
       if (channelOwner) {
         await TelegramNotificationQueueService.queueTelegramMessage(
           channelOwner.telegram_id,
-          `❌ Deal #${dealId} verification failed!\n\n` +
-          `The post was not found or was removed.\n` +
-          `Funds will be refunded to the advertiser.\n\n` +
-          `Use /deal ${dealId} to view details.`
+          `❌ Deal #${dealId} failed verification\n` +
+          `⚠️ Post deleted early\n` +
+          `💰 Refund to advertiser initiated\n` +
+          `⚠️ May affect channel rating\n` +
+          `/deal ${dealId}`
         );
       }
     } catch (error: any) {
@@ -503,95 +504,115 @@ export class TelegramNotificationService {
   }
 
   /**
-   * Notify channel owner that duration requirement not met
-   */
-  static async notifyDurationNotMet(
-    dealId: number,
-    channelOwnerId: number,
-    daysSinceFirstPublication: number,
-    minPublicationDurationDays: number
-  ): Promise<void> {
-    try {
-      const channelOwner = await UserModel.findById(channelOwnerId);
-      if (!channelOwner) {
-        logger.warn(`Channel owner #${channelOwnerId} not found for duration notification`);
-        return;
-      }
-
-      const remainingDays = Math.ceil(minPublicationDurationDays - daysSinceFirstPublication);
-      const message =
-        `📢 Deal #${dealId} Status Update\n\n` +
-        `The post has been verified (remained on channel for required duration).\n\n` +
-        `⚠️ Minimum publication duration not reached.\n` +
-        `Required: ${minPublicationDurationDays} days\n` +
-        `Elapsed: ${Math.floor(daysSinceFirstPublication)} days\n` +
-        `Remaining: ${remainingDays} day(s)\n\n` +
-        `Please wait until the minimum publication period is completed.\n\n` +
-        `Use /deal ${dealId} to view details.`;
-
-      await TelegramNotificationQueueService.queueTelegramMessage(channelOwner.telegram_id, message);
-    } catch (error: any) {
-      logger.error(`Error sending duration notification`, {
-        dealId,
-        channelOwnerId,
-        error: error.message,
-      });
-      throw error;
-    }
-  }
-
-  /**
    * Notify both parties about deal verification
    */
   static async notifyDealVerified(
-    dealId: number,
-    advertiserId: number,
-    channelOwnerId: number,
+    deal: Deal & { username: string},
     daysSinceFirstPublication: number,
     minPublicationDurationDays: number
   ): Promise<void> {
+
+    if (deal?.needConfirmByAdvertiser === true) {
+      await this.notifyAboutConfirmation(deal, daysSinceFirstPublication, minPublicationDurationDays);
+      return;
+    }
+    await this.notifyDealConfirmedStartMoneyTransfer(deal);
+  }
+
+  /**
+   * Notify both parties that the deal is confirmed and money transfer to the owner has started
+   */
+  static async notifyDealConfirmedStartMoneyTransfer(deal: Deal & {
+    username: string
+  }): Promise<void> {
+    const {
+      id: dealId,
+      advertiser_id: advertiserId,
+      channel_owner_id: channelOwnerId,
+    } = deal;
     try {
       const advertiser = await UserModel.findById(advertiserId);
       const channelOwner = await UserModel.findById(channelOwnerId);
 
       if (advertiser) {
-        const confirmMessage =
-          `✅ Deal #${dealId} Verified!\n\n` +
-          `The post has remained on the channel for at least ${minPublicationDurationDays} days.\n` +
-          `Minimum requirement met:\n` +
-          `- Publication duration: ${Math.floor(daysSinceFirstPublication)}/${minPublicationDurationDays} days ✓\n\n` +
-          `Please confirm that the post is still visible and meets your requirements.\n\n` +
-          `After your confirmation, funds will be released to the channel owner.\n\n` +
-          `Use /deal ${dealId} to view details.`;
-
-        const confirmButtons = {
-          reply_markup: {
-            inline_keyboard: [
-              [
-                { text: '✅ Confirm Publication', callback_data: `confirm_publication_${dealId}` }
-              ],
-              [
-                { text: '📋 View Deal', callback_data: `deal_details_${dealId}` }
-              ]
-            ]
-          }
-        };
-
         await TelegramNotificationQueueService.queueTelegramMessage(
           advertiser.telegram_id,
-          confirmMessage,
-          confirmButtons
+          `✅ Deal #${dealId} confirmed\n` +
+          `💰 Funds transferred to channel owner\n` +
+          `/deal ${dealId}`
         );
       }
 
       if (channelOwner) {
         await TelegramNotificationQueueService.queueTelegramMessage(
           channelOwner.telegram_id,
-          `✅ Deal #${dealId} Verified!\n\n` +
-          `The post has been verified (remained on channel for ${Math.floor(daysSinceFirstPublication)} days).\n` +
-          `Minimum requirement met.\n` +
-          `Waiting for advertiser confirmation to release funds.\n\n` +
-          `Use /deal ${dealId} to view details.`
+          `✅ Deal #${dealId} confirmed\n` +
+          `💰 Money transfer to you started\n` +
+          `⏳ Please wait for settlement\n` +
+          `/deal ${dealId}`
+        );
+      }
+    } catch (error: any) {
+      logger.error(`Error sending money transfer started notifications`, {
+        dealId,
+        advertiserId,
+        channelOwnerId,
+        error: error.message,
+      });
+
+      throw error;
+    }
+  }
+  private static async notifyAboutConfirmation(deal: Deal & {
+    username: string
+  }, daysSinceFirstPublication: number, minPublicationDurationDays: number) {
+    const {
+      id: dealId,
+      advertiser_id: advertiserId,
+      channel_owner_id: channelOwnerId,
+    } = deal;
+
+    try {
+      const postLink = `https://t.me/${deal.username}/${deal.post_message_id}?embed=1&mode=tme`;
+      const advertiser = await UserModel.findById(advertiserId);
+      const channelOwner = await UserModel.findById(channelOwnerId);
+
+      if (advertiser) {
+        const confirmButtons = {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {text: '✅ Confirm Publication', callback_data: `confirm_publication_${dealId}`}
+              ],
+              [
+                {text: '📋 View Deal', callback_data: `deal_details_${dealId}`}
+              ]
+            ]
+          }
+        };
+        const message = `✅ Deal #${dealId} Verified\n` +
+          `📅 ${Math.floor(daysSinceFirstPublication)}/${minPublicationDurationDays}д ✓\n` +
+          `🔗 ${postLink}\n\n` +
+          `Confirm post is visible. Funds released after confirmation.\n\n` +
+          `/deal ${dealId}`;
+
+        await TelegramNotificationQueueService.queueTelegramMessage(
+          advertiser.telegram_id,
+          message,
+          confirmButtons
+        );
+      }
+
+      if (channelOwner) {
+        const message = `✅ Deal #${dealId} Verified\n` +
+          `📅 ${Math.floor(daysSinceFirstPublication)}/${minPublicationDurationDays}д ✓\n` +
+          `🔗 ${postLink}\n\n` +
+          `Waiting for advertiser confirmation.\n\n` +
+          `/deal ${dealId}`;
+
+        await TelegramNotificationQueueService.queueTelegramMessage(
+          channelOwner.telegram_id,
+          message
         );
       }
     } catch (error: any) {

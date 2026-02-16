@@ -1,7 +1,10 @@
+import {PoolClient} from "pg";
+
 import db from '../db/connection';
 import { withTx } from '../utils/transaction';
-import { Deal, DealStatus, DealType } from '../models/deal.types';
-import {PoolClient} from "pg";
+
+import type { Deal, DealStatus, DealType } from '../models/deal.types';
+import env from "../utils/env";
 
 export class DealModel {
   static async create(data: {
@@ -361,10 +364,10 @@ export class DealModel {
    * After VERIFIED_TIMEOUT_HOURS, automatically release funds
    */
   static async findVerifiedDealsForAutoRelease(limit: number = 100): Promise<Deal[]> {
-    const timeoutHours = parseInt(process.env.VERIFIED_TIMEOUT_HOURS || '168', 10); // 7 days default
+    const timeoutHours = env.VERIFIED_TIMEOUT_HOURS; // 7 days default
     const result = await db.query(
       `SELECT * FROM deals 
-       WHERE status = 'verified' 
+       WHERE (status = 'verified')  
        AND post_verification_until < CURRENT_TIMESTAMP - INTERVAL '1 hour' * $1
        ORDER BY post_verification_until ASC
        LIMIT $2`,
@@ -377,12 +380,16 @@ export class DealModel {
    * Find declined deals that need refund to advertiser
    * Returns deals with declined status that haven't been refunded yet
    */
-  static async findDeclinedDealsForRefund(limit: number = 100): Promise<Deal[]> {
+  static async findDeclinedOrVerificationFailedDeals(limit: number = 100): Promise<Deal[]> {
     const result = await db.query(
       `SELECT * FROM deals 
-       WHERE status = 'declined' 
-       AND escrow_address IS NOT NULL
-       AND (refund_tx_hash IS NULL OR refund_tx_hash = '')
+       WHERE 
+        (
+          (status = 'declined' OR status = 'refuned') 
+          AND escrow_address IS NOT NULL
+          AND payment_tx_hash IS NOT NULL
+          AND (refund_tx_hash IS NULL OR refund_tx_hash = '')
+        )
        ORDER BY updated_at ASC
        LIMIT $1`,
       [limit]
@@ -450,7 +457,7 @@ export class DealModel {
     const whereClause = additionalConditions
       ? `WHERE id = $2 AND ${additionalConditions}`
       : `WHERE id = $2`;
-    
+
     const result = await client.query(
       `UPDATE deals SET status = $1, updated_at = CURRENT_TIMESTAMP
        ${whereClause}
@@ -478,7 +485,7 @@ export class DealModel {
     const whereClause = condition
       ? `WHERE id = $3 AND ${condition}`
       : `WHERE id = $3`;
-    
+
     const result = await client.query(
       `UPDATE deals 
        SET status = $1, payment_tx_hash = $2, payment_confirmed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
@@ -551,7 +558,7 @@ export class DealModel {
     const whereClause = condition
       ? `WHERE id = $1 AND ${condition}`
       : `WHERE id = $1`;
-    
+
     const result = await client.query(
       `UPDATE deals 
        SET status = 'negotiating', updated_at = CURRENT_TIMESTAMP
@@ -590,11 +597,11 @@ export class DealModel {
        RETURNING *`,
       [escrowAddress, ownerWalletAddress, dealId]
     );
-    
+
     if (!result?.rows || result.rows.length === 0) {
       throw new Error('Deal status changed during processing');
     }
-    
+
     return result.rows[0];
   }
 }

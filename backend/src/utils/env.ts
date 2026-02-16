@@ -34,6 +34,7 @@ interface EnvConfig {
   DEAL_TIMEOUT_HOURS: number;
   MIN_POST_DURATION_HOURS: number;
   VERIFIED_TIMEOUT_HOURS: number;
+  VERIFIED_TIMEOUT_DAYS: number;
 
   // Logging
   LOG_LEVEL?: string;
@@ -63,6 +64,7 @@ function getNumberEnvVar(name: string, required: boolean = true, defaultValue?: 
   return num;
 }
 
+const verificationDelays = getNumberEnvVar('VERIFIED_TIMEOUT_HOURS', false, 168) / 7;
 export const env: EnvConfig = {
   PORT: getNumberEnvVar('PORT', false, 3000),
   NODE_ENV: (getEnvVar('NODE_ENV', false, 'development') as any) || 'development',
@@ -87,7 +89,8 @@ export const env: EnvConfig = {
 
   DEAL_TIMEOUT_HOURS: getNumberEnvVar('DEAL_TIMEOUT_HOURS', false, 240), // 10 days default (240 hours)
   MIN_POST_DURATION_HOURS: getNumberEnvVar('MIN_POST_DURATION_HOURS', false, 24),
-  VERIFIED_TIMEOUT_HOURS: getNumberEnvVar('VERIFIED_TIMEOUT_HOURS', false, 168), // 7 days default
+  VERIFIED_TIMEOUT_HOURS: verificationDelays, // 7 days default
+  VERIFIED_TIMEOUT_DAYS: verificationDelays / 24, // 7 days default
 
   LOG_LEVEL: getEnvVar('LOG_LEVEL', false),
   LOG_DIR: getEnvVar('LOG_DIR', false, 'logs'),

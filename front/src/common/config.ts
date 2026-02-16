@@ -1,6 +1,7 @@
 import config from "@config";
 
-export const isProd = process.env.NODE_ENV === 'production';
+// export const isProd = process.env.NODE_ENV === 'production';
+export const isProd = false;
 
 export const getTONScanUrl = (address: string): string => {
   const baseUrl = config.isDev

@@ -39,4 +39,5 @@ export interface Deal {
   min_publication_duration_days?: number;
   created_at: Date;
   updated_at: Date;
+  needConfirmByAdvertiser: boolean;
 }

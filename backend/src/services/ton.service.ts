@@ -875,7 +875,7 @@ export class TONService {
           }
 
           // If deal is not in a state that allows release, throw error
-          if (deal.status !== 'verified' && deal.status !== 'completed') {
+          if (deal.status !== 'verified' && deal.status !== 'posted' && deal.status !== 'completed') {
             throw new Error(
               `Cannot release funds for Deal #${dealId} in status: ${deal.status}. ` +
               `Funds can only be released for verified or completed deals.`

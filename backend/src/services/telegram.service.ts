@@ -1,13 +1,14 @@
 import TelegramBot, {ChatMember} from 'node-telegram-bot-api';
 import * as dotenv from 'dotenv';
-import { JSDOM } from 'jsdom';
-import { getRandomUserAgent } from '../utils/network/useragent';
+import {JSDOM} from 'jsdom';
+import {getRandomUserAgent} from '../utils/network/useragent';
 import {formatUsername} from "../models/tg.util";
+import {withRetry} from "../utils/network/retry";
 
 dotenv.config();
 
 const botToken = process.env.TELEGRAM_BOT_TOKEN!;
-export const bot = new TelegramBot(botToken, { polling: false });
+export const bot = new TelegramBot(botToken, {polling: false});
 
 export interface ChannelStats {
   subscribers_count?: number;
@@ -148,7 +149,7 @@ export class TelegramService {
 
       let memberCount = await bot.getChatMemberCount(channelId);
       if (memberCount === 0) {
-         memberCount = 0;
+        memberCount = 0;
       }
       // Note: Detailed stats like average views, language distribution, premium stats
       // require Telegram Premium API or channel analytics access
@@ -263,27 +264,46 @@ export class TelegramService {
    * Get message text from channel using message ID
    */
   static async getMessageText(channelUsername: string, messageId: number): Promise<string | undefined> {
-    try {
-      const url = `https://t.me/${channelUsername}/${messageId}?embed=1&mode=tme`;
-
-      const res = await fetch(url, {
-        headers: {
-          "User-Agent": getRandomUserAgent(),
-        }
-      });
-
-      const html = await res.text();
-
-      const dom = new JSDOM(html);
-      const document = dom.window.document;
-
-      const el = document.querySelector(
-        ".tgme_widget_message_text.js-message_text"
-      );
-
-      return el?.textContent?.trim() ?? undefined;
-    } catch (e) {
+    if (!channelUsername || messageId === undefined) {
       return undefined;
     }
+
+    const url = `https://t.me/${channelUsername}/${messageId}?embed=1&mode=tme`;
+
+    return withRetry(
+      async () => await this.fetchMessageContent(url),
+      {
+        maxRetries: 3,
+        baseDelay: 1000,
+        maxDelay: 10000,
+        shouldRetry: (error) => {
+          return !error.message.includes("404");
+        },
+      }
+    );
+  }
+
+  private static async fetchMessageContent(url: string): Promise<string | undefined>  {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": getRandomUserAgent(),
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    const html = await res.text();
+    const dom = new JSDOM(html);
+    const el = dom.window.document.querySelector(
+      ".tgme_widget_message_text.js-message_text"
+    );
+
+    const text = el?.textContent?.trim();
+    console.log(url, text)
+    if (!text) throw new Error("No text content");
+
+    return text;
   }
 }

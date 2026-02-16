@@ -256,7 +256,7 @@ export class DealRepository {
    */
   static async findDealsReadyForVerificationWithChannels(limit: number = 100): Promise<any[]> {
     const result = await db.query(
-      `SELECT d.*, c.telegram_channel_id
+      `SELECT d.*, c.username, c.telegram_channel_id
        FROM deals d
        INNER JOIN channels c ON d.channel_id = c.id
        WHERE d.status = 'posted' 

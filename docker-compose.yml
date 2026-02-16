@@ -18,7 +18,9 @@ services:
       retries: 5
     networks:
       - ad-marketplace-network
-#
+#await client.getEntity(username)
+  #      : await client.getInputEntity(telegramChannelId);
+  #    if (!peer) return null;
 #  backend:
 #    build:
 #      context: ./backend

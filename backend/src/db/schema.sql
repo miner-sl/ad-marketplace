@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS channel_stats (
     average_reach INTEGER,
     language_distribution JSONB,
     premium_subscribers_count INTEGER,
+    statistic JSONB,
     stats_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

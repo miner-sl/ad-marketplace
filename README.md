@@ -58,6 +58,12 @@ See `backend/.env.docker.example` for all required variables:
 
 ```
 
+6**Telegram Channel Statistic**
+1. get TELEGRAM_API_ID and TELEGRAM_API_HASH at https://my.telegram.org/apps
+2. setup .env TELEGRAM_API_ID and TELEGRAM_API_HASH
+3. run `npm run gramjs:session`
+4. login with telegram user account
+5. after success login setup session string TELEGRAM_API_SESSION at .env
 
 ## Features
 

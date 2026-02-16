@@ -11,6 +11,7 @@ import { getWorkerId, isPrimaryWorker } from './utils/cluster.util';
 import { topicsService } from './services/topics.service';
 import { buildApp } from './app';
 import { TelegramNotificationQueueService } from './services/telegram-notification-queue.service';
+import { initializeGramJsClients } from './utils/gramjs-client';
 
 const PORT = env.PORT;
 const isProd = env.NODE_ENV === 'production';
@@ -77,6 +78,15 @@ async function bootstrap(): Promise<void> {
       error: error.message,
       stack: error.stack,
     });
+  }
+
+  if (isPrimaryWorker()) {
+    try {
+      await initializeGramJsClients();
+      logger.info('GramJS clients initialization attempted');
+    } catch (error: any) {
+      logger.debug('GramJS clients not initialized (optional)', { error: error?.message });
+    }
   }
 
   const app = await buildApp();

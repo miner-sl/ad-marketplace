@@ -13,6 +13,11 @@ interface EnvConfig {
   TELEGRAM_BOT_TOKEN: string;
   TELEGRAM_WEBHOOK_URL?: string;
 
+  // Telegram GramJS (optional – for full channel stats via MTProto)
+  TELEGRAM_API_ID?: number;
+  TELEGRAM_API_HASH?: string;
+  TELEGRAM_SESSION?: string;
+
   // JWT
   JWT_SECRET: string;
   JWT_EXPIRES_IN?: string;
@@ -72,6 +77,10 @@ export const env: EnvConfig = {
   TELEGRAM_BOT_USERNAME: getEnvVar('TELEGRAM_BOT_USERNAME', true),
   TELEGRAM_BOT_TOKEN: getEnvVar('TELEGRAM_BOT_TOKEN', true),
   TELEGRAM_WEBHOOK_URL: getEnvVar('TELEGRAM_WEBHOOK_URL', false),
+
+  TELEGRAM_API_ID: getNumberEnvVar('TELEGRAM_API_ID', false),
+  TELEGRAM_API_HASH: getEnvVar('TELEGRAM_API_HASH', false),
+  TELEGRAM_SESSION: getEnvVar('TELEGRAM_SESSION', false),
 
   JWT_SECRET: getEnvVar('JWT_SECRET', true),
   JWT_EXPIRES_IN: getEnvVar('JWT_EXPIRES_IN', false, '7D'),

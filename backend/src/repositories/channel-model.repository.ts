@@ -103,10 +103,12 @@ export class ChannelModel {
     average_reach?: number;
     language_distribution?: Record<string, number>;
     premium_subscribers_count?: number;
+    /** Full Telegram stats JSON to store in channel_stats.statistic */
+    statistic?: Record<string, unknown>;
   }): Promise<ChannelStats> {
     const result = await db.query(
-      `INSERT INTO channel_stats (channel_id, subscribers_count, average_views, average_reach, language_distribution, premium_subscribers_count)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO channel_stats (channel_id, subscribers_count, average_views, average_reach, language_distribution, premium_subscribers_count, statistic)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
       [
         channelId,
@@ -115,6 +117,7 @@ export class ChannelModel {
         stats.average_reach,
         stats.language_distribution ? JSON.stringify(stats.language_distribution) : null,
         stats.premium_subscribers_count,
+        stats.statistic != null ? JSON.stringify(stats.statistic) : null,
       ]
     );
     return result.rows[0];

@@ -29,6 +29,8 @@ export interface ChannelStats {
   average_reach?: number;
   language_distribution?: Record<string, number>;
   premium_subscribers_count?: number;
+  /** Full Telegram stats JSON (e.g. from stats.GetBroadcastStats / GetMegagroupStats) */
+  statistic?: Record<string, unknown>;
   stats_date: Date;
   created_at: Date;
 }

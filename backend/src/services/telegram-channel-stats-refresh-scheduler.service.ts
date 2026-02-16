@@ -70,7 +70,7 @@ export class TelegramChannelStatsRefreshSchedulerService {
       this.logger.info('Refreshing channel stats...');
 
       const channelsResult = await db.query(
-        'SELECT id, telegram_channel_id FROM channels WHERE is_active = TRUE'
+        'SELECT id, telegram_channel_id, username FROM channels WHERE is_active = TRUE'
       );
 
       const channels = channelsResult?.rows || [];
@@ -87,7 +87,8 @@ export class TelegramChannelStatsRefreshSchedulerService {
         try {
           const result = await statsRefreshSenderService.refreshChannelStats(
             channel.id,
-            channel.telegram_channel_id
+            channel.telegram_channel_id,
+            channel.username
           );
 
           if (result.success) {

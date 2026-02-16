@@ -2,6 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { UserModel } from '../repositories/user.repository';
 import { LedgerRepository } from '../repositories/ledger.repository';
 import logger from '../utils/logger';
+import {formatTonAddress} from "../utils/ton-util";
 
 export class UserController {
   static async getCurrentUser(request: FastifyRequest, reply: FastifyReply) {
@@ -99,7 +100,8 @@ export class UserController {
         return reply.code(404).send({ error: 'User not found' });
       }
 
-      const updatedUser = await UserModel.updateWalletAddress(user.telegram_id, wallet_address);
+      const address = wallet_address.startsWith('0:') ? formatTonAddress(wallet_address) : wallet_address
+      const updatedUser = await UserModel.updateWalletAddress(user.telegram_id, address);
 
       return reply.send({
         success: true,

@@ -1,15 +1,18 @@
 import { useNavigate } from 'react-router-dom'
 
-import {BlockNew, Text, Image} from '@components';
+import { BlockNew, Text, Image } from '@components';
 import { useAuth } from '@context';
 import { ROUTES_NAME } from '@routes';
+import { useUpdateWalletAddress } from '@hooks';
 
 import styles from './AppHeader.module.scss';
-import {TonConnectButton} from "@tonconnect/ui-react";
+import { TonConnectButton } from '@tonconnect/ui-react';
 
 export function AppHeader() {
   const { user } = useAuth()
   const navigate = useNavigate()
+
+  useUpdateWalletAddress()
 
   if (!user) {
     return null

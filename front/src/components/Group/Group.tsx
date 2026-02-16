@@ -15,7 +15,7 @@ export const Group = ({ children, header, footer, action }: GroupProps) => {
       {header && (
         <div className={styles.header}>
           <div className={styles.headerText}>
-            <Text type="caption" color="secondary" uppercase>
+            <Text type="caption" color="primary" uppercase>
               {header}
             </Text>
           </div>

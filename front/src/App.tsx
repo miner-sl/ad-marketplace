@@ -3,15 +3,15 @@ import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import '@styles/index.scss'
 
 import AppRouter from "@routes";
-import {ErrorBoundary, ToastProvider, AppHeader, Spinner} from "@components";
+import { ErrorBoundary, ToastProvider, AppHeader, Spinner } from "@components";
 import {LoginPage} from "@pages";
 
-import {AuthProvider, ThemeProvider, useAuth} from "@context";
+import { AuthProvider, ThemeProvider, useAuth } from "@context";
 import config from "./config";
 
 const queryClient = new QueryClient();
 
-function InnerApp () {
+function InnerApp() {
   const { user, loading } = useAuth();
 
   if (loading) {

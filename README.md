@@ -1,8 +1,10 @@
 # Ad Marketplace - Telegram Mini App Backend
 
 [@NonNano_bot](https://t.me/NonNano_Bot)
+
 ## Setup & Installation
-###  Local Development
+
+### Local Development
 
 See `backend/.env.docker.example` for all required variables:
 
@@ -40,13 +42,22 @@ See `backend/.env.docker.example` for all required variables:
    ```
 
 5**Start server**
+
    ```bash
    # Development
    cd backend && npm run dev
    cd front && npm run dev:https
    ```
 
-### at bot farther setup url to frontend. something like that `Network: https://192.168.31.146:5173/`
+5**Open telegram mini app at web.telegram.org/a**
+
+```bash
+1. at bot farther setup url to frontend.
+ something like that `Network: https://192.168.31.146:5173/`
+2. Open telegram mini app at web.telegram.org/a
+
+```
+
 
 ## Features
 
@@ -115,6 +126,7 @@ pending → negotiating → approved → payment_pending → paid
 ```
 
 Alternative paths:
+
 - `cancelled` (timeout or manual)
 - `refunded` (verification failed)
 
@@ -137,7 +149,6 @@ Alternative paths:
 - Verifies post exists and is unchanged
 - Releases or refunds based on verification result
 
-
 ### Документация
 
 - **[API.md](./API.md)** - Краткая документация с примерами curl запросов
@@ -146,6 +157,7 @@ Alternative paths:
 ### Основные эндпоинты
 
 **Channels:**
+
 - `GET /api/channels` - Список каналов
 - `GET /api/channels/:id` - Информация о канале
 - `POST /api/channels` - Регистрация канала
@@ -153,6 +165,7 @@ Alternative paths:
 - `POST /api/channels/:id/refresh-stats` - Обновить статистику
 
 **Deals:**
+
 - `GET /api/deals` - Список сделок
 - `GET /api/deals/:id` - Информация о сделке
 - `POST /api/deals` - Создать сделку
@@ -163,15 +176,16 @@ Alternative paths:
 - `POST /api/deals/:id/schedule` - Запланировать публикацию
 
 **Campaigns:**
+
 - `GET /api/campaigns` - Список кампаний
 - `GET /api/campaigns/:id` - Информация о кампании
 - `POST /api/campaigns` - Создать кампанию
 - `PUT /api/campaigns/:id` - Обновить кампанию
 
-
 ### Webhook Setup (Production)
 
 Set webhook URL in `.env`:
+
 ```
 TELEGRAM_WEBHOOK_URL=https://your-domain.com/webhook
 ```
@@ -180,38 +194,46 @@ The server will automatically set the webhook on startup in production mode.
 
 ## Key Design Decisions
 
-1. **Unified Deal Flow**: Both channel listings and advertiser campaigns converge into a single deal workflow, simplifying implementation and ensuring consistent behavior.
+1. **Unified Deal Flow**: Both channel listings and advertiser campaigns converge into a single deal workflow,
+   simplifying implementation and ensuring consistent behavior.
 
-2. **Escrow Per Deal**: Each deal gets its own escrow address for security and transparency. Alternative: per-user wallets (hot wallet) for efficiency.
+2. **Escrow Per Deal**: Each deal gets its own escrow address for security and transparency. Alternative: per-user
+   wallets (hot wallet) for efficiency.
 
-3. **Text Bot for Messaging**: Deal negotiations happen via text bot rather than mini-app chat, keeping the implementation simple and accessible.
+3. **Text Bot for Messaging**: Deal negotiations happen via text bot rather than mini-app chat, keeping the
+   implementation simple and accessible.
 
-4. **Admin Verification**: Before financial operations, the system re-verifies that users are still admins of their channels, preventing unauthorized actions.
+4. **Admin Verification**: Before financial operations, the system re-verifies that users are still admins of their
+   channels, preventing unauthorized actions.
 
-5. **Post Verification**: After posting, the system waits a minimum duration (24h default) and verifies the post still exists before releasing funds, protecting advertisers.
+5. **Post Verification**: After posting, the system waits a minimum duration (24h default) and verifies the post still
+   exists before releasing funds, protecting advertisers.
 
-6. **Cron-based Automation**: Auto-posting and verification run as scheduled jobs, ensuring reliability without complex event systems.
+6. **Cron-based Automation**: Auto-posting and verification run as scheduled jobs, ensuring reliability without complex
+   event systems.
 
 ## Known Limitations & Future Improvements
 
 ### Current Limitations
 
-1. **Channel Stats**: Detailed stats (average views, language distribution, premium stats) require Telegram Premium API access. MVP uses basic member count.
+1. **Channel Stats**: Detailed stats (average views, language distribution, premium stats) require Telegram Premium API
+   access. MVP uses basic member count.
 
 2. **TON Integration**: Escrow wallet generation and transaction signing are simplified for MVP. Production would need:
-   - Proper mnemonic generation
-   - Secure key management
+    - Proper mnemonic generation
+    - Secure key management
 
 3. **Post Verification**: Current verification is simplified (checks existence only). Production should:
-   - Store message content on post
-   - Compare content for changes
-   - Handle edge cases (edited posts, etc.)
+    - Store message content on post
+    - Compare content for changes
+    - Handle edge cases (edited posts, etc.)
 
 4. **PR Manager Flow**: Admin fetching and permission management is basic. Production should:
-   - Real-time admin verification
-   - Admin change notifications
+    - Real-time admin verification
+    - Admin change notifications
 
 ### Future Enhancements
+
 3. **Advanced Analytics**: Integration with Telegram Analytics API for detailed stats
 3. **Multi-currency Support**: Support for other cryptocurrencies
 4. **Rating System**: Channel and advertiser ratings/reviews
@@ -222,10 +244,10 @@ The server will automatically set the webhook on startup in production mode.
 9. **Mini-App Frontend**: Full-featured Telegram Mini App UI
 10. **Analytics Dashboard**: Channel performance analytics
 
-
-
 ## Features
+
 ### 1. Done
+
 - [X] distributed lock (redis)
 - [X] jwt auth
 - [X] channel topic
@@ -236,6 +258,7 @@ The server will automatically set the webhook on startup in production mode.
 - [X] channel topic
 
 ### 2. TODO
+
 - [ ] connect wallet by channel owner
 - [ ] scheduler for generate escrow wallet at ton
 - [ ] role [admin moderator, channel owner, ads buyer]

@@ -22,6 +22,15 @@ export function AppHeader() {
   return (
     <header className={styles.header}>
       <BlockNew row gap={12} align="center" justify="between" className={styles.container}>
+        <span
+          onClick={() => navigate(ROUTES_NAME.MARKETPLACE_HOME)}
+          className={styles.logo}
+        >
+          <Text type="caption2" weight="bold">
+            Ads Marketplace
+          </Text>
+        </span>
+        <TonConnectButton />
         <BlockNew row gap={8} align="center" className={styles.userInfo}>
           <span
             onClick={() => navigate(ROUTES_NAME.PROFILE)}
@@ -35,16 +44,8 @@ export function AppHeader() {
             />
           </span>
         </BlockNew>
-        <span
-          onClick={() => navigate(ROUTES_NAME.MARKETPLACE_HOME)}
-          className={styles.logo}
-        >
-          <Text type="caption2" weight="bold">
-            Ads Marketplace
-          </Text>
-        </span>
+
       </BlockNew>
-      <TonConnectButton />
     </header>
   )
 }

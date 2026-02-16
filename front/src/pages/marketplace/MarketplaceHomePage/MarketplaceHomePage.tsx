@@ -1,6 +1,6 @@
 import {useNavigate} from 'react-router-dom';
 
-import {BlockNew, ChannelListSnippet, Group, GroupItem, Page, PageLayout, Spinner, Text,} from '@components';
+import {BlockNew, BottomBar, ChannelListSnippet, Group, GroupItem, Page, PageLayout, Spinner, Text,} from '@components';
 import {useChannelsQuery,} from '@store-new';
 import {ROUTES_NAME} from '@routes';
 
@@ -60,18 +60,17 @@ export const MarketplaceHomePage = () => {
         {/*<TelegramMainButton text="Add Bot To Channel" onClick={handleAddChat}/>*/}
 
         <BlockNew margin="0 0 16px">
-          <Group header="MARKETPLACE">
+          <Group header="Advertiser">
             <GroupItem text="Browse Channels" chevron onClick={() => navigate('/browse_channels')} />
-            <GroupItem text="Ads Requests" chevron onClick={() => navigate('/requests')} />
-            <GroupItem text="My Channels" chevron onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CHANNELS)} />
+            <GroupItem text="My Deals" chevron onClick={() => navigate(ROUTES_NAME.MARKETPLACE_ADVERTISER_MY_DEALS)} />
           </Group>
         </BlockNew>
         <BlockNew margin="0 0 16px">
-          <Group header="Channel Owner">
-            <GroupItem text="My Deals" chevron onClick={() => navigate(ROUTES_NAME.MARKETPLACE_ADVERTISER_MY_DEALS)} />
+          <Group header="Publisher">
+            <GroupItem text="Ads Requests" chevron onClick={() => navigate('/requests')} />
+            <GroupItem text="My Channels" chevron onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CHANNELS)} />
             <GroupItem text="My Campaigns" chevron onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CAMPAIGNS)} />
           </Group>
-
         </BlockNew>
 
         <BlockNew gap={12} className={`${styles.chatsBlock} ${styles.contentWithBottomBar}`}>
@@ -99,21 +98,21 @@ export const MarketplaceHomePage = () => {
 
         {/*<BottomBar>*/}
         {/*  <BottomBar.Row>*/}
-        {/*    <BottomBar.Item onClick={() => navigate('/browse_channels')}>*/}
-        {/*      Channels*/}
+        {/*    <BottomBar.Item onClick={() => navigate('/')}>*/}
+        {/*      Home*/}
         {/*    </BottomBar.Item>*/}
         {/*    <BottomBar.Item onClick={() => navigate('/requests')}>*/}
-        {/*      Requests*/}
+        {/*      Publisher*/}
         {/*    </BottomBar.Item>*/}
         {/*    <BottomBar.Item onClick={() => navigate(ROUTES_NAME.MARKETPLACE_ADVERTISER_MY_DEALS)}>*/}
-        {/*      My Deals*/}
+        {/*      Advertiser*/}
         {/*    </BottomBar.Item>*/}
-        {/*    <BottomBar.Item onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CHANNELS)}>*/}
-        {/*      My Channels*/}
-        {/*    </BottomBar.Item>*/}
-        {/*    <BottomBar.Item onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CAMPAIGNS)}>*/}
-        {/*      My Campaigns*/}
-        {/*    </BottomBar.Item>*/}
+        {/*    /!*<BottomBar.Item onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CHANNELS)}>*!/*/}
+        {/*    /!*  My Channels*!/*/}
+        {/*    /!*</BottomBar.Item>*!/*/}
+        {/*    /!*<BottomBar.Item onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CAMPAIGNS)}>*!/*/}
+        {/*    /!*  My Campaigns*!/*/}
+        {/*    /!*</BottomBar.Item>*!/*/}
         {/*  </BottomBar.Row>*/}
         {/*</BottomBar>*/}
       </PageLayout>

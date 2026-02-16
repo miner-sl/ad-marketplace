@@ -62,11 +62,16 @@ export const MarketplaceHomePage = () => {
         <BlockNew margin="0 0 16px">
           <Group header="MARKETPLACE">
             <GroupItem text="Browse Channels" chevron onClick={() => navigate('/browse_channels')} />
-            <GroupItem text="Requests" chevron onClick={() => navigate('/requests')} />
-            <GroupItem text="My Deals" chevron onClick={() => navigate(ROUTES_NAME.MARKETPLACE_ADVERTISER_MY_DEALS)} />
+            <GroupItem text="Ads Requests" chevron onClick={() => navigate('/requests')} />
             <GroupItem text="My Channels" chevron onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CHANNELS)} />
+          </Group>
+        </BlockNew>
+        <BlockNew margin="0 0 16px">
+          <Group header="Channel Owner">
+            <GroupItem text="My Deals" chevron onClick={() => navigate(ROUTES_NAME.MARKETPLACE_ADVERTISER_MY_DEALS)} />
             <GroupItem text="My Campaigns" chevron onClick={() => navigate(ROUTES_NAME.MARKETPLACE_MY_CAMPAIGNS)} />
           </Group>
+
         </BlockNew>
 
         <BlockNew gap={12} className={`${styles.chatsBlock} ${styles.contentWithBottomBar}`}>

@@ -34,7 +34,7 @@ export class TelegramChannelStatsRefreshSchedulerService {
       this.logger.warn('TelegramChannelStatsRefreshSchedulerService: Job already started');
       return;
     }
-
+    // void this.processStatsRefresh();
     // Run daily at 2 AM
     this.job = cron.schedule('0 2 * * *', async () => {
       await this.processStatsRefresh();

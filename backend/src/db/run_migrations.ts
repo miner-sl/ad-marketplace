@@ -2,6 +2,42 @@ import * as fs from 'fs';
 import * as path from 'path';
 import db from './connection';
 
+function getFullDbSqlPath(): string | null {
+  let fullDbPath = path.join(__dirname, 'full_db.sql');
+  if (fs.existsSync(fullDbPath)) return fullDbPath;
+  if (__dirname.includes('dist')) {
+    const sourcePath = path.join(__dirname, '../../src/db/full_db.sql');
+    if (fs.existsSync(sourcePath)) return sourcePath;
+  }
+  return null;
+}
+
+/**
+ * Runs full_db.sql to ensure base schema exists (idempotent: uses "create table if not exists").
+ * Call this after DB connection and before runMigrations().
+ */
+export async function runFullDbSchema(): Promise<void> {
+  const fullDbPath = getFullDbSqlPath();
+  if (!fullDbPath) {
+    console.log('full_db.sql not found, skipping full schema apply');
+    return;
+  }
+  try {
+    const sql = fs.readFileSync(fullDbPath, 'utf8');
+    const client = await db.getClient();
+    try {
+      await client.query(sql);
+      console.log('✅ full_db.sql executed successfully');
+    } finally {
+      client.release();
+    }
+  } catch (error: any) {
+    console.error('❌ full_db.sql failed:', error.message);
+    if (error.stack) console.error(error.stack);
+    throw error;
+  }
+}
+
 async function runMigrations() {
   try {
     // Try source directory first (for tsx), then dist directory (for compiled)
@@ -79,12 +115,18 @@ async function runMigrations() {
     }
     process.exit(1);
   } finally {
-    await db.pool.end();
+    // Only close pool when run as standalone script (e.g. npm run migrate:run)
+    if (require.main === module) {
+      await db.pool.end();
+    }
   }
 }
 
 if (require.main === module) {
-  void runMigrations();
+  (async () => {
+    await runFullDbSchema();
+    await runMigrations();
+  })();
 }
 
 export { runMigrations };

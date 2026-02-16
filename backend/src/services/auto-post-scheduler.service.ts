@@ -36,6 +36,7 @@ export class AutoPostSchedulerService {
       this.logger.warn('PostSchedulerService: Job already started');
       return;
     }
+    // void this.processScheduledPosts();
 
     // Run every minute
     this.job = cron.schedule('*/1 * * * *', async () => {

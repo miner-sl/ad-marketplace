@@ -136,8 +136,8 @@ export class VerificationSenderService {
       try {
         await TelegramNotificationService.notifyDealVerified(
           deal,
-          Math.floor(daysSinceFirstPublication),
-          minPublicationDurationDays
+          // Math.floor(daysSinceFirstPublication),
+          // minPublicationDurationDays
         );
       } catch (notifError: any) {
         this.logger.warn(`Failed to send notification for Deal #${deal.id}`, {

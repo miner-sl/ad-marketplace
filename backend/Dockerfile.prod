@@ -33,6 +33,8 @@ RUN npm ci --only=production && npm cache clean --force
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
+# Copy full_db.sql for schema init on startup
+COPY --from=builder /app/src/db/full_db.sql ./dist/db/
 
 # Create logs directory
 RUN mkdir -p logs && chown -R nodejs:nodejs logs

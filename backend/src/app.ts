@@ -13,10 +13,18 @@ import logger from './utils/logger';
 import env from './utils/env';
 import { requestIdPlugin } from './middleware/requestId';
 import db from './db/connection';
+import { runFullDbSchema } from './db/run_migrations';
 
 const isProd = env.NODE_ENV === 'production';
 
 export async function buildApp() {
+  // Ensure DB schema (full_db.sql) then run incremental migrations
+  try {
+    await runFullDbSchema();
+  } catch (error: any) {
+    logger.error('DB schema/migrations failed', { error: error.message });
+    throw error;
+  }
   const app = Fastify({
     logger: false, // We use winston for logging
     requestIdLogLabel: 'requestId',

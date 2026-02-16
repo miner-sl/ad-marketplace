@@ -36,8 +36,6 @@ See `backend/.env.docker.example` for all required variables:
 4. **Set up database**
    ```bash
    docker-compose up -d
-   
-   npm run migrate
    ```
 
 5**Start server**

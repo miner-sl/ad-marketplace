@@ -135,7 +135,7 @@ export class DealRepository {
     const rows = result?.rows || [];
     const allAmount = rows.length > 0 ? Number(rows[0].all_amount) : 0;
     const rowsWithoutCount = rows.map(({ all_amount, ...r }) => r);
-    return { rows: rowsWithoutCount, allAmount: 200 };
+    return { rows: rowsWithoutCount, allAmount: allAmount };
   }
 
   /**

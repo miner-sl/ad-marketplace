@@ -12,7 +12,12 @@ import {
   DealStatusBadge,
   CampaignCard,
   Button,
-  ListToggler, AppSelect, type AppSelectOption,
+  ListToggler,
+  AppSelect,
+  type AppSelectOption,
+  List,
+  ListItem,
+  Spinner,
 } from '@components';
 import { useDealRequestsQuery, useCampaignsQuery } from '@store-new';
 import { useTelegramUser } from '@hooks';
@@ -139,81 +144,86 @@ export const RequestsPage = () => {
             </BlockNew>
           </BlockNew>
 
-          <BlockNew padding="0 16px">
-            <BlockNew row gap={16} marginValue={8} >
-              {/*<BlockNew gap={4}>*/}
-              {/*  <Text type="caption" color="secondary">*/}
-              {/*    From*/}
-              {/*  </Text>*/}
-              {/*  <ListInput*/}
-              {/*    type="date"*/}
-              {/*    value={dateFrom}*/}
-              {/*    onChange={(v) => {*/}
-              {/*      setDateFrom(v)*/}
-              {/*      setPage(1)*/}
-              {/*    }}*/}
-              {/*  />*/}
-              {/*</BlockNew>*/}
-              {/*<BlockNew gap={4}>*/}
-              {/*  <Text type="caption" color="secondary">*/}
-              {/*    To*/}
-              {/*  </Text>*/}
-              {/*  <ListInput*/}
-              {/*    type="date"*/}
-              {/*    value={dateTo}*/}
-              {/*    onChange={(v) => {*/}
-              {/*      setDateTo(v)*/}
-              {/*      setPage(1)*/}
-              {/*    }}*/}
-              {/*  />*/}
-              {/*</BlockNew>*/}
-              {/*<BlockNew gap={4} align="start">*/}
-              {/*  <Text type="caption" color="secondary">*/}
-              {/*    Country*/}
-              {/*  </Text>*/}
-              {/*  <ListInput*/}
-              {/*    type="text"*/}
-              {/*    placeholder="Country"*/}
-              {/*    value={country}*/}
-              {/*    onChange={(v) => {*/}
-              {/*      setCountry(v)*/}
-              {/*      setPage(1);*/}
-              {/*      showToast({*/}
-              {/*        message: 'Todo',*/}
-              {/*      })*/}
-              {/*    }}*/}
-              {/*  />*/}
-              {/*</BlockNew>*/}
-              <BlockNew gap={4} row align="start">
-                <Text type="caption" color="secondary">
-                  Locale
-                </Text>
-                <AppSelect
-                  options={locales}
-                  value={locale || null}
-                  onChange={(value) => setLocale(value as Locales)}
-                  placeholder="Select a topic"
-                />
+          <List>
+            <ListItem>
+              <BlockNew row gap={24} marginValue={8} justify="between">
+                {/*<BlockNew gap={4}>*/}
+                {/*  <Text type="caption" color="secondary">*/}
+                {/*    From*/}
+                {/*  </Text>*/}
+                {/*  <ListInput*/}
+                {/*    type="date"*/}
+                {/*    value={dateFrom}*/}
+                {/*    onChange={(v) => {*/}
+                {/*      setDateFrom(v)*/}
+                {/*      setPage(1)*/}
+                {/*    }}*/}
+                {/*  />*/}
+                {/*</BlockNew>*/}
+                {/*<BlockNew gap={4}>*/}
+                {/*  <Text type="caption" color="secondary">*/}
+                {/*    To*/}
+                {/*  </Text>*/}
+                {/*  <ListInput*/}
+                {/*    type="date"*/}
+                {/*    value={dateTo}*/}
+                {/*    onChange={(v) => {*/}
+                {/*      setDateTo(v)*/}
+                {/*      setPage(1)*/}
+                {/*    }}*/}
+                {/*  />*/}
+                {/*</BlockNew>*/}
+                {/*<BlockNew gap={4} align="start">*/}
+                {/*  <Text type="caption" color="secondary">*/}
+                {/*    Country*/}
+                {/*  </Text>*/}
+                {/*  <ListInput*/}
+                {/*    type="text"*/}
+                {/*    placeholder="Country"*/}
+                {/*    value={country}*/}
+                {/*    onChange={(v) => {*/}
+                {/*      setCountry(v)*/}
+                {/*      setPage(1);*/}
+                {/*      showToast({*/}
+                {/*        message: 'Todo',*/}
+                {/*      })*/}
+                {/*    }}*/}
+                {/*  />*/}
+                {/*</BlockNew>*/}
+                <BlockNew gap={8} row align="center" justify="start">
+                  <Text type="caption" color="primary">
+                    Language
+                  </Text>
+                  <AppSelect
+                    options={locales}
+                    value={locale || null}
+                    onChange={(value) => setLocale(value as Locales)}
+                    placeholder="Select a topic"
+                  />
+                </BlockNew>
+                <BlockNew gap={8} row align="center" justify="end">
+                  <Text type="caption" color="primary">
+                    Only Premium User
+                  </Text>
+                  <ListToggler
+                    isEnabled={premiumOnly}
+                    onChange={(v) => {
+                      setPremiumOnly(v)
+                      setPage(1)
+                    }}
+                  />
+                </BlockNew>
               </BlockNew>
-              <BlockNew gap={4} row align="start">
-                <Text type="caption" color="secondary">
-                  Only Premium User
-                </Text>
-                <ListToggler
-                  isEnabled={premiumOnly}
-                  onChange={(v) => {
-                    setPremiumOnly(v)
-                    setPage(1)
-                  }}
-                />
-              </BlockNew>
-            </BlockNew>
-          </BlockNew>
+            </ListItem>
+          </List>
 
           {dealsLoading ? (
-            <Text type="text" color="secondary" align="center">
-              Loading requests...
-            </Text>
+             <BlockNew justify="center" align="center">
+               <Spinner size={18} />
+               <Text type="text" color="secondary" align="center">
+                 Loading requests...
+               </Text>
+             </BlockNew>
           ) : incomingRequests.length > 0 ? (
             <BlockNew id="requests-container">
               <Group>

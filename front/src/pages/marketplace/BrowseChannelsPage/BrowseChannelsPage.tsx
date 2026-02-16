@@ -133,7 +133,7 @@ export const BrowseChannelsPage = () => {
                   type="secondary"
                   onClick={onToggleFilters}
                 >
-                  {showFilters ? 'Hide' : 'Filters'}
+                  Filters
                 </Button>
               </BlockNew>
             </BlockNew>

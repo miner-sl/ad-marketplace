@@ -722,6 +722,9 @@ export const ChannelDetailsPage = () => {
           </Block>
         </Block>
 
+        {channel.statistic && (
+          <pre>{JSON.stringify(channel.statistic, null, 2)}</pre>
+        )}
 
         {!isChannelOwner && (
           <Block margin="top" marginValue="auto">

@@ -262,11 +262,11 @@ The server will automatically set the webhook on startup in production mode.
 - [X] setup post publication time
 - [X] check that user really admin before send to their address money
 - [X] channel topic
+- [X] scheduler for generate escrow wallet at ton
+- [X] telegram post analytics
 
 ### 2. TODO
-
 - [ ] connect wallet by channel owner
-- [ ] scheduler for generate escrow wallet at ton
 - [ ] role [admin moderator, channel owner, ads buyer]
 - [ ] channel verification and advertiser verification
 - [ ] use tg stats for gather stats
@@ -275,23 +275,14 @@ The server will automatically set the webhook on startup in production mode.
 - [ ] integrate i18n
 - [ ] channel geo/country, language, budget range, format
 - [ ] SEARCH: vectorize channels fields and sort relevance by cosine distance
-- [ ] store images before publish
+- [ ] post with images (store at minio)
 - [ ] dashboard (revenue by month, channel page views, in favorites, in favorites, placemnets, earned)
 - [ ] transaction history
-- [ ] channels catalog with basket or fast buy flow (select type, place order, wait moderation)
-- [ ] super admin for moderate channels
 - [ ] Store escrow wallet secret in KMS/HSM/encrypted at database (?)
-- [ ] sleek ui
 - [ ] ads payments by advertiser (integrate tonconnect)
 - [ ] support all telegram message entities in post (emoji, animated/premium emoji, markdown formatting and etc)
   https://core.telegram.org/type/MessageEntity
-- [ ] fix transactions operation
-- [ ] telegram post analytics
 - [ ] use usdt for prices
-- [ ] refunds money to channel owner
-- [ ] Release funds to channel owner check transaction really exist
 - [ ] /check payments without mock transactions
-- [ ] check edit post text,
 - [ ] attach media, photos, formatted with telegram entities
-- [ ] mini app
 - [ ] deploy to vps workflow

@@ -59,6 +59,9 @@ export const MarketplaceHomePage = () => {
       <PageLayout>
         {/*<TelegramMainButton text="Add Bot To Channel" onClick={handleAddChat}/>*/}
 
+        <Text>
+          TODO: Implement real TonWallet payment for escrow. Replace mocks in transaction indexer by real API.
+        </Text>
         <BlockNew margin="0 0 16px">
           <Group header="Advertiser">
             <GroupItem text="Browse Channels" chevron onClick={() => navigate('/browse_channels')}/>

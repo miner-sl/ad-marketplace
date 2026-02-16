@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 
-import { BlockNew, Text, Image } from '@components';
+import {BlockNew, Text, Image} from '@components';
 import { useAuth } from '@context';
 import { ROUTES_NAME } from '@routes';
 

@@ -132,13 +132,32 @@ export const DealDetailsPage = () => {
 
   const tonConnectRef = useRef<boolean>(false);
 
-  const onClickButton = async () => {
+  const onPayDeal = async () => {
     // if (processing()) return;
-    // await playConfetti({
-    //   emojis: ["🎉"],
-    // });
-    //
+    await playConfetti({
+      emojis: ["🎉"],
+    });
+
+    // showToast({
+    //   message: 'TODO implement from tonwallet, currently mocked transaction indexer by default ton transactions'
+    // })
     hapticFeedback("soft");
+
+    await popupManager.openPopup({
+      title: 'Payment',
+      message: ' Implement real TonWallet payment for escrow. Replace mocks in transaction indexer by real API.',
+      buttons: [
+        {
+          id: "ok",
+          type: 'destructive',
+          text: "Pay",
+        },
+        {
+          id: "cancel",
+          type: "cancel",
+        },
+      ],
+    });
 
     const popup = await popupManager.openPopup({
       title: 'Payment',
@@ -159,55 +178,55 @@ export const DealDetailsPage = () => {
     if (!popup.button_id || popup.button_id === "cancel") return;
 
     // setProcessing(true);
-
-
-    let boc: string | undefined;
-
-    // const fee = modals.participate.contest?.fee;
-    const fee = true;
-    if (fee) {
-      const result = await handlePayment();
-
-      if (result) {
-        boc = result.boc;
-      } else {
-        // setProcessing(false);
-        return;
-      }
-    }
-
-    const request = await requestAPI(
-      `/deal/${dealId}/pay`,
-      {
-        boc: boc,
-        wallet: formWallet.wallet,
-      },
-      "POST",
-      120_000,
-    );
-
-    if (request) {
-      const { status } = request;
-
-      if (status === "success") {
-        hapticFeedback('medium');
-        await playConfetti({
-          emojis: ["🎉"],
-        });
-
-        // batch(() => {
-        //   setState("done");
-        //   toggleSignal("fetchContest");
-        // });
-
-        return;
-      }
-    }
-
-    showToast({
-      type: 'warning',
-      message: 'Failed to pay deal. Please try again.',
-    });
+    //
+    //
+    // let boc: string | undefined;
+    //
+    // // const fee = modals.participate.contest?.fee;
+    // const fee = true;
+    // if (fee) {
+    //   const result = await handlePayment();
+    //
+    //   if (result) {
+    //     boc = result.boc;
+    //   } else {
+    //     // setProcessing(false);
+    //     return;
+    //   }
+    // }
+    //
+    // const request = await requestAPI(
+    //   `/deal/${dealId}/pay`,
+    //   {
+    //     boc: boc,
+    //     wallet: formWallet.wallet,
+    //   },
+    //   "POST",
+    //   120_000,
+    // );
+    //
+    // if (request) {
+    //   const { status } = request;
+    //
+    //   if (status === "success") {
+    //     hapticFeedback('medium');
+    //     await playConfetti({
+    //       emojis: ["🎉"],
+    //     });
+    //
+    //     // batch(() => {
+    //     //   setState("done");
+    //     //   toggleSignal("fetchContest");
+    //     // });
+    //
+    //     return;
+    //   }
+    // }
+    //
+    // showToast({
+    //   type: 'warning',
+    //   message: 'Failed to pay deal. Please try again.',
+    // });
     // setProcessing(false);
   };
 
@@ -816,13 +835,13 @@ export const DealDetailsPage = () => {
           {wallet?.account ? (
             <TelegramMainButton
               text={`Pay ${deal.price_ton} TON`}
-              onClick={onClickButton}
+              onClick={onPayDeal}
               isVisible={true}
             />
           ) : (
             <TelegramMainButton
               text={`Connect Wallet`}
-              onClick={onClickButton}
+              onClick={onPayDeal}
               isVisible={true}
             />
           )}

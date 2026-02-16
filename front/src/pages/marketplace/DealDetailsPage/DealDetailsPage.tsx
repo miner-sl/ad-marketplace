@@ -142,7 +142,7 @@ export const DealDetailsPage = () => {
 
     const popup = await popupManager.openPopup({
       title: 'Payment',
-      message: 'Do you want to pay deal for USDT?',
+      message: 'Do you want to pay deal for TON?',
       buttons: [
         {
           id: "ok",
@@ -482,7 +482,7 @@ export const DealDetailsPage = () => {
   //   if (!isConnected) {
   //     showToast({
   //       type: 'error',
-  //       message: 'Please connect your USDT wallet first'
+  //       message: 'Please connect your TON wallet first'
   //     })
   //     return
   //   }
@@ -724,7 +724,7 @@ export const DealDetailsPage = () => {
                 after={
                   <BlockNew row align="center" gap={8}>
                     <Text type="text" color="accent">
-                      {deal?.price_ton !== undefined ? deal?.price_ton + ' USDT' : '-'}
+                      {deal?.price_ton !== undefined ? deal?.price_ton + ' TON' : '-'}
                     </Text>
                   </BlockNew>
                 }
@@ -815,7 +815,7 @@ export const DealDetailsPage = () => {
         <>
           {wallet?.account ? (
             <TelegramMainButton
-              text={`Pay ${deal.price_ton} USDT`}
+              text={`Pay ${deal.price_ton} TON`}
               onClick={onClickButton}
               isVisible={true}
             />

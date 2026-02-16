@@ -17,7 +17,7 @@ function formatDate(value: string | null): string {
 function formatAmount(amount: string): string {
   const n = parseFloat(amount)
   const sign = n >= 0 ? '+' : ''
-  return `${sign}${n.toFixed(4)} USDT`
+  return `${sign}${n.toFixed(4)} TON`
 }
 
 export function TransactionsPage() {

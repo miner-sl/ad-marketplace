@@ -20,7 +20,7 @@ function buildJettonTransfer({
     .endCell();
 }
 /**
- * Component for sending USDT on TON network
+ * Component for sending TON on TON network
  * Uses only @tonconnect/ui-react (no @ton/core dependency)
  */
 export function SendUSDT() {
@@ -33,12 +33,12 @@ export function SendUSDT() {
     }
 
     // User's Jetton wallet address - this should be derived from their TON wallet
-    // by calling get_wallet_address() on the USDT Jetton Master contract
+    // by calling get_wallet_address() on the TON Jetton Master contract
     const jettonWalletAddress = "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs";
     const senderAddress = tonConnectUI.account?.address;
 
     const payload = buildJettonTransfer({
-      amount: usdt * 1_000_000, // 1 USDT
+      amount: usdt * 1_000_000, // 1 TON
       toAddress: toAddress,
       responseAddress: senderAddress
     });
@@ -58,7 +58,7 @@ export function SendUSDT() {
 
   return (
     <button onClick={() => send(1, 'UQDwbxpqt_ps-V5H89mo8PWKErXuz__9fDRyU8HKgj4YdOah')}>
-      Send USDT
+      Send TON
     </button>
   );
 }

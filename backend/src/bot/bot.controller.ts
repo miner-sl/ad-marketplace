@@ -480,7 +480,7 @@ export class BotController {
     // Show payment information for advertiser when payment is pending
     if (deal.status === 'payment_pending' && isAdvertiser && deal.escrow_address) {
       dealInfo += `\n💰 Payment Required:\n`;
-      dealInfo += `Send ${deal.price_ton} USDT to:\n`;
+      dealInfo += `Send ${deal.price_ton} TON to:\n`;
       dealInfo += `${deal.escrow_address}\n\n`;
       dealInfo += `After sending payment, click "✅ Confirm Payment" below.\n`;
     } else if (deal.escrow_address) {
@@ -1266,9 +1266,9 @@ export class BotController {
         // Payment not found
         await ctx.reply(
           `❌ Payment Not Found\n\n` +
-          `We couldn't detect payment of ${deal.price_ton} USDT at the escrow address.\n\n` +
+          `We couldn't detect payment of ${deal.price_ton} TON at the escrow address.\n\n` +
           `Please verify:\n` +
-          `• You sent exactly ${deal.price_ton} USDT\n` +
+          `• You sent exactly ${deal.price_ton} TON\n` +
           `• You sent to: <code>${deal.escrow_address}</code>\n` +
           `• Transaction was completed\n\n` +
           `Current balance: ${paymentCheck.amount} TON\n\n` +

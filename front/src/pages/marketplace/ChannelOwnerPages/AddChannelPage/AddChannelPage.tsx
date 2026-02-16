@@ -106,7 +106,7 @@ export const AddChannelPage = () => {
 
     if (!priceTon.trim()) {
       showToast({
-        message: 'Please enter price in USDT',
+        message: 'Please enter price in TON',
         type: 'warning',
       })
       return;
@@ -241,7 +241,7 @@ export const AddChannelPage = () => {
             <List footer="Set the price for posting ads in your channel">
               <ListItem
                 padding='2px 16px'
-                text="Post Price (USDT)"
+                text="Post Price (TON)"
                 after={
                   <ListInput
                     type="number"

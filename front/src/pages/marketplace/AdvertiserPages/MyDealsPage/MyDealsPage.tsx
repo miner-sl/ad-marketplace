@@ -161,7 +161,7 @@ export const MyDealsPage = () => {
                             </>
                           )}
                           <Text type="caption2" color="tertiary">
-                            • {deal.price_ton !== undefined ? deal.price_ton?.toFixed?.(2) + ' USDT' :''}
+                            • {deal.price_ton !== undefined ? deal.price_ton?.toFixed?.(2) + ' TON' :''}
                           </Text>
                         </BlockNew>
                       }

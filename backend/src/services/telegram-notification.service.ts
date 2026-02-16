@@ -37,8 +37,8 @@ export class TelegramNotificationService {
         `💰 Payment Invoice for Deal #${dealId}\n\n` +
         (data.channelName ? `Channel: ${data.channelName}\n` : `Channel: #${data.channelId}\n`) +
         (data.adFormat ? `Format: ${data.adFormat}\n` : '') +
-        (data.priceTon ? `Amount: ${data.priceTon} USDT\n\n` : '') +
-        (data.priceTon ? `Please send ${data.priceTon} USDT to the escrow address:\n\n` : '') +
+        (data.priceTon ? `Amount: ${data.priceTon} TON\n\n` : '') +
+        (data.priceTon ? `Please send ${data.priceTon} TON to the escrow address:\n\n` : '') +
         (data.escrowAddress ? `\`${data.escrowAddress}\`\n\n` : '') +
         `After sending payment, click "✅ Confirm Payment" below.\n\n` +
         `This is a system-managed escrow wallet. Funds will be held until the post is published and verified.`;
@@ -86,7 +86,7 @@ export class TelegramNotificationService {
       const notificationMessage =
         `📨 New Ad Request for Deal #${dealId}!\n\n` +
         (data.channelName ? `📺 Channel: ${data.channelName}\n` : '') +
-        (data.priceTon ? `💰 Price: ${data.priceTon} USDT\n` : '') +
+        (data.priceTon ? `💰 Price: ${data.priceTon} TON\n` : '') +
         (data.adFormat ? `📝 Format: ${data.adFormat}\n\n` : '') +
         (data.briefPreview ? `📄 Brief:\n${data.briefPreview}\n\n` : '') +
         `Please review and accept or decline the request.`;
@@ -138,7 +138,7 @@ export class TelegramNotificationService {
         `❌ Deal #${dealId} Declined\n\n` +
         `The channel owner has declined your ad request.\n\n` +
         (data.channelName ? `📺 Channel: ${data.channelName}\n` : '') +
-        (data.priceTon ? `💰 Price: ${data.priceTon} USDT\n` : '') +
+        (data.priceTon ? `💰 Price: ${data.priceTon} TON\n` : '') +
         (data.adFormat ? `📝 Format: ${data.adFormat}\n\n` : '') +
         `You can browse other channels or create a new request.\n\n` +
         `Use /deal ${dealId} to view details.`;
@@ -186,7 +186,7 @@ export class TelegramNotificationService {
         await TelegramNotificationQueueService.queueTelegramMessage(
           advertiser.telegram_id,
           `✅ Payment confirmed for Deal #${dealId}!\n\n` +
-          `Amount: ${priceTon} USDT\n` +
+          `Amount: ${priceTon} TON\n` +
           `The channel owner will now prepare the creative.\n\n` +
           `Use /deal ${dealId} to view details.`
         );
@@ -196,7 +196,7 @@ export class TelegramNotificationService {
         await TelegramNotificationQueueService.queueTelegramMessage(
           channelOwner.telegram_id,
           `✅ Payment received for Deal #${dealId}!\n\n` +
-          `Amount: ${priceTon} USDT\n` +
+          `Amount: ${priceTon} TON\n` +
           `You can now submit the creative.\n\n` +
           `Use /deal ${dealId} to view details.`
         );
@@ -236,7 +236,7 @@ export class TelegramNotificationService {
       await TelegramNotificationQueueService.queueTelegramMessage(
         channelOwner.telegram_id,
         `✅ Payment received for Deal #${dealId}!\n\n` +
-        `Amount: ${priceTon} USDT\n` +
+        `Amount: ${priceTon} TON\n` +
         `You can now publish the post.\n\n` +
         `Use the button below to view deal details.`,
         ownerNotificationButtons
@@ -412,7 +412,7 @@ export class TelegramNotificationService {
         `✅ Deal #${dealId} Completed!\n\n` +
         `The advertiser has confirmed publication.\n` +
         `Post verification period completed and post verified.\n` +
-        (data.priceTon ? `Funds (${data.priceTon} USDT) have been released to your wallet:\n` : '') +
+        (data.priceTon ? `Funds (${data.priceTon} TON) have been released to your wallet:\n` : '') +
         (data.channelOwnerWalletAddress ? `\`${data.channelOwnerWalletAddress}\`\n\n` : '') +
         (data.txHash ? `Transaction: ${data.txHash}\n\n` : '') +
         `Use /deal ${dealId} to view details.`,
@@ -673,7 +673,7 @@ export class TelegramNotificationService {
       }
 
       const message = `💰 Refund Processed for Deal #${dealId}\n\n` +
-        `Amount: ${data.priceTon} USDT\n` +
+        `Amount: ${data.priceTon} TON\n` +
         `Transaction: ${data.txHash}\n` +
         `Wallet: ${data.advertiserWalletAddress}\n\n` +
         `Your funds have been refunded to your wallet.`;
@@ -790,7 +790,7 @@ export class TelegramNotificationService {
         `📋 Deal #${deal.id} is ready to proceed, but the bot needs to be added as an admin to your channel.\n\n` +
         `📺 Channel: ${channel.title || channel.username || `Channel #${channel.id}`}\n` +
         (channel.username ? `🔗 Username: ${channel.username}\n` : '') +
-        `💰 Deal Amount: ${deal.price_ton} USDT\n` +
+        `💰 Deal Amount: ${deal.price_ton} TON\n` +
         `📝 Format: ${deal.ad_format}\n\n` +
         `To continue with this deal, please add the bot as an admin with the following permissions:\n` +
         `• Post messages\n` +

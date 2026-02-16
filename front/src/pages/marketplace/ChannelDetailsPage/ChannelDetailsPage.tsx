@@ -663,7 +663,7 @@ export const ChannelDetailsPage = () => {
                                 className={styles.priceInput}
                               />
                               <Text type="text" color="secondary">
-                                USDT
+                                TON
                               </Text>
                             </Block>
                           </>
@@ -675,7 +675,7 @@ export const ChannelDetailsPage = () => {
                               </Text>
                             </div>
                             <Text type="text" color={isEnabled ? 'accent' : 'secondary'}>
-                              {postPricing?.price_ton !== undefined ? postPricing?.price_ton : '-'} USDT
+                              {postPricing?.price_ton !== undefined ? postPricing?.price_ton : '-'} TON
                             </Text>
                           </>
                         )}

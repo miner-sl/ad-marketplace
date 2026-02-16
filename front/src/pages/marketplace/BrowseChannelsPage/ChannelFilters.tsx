@@ -128,7 +128,7 @@ export const FiltersContent: React.FC<Props> = ({
 
       <BlockNew gap={8}>
         <Text type="caption" color="secondary">
-          Price (USDT)
+          Price (TON)
         </Text>
         <Group>
           <BlockNew row gap={8}>

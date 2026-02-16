@@ -92,7 +92,7 @@ export const CreateCampaignPage = () => {
           </BlockNew>
           <BlockNew gap={4}>
             <Text type="text" weight="medium">
-              Budget (USDT)
+              Budget (TON)
             </Text>
             <ListInput
               value={budgetTon}

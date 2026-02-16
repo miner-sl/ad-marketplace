@@ -9,7 +9,7 @@ export const transferTonCall = async (
   comment?: string
 ): Promise<any> => {
   try {
-    console.log('Sending USDT...', comment);
+    console.log('Sending TON...', comment);
     // TODO implement with TON connect
     // Check if wallet is connected
     if (!tonConnectUI.account) {
@@ -44,7 +44,7 @@ export const transferTonCall = async (
     //   message: `Transaction sent! Hash: ${result.boc.slice(0, 10)}...`,
     // }
   } catch (error: any) {
-    console.error('USDT transfer error:', error)
+    console.error('TON transfer error:', error)
 
     // Handle user rejection
     if (error?.message?.includes('User rejected') || error?.code === 300) {
@@ -64,14 +64,14 @@ export const transferTonCall = async (
 }
 
 /**
- * Hook for handling USDT transfers using TON Connect
+ * Hook for handling TON transfers using TON Connect
  */
 export function useTonTransfer() {
   const [tonConnectUI] = useTonConnectUI()
   const { showToast } = useToast()
 
   /**
-   * Transfer USDT to a specified address
+   * Transfer TON to a specified address
    * @param toAddress - The recipient address (bounceable or non-bounceable)
    * @param amountUSDT - The amount in TON (will be converted to nanotons)
    * @param comment - Optional comment for the transaction

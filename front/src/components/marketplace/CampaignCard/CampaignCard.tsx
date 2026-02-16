@@ -54,7 +54,7 @@ export const CampaignCard = ({ campaign, onClick }: CampaignCardProps) => {
         <Block row gap={16} marginValue={8}>
           {campaign.budget_ton && (
             <Text type="caption" color="secondary">
-              💰 Budget: {campaign.budget_ton} USDT
+              💰 Budget: {campaign.budget_ton} TON
             </Text>
           )}
           {campaign.target_subscribers_min && (

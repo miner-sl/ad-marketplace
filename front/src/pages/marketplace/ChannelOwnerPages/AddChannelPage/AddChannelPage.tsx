@@ -25,6 +25,7 @@ import {useClipboard} from '@hooks'
 import config from '@config'
 import {PREDEFINED_TOPICS} from '../../../../common/constants/topics'
 import {COUNTRIES, LOCALES} from '@types'
+import {cleanChannelUsername} from "../../../../common/utils/cleanChannelUsername.ts";
 
 const topics = PREDEFINED_TOPICS.map((topic: { id: number; name: string }) => ({
   name: topic.name,
@@ -179,7 +180,7 @@ export const AddChannelPage = () => {
                 <DebouncedListInput
                   value={username}
                   onChange={(value: string) => {
-                    setUsername(value);
+                    setUsername(cleanChannelUsername(value));
                     setValidateError(undefined);
                   }}
                   delay={1000}

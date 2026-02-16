@@ -8,7 +8,7 @@ import {ChannelListFilters, ChannelRepository} from '../repositories/channel.rep
 import { topicsService } from './topics.service';
 import { withTx } from '../utils/transaction';
 import logger from '../utils/logger';
-import {formatUsername} from "../models/tg.util";
+import {cleanChannelUsername, formatUsername} from "../models/tg.util";
 
 export interface ChannelRegistrationResult {
   success: boolean;
@@ -89,6 +89,7 @@ export class ChannelService {
           message: 'User not found. Please use /start first',
         };
       }
+
       if (await ChannelService.channelAlreadyAdded(username)) {
         return {
           success: false,
@@ -312,7 +313,7 @@ export class ChannelService {
   }
 
   static async channelAlreadyAdded(username:string) {
-    const formattedUsername = username.startsWith('@') ? username.substring(1) : `${username}`;
+    const formattedUsername = cleanChannelUsername(username);
     const channel = await ChannelRepository.findByChannelUsername(formattedUsername);
     return channel !== null;
   }

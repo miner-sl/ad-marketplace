@@ -1,11 +1,3 @@
-export const formatUsername = (username: string): string => {
-  if (username.startsWith('t.me')) {
-    return '@' + username.substring('t.me'.length);
-  } else if (username.startsWith('https://t.me')) {
-    return '@' + username.substring('https://t.me'.length);
-  }
-  return username.startsWith('@') ? username : `@${username}`;
-}
 
 export const cleanChannelUsername = (username: string): string=> {
   if (username.startsWith('t.me/')) {

@@ -39,6 +39,16 @@ export class UserModel {
     }
     return result.rows[0] || null;
   }
+  static async findByIdWithClient(client: PoolClient, id: number): Promise<User | null> {
+    const result = await client.query(
+      'SELECT * FROM users WHERE id = $1',
+      [id]
+    );
+    if (!result?.rows || result.rows.length === 0) {
+      return null;
+    }
+    return result.rows[0] || null;
+  }
 
   static async create(data: {
     telegram_id: number;
@@ -55,20 +65,20 @@ export class UserModel {
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING *`,
         [
-          data.telegram_id, 
-          data.username, 
-          data.first_name, 
+          data.telegram_id,
+          data.username,
+          data.first_name,
           data.last_name,
           data.photo_url,
           data.language_code,
           data.is_premium ?? false,
         ]
       );
-      
+
       if (result.rows.length === 0) {
         throw new Error(`Failed to create user with telegram_id: ${data.telegram_id}`);
       }
-      
+
       return result.rows[0];
     });
   }
@@ -157,7 +167,7 @@ export class UserModel {
       `SELECT * FROM users WHERE telegram_id = $1 FOR UPDATE`,
       [data.telegram_id]
     );
-    
+
     if (existing.rows.length > 0) {
       const result = await client.query(
         `UPDATE users 
@@ -168,18 +178,18 @@ export class UserModel {
       );
       return result.rows[0];
     }
-    
+
     const result = await client.query(
       `INSERT INTO users (telegram_id, username, first_name, last_name)
        VALUES ($1, $2, $3, $4)
        RETURNING *`,
       [data.telegram_id, data.username, data.first_name, data.last_name]
     );
-    
+
     if (result.rows.length === 0) {
       throw new Error(`Failed to create user with telegram_id: ${data.telegram_id}`);
     }
-    
+
     return result.rows[0];
   }
 
@@ -210,11 +220,11 @@ export class UserModel {
        RETURNING *`,
       [value, telegramId]
     );
-    
+
     if (result.rows.length === 0) {
       throw new Error(`User with telegram_id ${telegramId} not found`);
     }
-    
+
     return result.rows[0];
   }
 
@@ -241,9 +251,9 @@ export class UserModel {
         `SELECT * FROM users WHERE telegram_id = $1 FOR UPDATE`,
         [data.telegram_id]
       );
-      
+
       let user: User;
-      
+
       if (existing.rows.length > 0) {
         const updateFields: string[] = [];
         const updateValues: any[] = [];
@@ -306,14 +316,14 @@ export class UserModel {
             data.is_advertiser ?? false,
           ]
         );
-        
+
         if (result.rows.length === 0) {
           throw new Error(`Failed to create user with telegram_id: ${data.telegram_id}`);
         }
-        
+
         user = result.rows[0];
       }
-      
+
       return user;
     });
   }
@@ -326,11 +336,11 @@ export class UserModel {
          RETURNING *`,
         [walletAddress, telegramId]
       );
-      
+
       if (result.rows.length === 0) {
         throw new Error(`User with telegram_id ${telegramId} not found`);
       }
-      
+
       return result.rows[0];
     });
   }

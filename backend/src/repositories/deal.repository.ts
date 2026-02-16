@@ -265,7 +265,7 @@ export class DealRepository {
       `SELECT d.*, c.username, c.telegram_channel_id
        FROM deals d
        INNER JOIN channels c ON d.channel_id = c.id
-       WHERE d.status = 'posted' 
+       WHERE (d.status = 'posted' or d.status = 'scheduled') 
        AND d.post_verification_until < CURRENT_TIMESTAMP
        ORDER BY d.post_verification_until ASC
        LIMIT $1`,

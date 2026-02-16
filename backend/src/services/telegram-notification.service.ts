@@ -327,15 +327,14 @@ export class TelegramNotificationService {
       const confirmButtons = {
         reply_markup: {
           inline_keyboard: [
-            [
-              { text: '✅ Confirm Publication', callback_data: `confirm_publication_${dealId}` }
-            ],
+            // [
+            //   { text: '✅ Confirm Publication', callback_data: `confirm_publication_${dealId}` }
+            // ],
             [
               { text: '📋 View Deal', callback_data: `deal_details_${dealId}` }
             ]
           ]
         },
-        parse_mode: 'HTML' as const
       };
 
       await TelegramNotificationQueueService.queueTelegramMessage(
@@ -508,13 +507,13 @@ export class TelegramNotificationService {
    */
   static async notifyDealVerified(
     deal: Deal & { username: string},
-    daysSinceFirstPublication: number,
-    minPublicationDurationDays: number
+    // daysSinceFirstPublication: number,
+    // minPublicationDurationDays: number
   ): Promise<void> {
 
     if (deal?.needConfirmByAdvertiser === true) {
-      await this.notifyAboutConfirmation(deal, daysSinceFirstPublication, minPublicationDurationDays);
-      return;
+      // await this.notifyAboutConfirmation(deal, daysSinceFirstPublication, minPublicationDurationDays);
+      // return;
     }
     await this.notifyDealConfirmedStartMoneyTransfer(deal);
   }
@@ -581,9 +580,9 @@ export class TelegramNotificationService {
         const confirmButtons = {
           reply_markup: {
             inline_keyboard: [
-              [
-                {text: '✅ Confirm Publication', callback_data: `confirm_publication_${dealId}`}
-              ],
+              // [
+              //   {text: '✅ Confirm Publication', callback_data: `confirm_publication_${dealId}`}
+              // ],
               [
                 {text: '📋 View Deal', callback_data: `deal_details_${dealId}`}
               ]

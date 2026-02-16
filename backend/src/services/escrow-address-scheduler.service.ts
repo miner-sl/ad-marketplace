@@ -32,7 +32,7 @@ export class EscrowAddressSchedulerService {
       return;
     }
     // void this.processDealsNeedingEscrow();
-    this.job = cron.schedule('*/5 * * * *', async () => {
+    this.job = cron.schedule('*/1 * * * *', async () => {
       await this.processDealsNeedingEscrow();
     });
 

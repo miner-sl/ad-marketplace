@@ -37,6 +37,7 @@ export class VerificationSchedulerService {
       return;
     }
 
+    // void this.processVerifications();
     // Run every hour
     this.job = cron.schedule('0 * * * *', async () => {
       await this.processVerifications();

@@ -201,42 +201,42 @@ export class DealModel {
       return result.rows[0];
     });
   }
-
-  static async schedulePost(id: number, postTime: Date): Promise<Deal> {
-    return await withTx(async (client) => {
-      const dealCheck = await client.query(
-        `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
-        [id]
-      );
-
-      if (dealCheck.rows.length === 0) {
-        throw new Error('Deal not found');
-      }
-
-      const deal = dealCheck.rows[0];
-
-      if (deal.status !== 'paid' && deal.status !== 'scheduled') {
-        throw new Error(`Cannot schedule post in status: ${deal.status}`);
-      }
-
-      // Ensure date is in UTC (convert to ISO string and back to ensure UTC)
-      const utcDate = new Date(postTime.toISOString());
-
-      const result = await client.query(
-        `UPDATE deals 
-         SET status = 'scheduled', scheduled_post_time = $1, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $2 AND status IN ('paid', 'scheduled')
-         RETURNING *`,
-        [utcDate, id]
-      );
-
-      if (result.rows.length === 0) {
-        throw new Error('Deal status changed during processing');
-      }
-
-      return result.rows[0];
-    });
-  }
+  //
+  // static async schedulePost(id: number, postTime: Date): Promise<Deal> {
+  //   return await withTx(async (client) => {
+  //     const dealCheck = await client.query(
+  //       `SELECT * FROM deals WHERE id = $1 FOR UPDATE`,
+  //       [id]
+  //     );
+  //
+  //     if (dealCheck.rows.length === 0) {
+  //       throw new Error('Deal not found');
+  //     }
+  //
+  //     const deal = dealCheck.rows[0];
+  //
+  //     if (deal.status !== 'paid' && deal.status !== 'scheduled') {
+  //       throw new Error(`Cannot schedule post in status: ${deal.status}`);
+  //     }
+  //
+  //     // Ensure date is in UTC (convert to ISO string and back to ensure UTC)
+  //     const utcDate = new Date(postTime.toISOString());
+  //
+  //     const result = await client.query(
+  //       `UPDATE deals
+  //        SET status = 'scheduled', scheduled_post_time = $1, updated_at = CURRENT_TIMESTAMP
+  //        WHERE id = $2 AND status IN ('paid', 'scheduled')
+  //        RETURNING *`,
+  //       [utcDate, id]
+  //     );
+  //
+  //     if (result.rows.length === 0) {
+  //       throw new Error('Deal status changed during processing');
+  //     }
+  //
+  //     return result.rows[0];
+  //   });
+  // }
 
   static async recordPost(id: number, messageId: number, verificationUntil: Date): Promise<Deal> {
     return await withTx(async (client) => {
@@ -254,7 +254,7 @@ export class DealModel {
       const result = await client.query(
         `UPDATE deals 
          SET status = 'posted', actual_post_time = CURRENT_TIMESTAMP, 
-             post_message_id = $1, post_verification_until = $2, updated_at = CURRENT_TIMESTAMP
+             post_message_id = $1, post_verification_until = $2 AT TIME ZONE 'UTC', updated_at = CURRENT_TIMESTAMP
          WHERE id = $3
          RETURNING *`,
         [messageId, utcDate, id]
@@ -427,7 +427,7 @@ export class DealModel {
       `INSERT INTO deals (
         deal_type, listing_id, campaign_id, channel_id, channel_owner_id,
         advertiser_id, ad_format, price_ton, escrow_address, scheduled_post_time
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10 AT TIME ZONE 'UTC')
       RETURNING *`,
       [
         data.deal_type,
@@ -592,7 +592,7 @@ export class DealModel {
   ): Promise<Deal> {
     const result = await client.query(
       `UPDATE deals 
-       SET escrow_address = $1, channel_owner_wallet_address = $2, status = 'payment_pending', updated_at = CURRENT_TIMESTAMP
+       SET escrow_address = $1, channel_owner_wallet_address = $2, updated_at = CURRENT_TIMESTAMP
        WHERE id = $3 AND escrow_address IS NULL
        RETURNING *`,
       [escrowAddress, ownerWalletAddress, dealId]

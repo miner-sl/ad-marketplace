@@ -247,25 +247,25 @@ export class DealsController {
       reply.code(500).send({ error: error.message });
     }
   }
-
-  static async schedulePost(request: FastifyRequest, reply: FastifyReply) {
-    try {
-      const { id } = request.params as { id: string };
-      const { post_time } = request.body as any;
-      const deal = await DealFlowService.schedulePost(
-        parseInt(id),
-        new Date(post_time)
-      );
-      return deal;
-    } catch (error: any) {
-      logger.error('Failed to schedule post', {
-        error: error.message,
-        stack: error.stack,
-        dealId: (request.params as { id: string }).id,
-      });
-      reply.code(500).send({ error: error.message });
-    }
-  }
+  //
+  // static async schedulePost(request: FastifyRequest, reply: FastifyReply) {
+  //   try {
+  //     const { id } = request.params as { id: string };
+  //     const { post_time } = request.body as any;
+  //     const deal = await DealFlowService.schedulePost(
+  //       parseInt(id),
+  //       new Date(post_time)
+  //     );
+  //     return deal;
+  //   } catch (error: any) {
+  //     logger.error('Failed to schedule post', {
+  //       error: error.message,
+  //       stack: error.stack,
+  //       dealId: (request.params as { id: string }).id,
+  //     });
+  //     reply.code(500).send({ error: error.message });
+  //   }
+  // }
 
   static async declineDeal(request: FastifyRequest, reply: FastifyReply) {
     try {

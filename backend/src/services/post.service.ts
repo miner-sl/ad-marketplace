@@ -98,7 +98,7 @@ export class PostService {
             const recordResult = await client.query(
               `UPDATE deals 
            SET status = 'posted', actual_post_time = CURRENT_TIMESTAMP, 
-               post_message_id = $1, post_verification_until = $2, updated_at = CURRENT_TIMESTAMP
+               post_message_id = $1, post_verification_until = $2 AT TIME ZONE 'UTC', updated_at = CURRENT_TIMESTAMP
            WHERE id = $3 AND status IN ('paid', 'scheduled', 'creative_approved')
            RETURNING *`,
               [messageId, verificationUntilUtc, dealId]

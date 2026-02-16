@@ -709,14 +709,16 @@ export class BotController {
     const briefPreview = briefText.substring(0, 200);
     const briefTextDisplay = briefText.length > 200 ? `${briefPreview}...` : briefPreview;
 
-    await TelegramNotificationService.notifyNewAdRequest(deal.id, deal.channel_owner_id, {
-      dealId: deal.id,
-      channelId: channelInfo.channelId,
-      channelName: channelInfo.channelName,
-      priceTon: deal.price_ton,
-      adFormat: deal.ad_format,
-      briefPreview: briefTextDisplay,
-    });
+    if (deal.status === 'pending' && deal.escrow_address !== null) {
+      await TelegramNotificationService.notifyNewAdRequest(deal.id, deal.channel_owner_id, {
+        dealId: deal.id,
+        channelId: channelInfo.channelId,
+        channelName: channelInfo.channelName,
+        priceTon: deal.price_ton,
+        adFormat: deal.ad_format,
+        briefPreview: briefTextDisplay,
+      });
+    }
 
     await ctx.reply(
       `✅ Request submitted!\n\n` +
@@ -1106,29 +1108,15 @@ export class BotController {
    * Handle accept request
    */
   static async handleAcceptRequest(ctx: Context, dealId: number) {
-    const user = await UserModel.findByTelegramId(ctx.from!.id);
+    let telegramId = ctx.from!.id;
+
+    const user = await UserModel.findByTelegramId(telegramId);
     if (!user) {
       return ctx.reply('Please use /start first');
     }
 
     try {
-      // await DealFlowService.acceptDeal(dealId, user.id, ctx.from!.id);
-
-      const deal = await DealModel.findById(dealId);
-      if (!deal || !deal.escrow_address) {
-        return ctx.reply('Error: Deal or escrow address not found');
-      }
-
-      const channelInfo = await DealFlowService.getChannelInfoForDeal(dealId);
-
-      await TelegramNotificationService.notifyPaymentInvoice(dealId, deal.advertiser_id, {
-        dealId,
-        channelId: channelInfo.channelId,
-        channelName: channelInfo.channelName,
-        priceTon: deal.price_ton,
-        adFormat: deal.ad_format,
-        escrowAddress: deal.escrow_address,
-      });
+      await DealFlowService.acceptDealWithNotify(dealId, telegramId);
 
       await ctx.reply('✅ Deal accepted! Payment invoice sent to advertiser.');
     } catch (error: any) {

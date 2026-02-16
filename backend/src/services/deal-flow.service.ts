@@ -99,8 +99,7 @@ export class DealFlowService {
       if (channel.owner_id !== channel_owner_id) {
         throw new Error(`Channel owner mismatch. Channel ${channel_id} is owned by user ${channel.owner_id}, not ${channel_owner_id}`);
       }
-
-      const advertiser = await UserModel.findByTelegramIdWithClient(client, data.advertiser_id);
+      const advertiser = await UserModel.findByIdWithClient(client, data.advertiser_id);
       if (!advertiser) {
         throw new Error(`User with telegram_id ${data.advertiser_id} not found. Please register first.`);
       }
@@ -128,31 +127,22 @@ export class DealFlowService {
         });
       }
 
-      if (advertiser.telegram_id) {
-        await TelegramNotificationService.notifyNewAdRequest(deal.id, deal.channel_owner_id, {
-          dealId: deal.id,
-          channelId: channel_owner_id,
-          priceTon: deal.price_ton,
-          adFormat: deal.ad_format,
-          briefPreview: data.postText,
-        });
-      }
       return deal;
     });
   }
-
-  static async schedulePost(dealId: number, postTime: Date): Promise<any> {
-    const deal = await DealModel.findById(dealId);
-    if (!deal) {
-      throw new Error('Deal not found');
-    }
-
-    if (deal.status !== 'paid' && deal.status !== 'scheduled') {
-      throw new Error(`Cannot schedule post in status: ${deal.status}`);
-    }
-
-    return await DealModel.schedulePost(dealId, postTime);
-  }
+  //
+  // static async schedulePost(dealId: number, postTime: Date): Promise<any> {
+  //   const deal = await DealModel.findById(dealId);
+  //   if (!deal) {
+  //     throw new Error('Deal not found');
+  //   }
+  //
+  //   if (deal.status !== 'paid' && deal.status !== 'scheduled') {
+  //     throw new Error(`Cannot schedule post in status: ${deal.status}`);
+  //   }
+  //
+  //   return await DealModel.schedulePost(dealId, postTime);
+  // }
 
   /**
    * Accept deal (channel owner accepts advertiser request)
@@ -256,11 +246,12 @@ export class DealFlowService {
       throw new Error('Channel owner wallet address not set. Please set your wallet address first.');
     }
     const channel = await ChannelRepository.findById(deal.channel_id);
-    if (!channel || !channel.telegram_channel_id) {
+    let telegramChannelId = channel?.telegram_channel_id;
+    if (!channel || !telegramChannelId) {
       throw new Error('Channel not found');
     }
 
-    const isChannelAdmin = await TelegramService.botStillAdminInChannel(channel?.telegram_channel_id);
+    const isChannelAdmin = await TelegramService.botStillAdminInChannel(telegramChannelId);
     if (!isChannelAdmin) {
       await TelegramNotificationService.notifyAboutAddBotAsAdmin(deal, channel, channel.owner_id);
       throw new Error('You are not an admin of this channel');
@@ -269,6 +260,14 @@ export class DealFlowService {
     const escrowAddress = await TONService.generateEscrowAddress(dealId);
     const updateDeal = await DealModel.updateEscrowAddress(escrowAddress, ownerWalletAddress, dealId);
 
+    if (deal.status === 'pending' && deal.escrow_address === null) {
+      await TelegramNotificationService.notifyNewAdRequest(deal.id, deal.channel_owner_id, {
+        dealId: deal.id,
+        channelId: deal.channel_owner_id,
+        priceTon: deal.price_ton,
+        adFormat: deal.ad_format,
+      });
+    }
     if (deal.status === 'payment_pending') {
       await TelegramNotificationService.notifyPaymentInvoice(
         dealId,

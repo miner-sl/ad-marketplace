@@ -326,7 +326,6 @@ export class ChannelService {
         }
       }
       const isAdmin = await this.validateChannelAdmin(channelUsername);
-      console.log(isAdmin, channelUsername)
       return {
         ok: isAdmin,
       };

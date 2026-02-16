@@ -1,7 +1,7 @@
 import logger from '../utils/logger';
-import { PostService } from './post.service';
+import {PostService, PublishedPost} from './post.service';
 import { TelegramNotificationService } from './telegram-notification.service';
-import { Deal } from '../models/deal.types';
+import {DealScheduledDTO} from "../repositories/deal.repository";
 
 export interface PublishPostResult {
   success: boolean;
@@ -32,7 +32,7 @@ export class PostSenderService {
    * @param deal - The deal entity to publish
    * @returns Result object containing success status, messageId/postLink, or error details
    */
-  async publishPost(deal: Deal): Promise<PublishPostResult> {
+  async publishPost(deal: DealScheduledDTO): Promise<PublishPostResult> {
     try {
       this.logger.debug(`Publishing post for Deal #${deal.id}`, {
         dealId: deal.id,
@@ -52,7 +52,7 @@ export class PostSenderService {
         };
       }
 
-      const result = await PostService.preparePublishPost(deal.id, deal.channel_id, postText);
+      const result: PublishedPost = await PostService.preparePublishPost(deal.id, deal.channel_id, postText);
 
       try {
         await TelegramNotificationService.notifyPostPublished(deal.id, deal.advertiser_id, result.postLink);

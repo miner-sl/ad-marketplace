@@ -157,8 +157,7 @@ export class DealFlowService {
         throw new Error('Channel not found');
       }
 
-      const channelAdmins = await TelegramService.getChannelAdmins(channel?.telegram_channel_id);
-      const isChannelAdmin = channelAdmins.find((admin) => String(admin.user.id) === String(telegramUserId));
+      const isChannelAdmin = await TelegramService.botStillAdminInChannel(channel?.telegram_channel_id);
       if (!isChannelAdmin) {
         throw new Error('You are not an admin of this channel');
       }
@@ -244,8 +243,7 @@ export class DealFlowService {
       throw new Error('Channel not found');
     }
 
-    const channelAdmins = await TelegramService.getChannelAdmins(channel?.telegram_channel_id);
-    const isChannelAdmin = channelAdmins.find((admin) => String(admin.user.username) === env.TELEGRAM_BOT_USERNAME);
+    const isChannelAdmin = await TelegramService.botStillAdminInChannel(channel?.telegram_channel_id);
     if (!isChannelAdmin) {
       await TelegramNotificationService.notifyAboutAddBotAsAdmin(deal, channel, channel.owner_id);
       throw new Error('You are not an admin of this channel');

@@ -1,4 +1,4 @@
-import { PoolClient } from 'pg';
+import {PoolClient} from 'pg';
 import db from '../db/connection';
 import {Deal} from "../models/deal.types";
 
@@ -9,6 +9,8 @@ export interface DealMessage {
   message_text: string;
   created_at: Date;
 }
+
+export type DealScheduledDTO = Deal & { telegram_channel_id: number, channel_owner_id: number }
 
 export interface DealListFilters {
   status?: string;
@@ -28,11 +30,12 @@ export class DealRepository {
     );
     return result.rows || [];
   }
+
   /**
    * List deals with filters (status, deal_type)
    */
   static async listDealsWithFilters(filters: DealListFilters): Promise<Deal[]> {
-    const { status, deal_type, limit = 100 } = filters;
+    const {status, deal_type, limit = 100} = filters;
 
     const result = await db.query(
       `SELECT * FROM deals 
@@ -134,8 +137,8 @@ export class DealRepository {
     );
     const rows = result?.rows || [];
     const allAmount = rows.length > 0 ? Number(rows[0].all_amount) : 0;
-    const rowsWithoutCount = rows.map(({ all_amount, ...r }) => r);
-    return { rows: rowsWithoutCount, allAmount: allAmount };
+    const rowsWithoutCount = rows.map(({all_amount, ...r}) => r);
+    return {rows: rowsWithoutCount, allAmount: allAmount};
   }
 
   /**
@@ -212,7 +215,10 @@ export class DealRepository {
   /**
    * Batch fetch channels by IDs (solves N+1 query problem)
    */
-  static async findChannelsByIds(channelIds: number[]): Promise<Map<number, { id: number; telegram_channel_id?: number }>> {
+  static async findChannelsByIds(channelIds: number[]): Promise<Map<number, {
+    id: number;
+    telegram_channel_id?: number
+  }>> {
     if (channelIds.length === 0) {
       return new Map();
     }
@@ -234,7 +240,7 @@ export class DealRepository {
    * Get deals ready for auto-post with channel info (optimized query)
    * Finds deals that are scheduled and ready to be published
    */
-  static async findPendingScheduledPosts(limit: number = 100): Promise<any[]> {
+  static async findPendingScheduledPosts(limit: number = 100): Promise<DealScheduledDTO[]> {
     const result = await db.query(
       `SELECT d.*, c.telegram_channel_id, c.owner_id as channel_owner_id
        FROM deals d

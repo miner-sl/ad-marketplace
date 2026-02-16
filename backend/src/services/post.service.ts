@@ -7,16 +7,18 @@ import {distributedLock} from '../utils/lock';
 
 const minPostDurationHours = parseInt(String(env.MIN_POST_DURATION_HOURS || '24'), 10);
 
+export type PublishedPost = {
+  messageId: number;
+  postLink: string;
+};
+
 export class PostService {
   /**
    * Publish post to channel
    * Returns post link and message ID
    * Uses distributed lock + FOR UPDATE lock to prevent race conditions between manual and auto-publish
    */
-  static async preparePublishPost(dealId: number, channelId: number, postText: string): Promise<{
-    messageId: number;
-    postLink: string;
-  }> {
+  static async preparePublishPost(dealId: number, channelId: number, postText: string): Promise<PublishedPost> {
     return await distributedLock.withLock(
       dealId,
       'publish_post',
@@ -40,7 +42,6 @@ export class PostService {
                 existingMessageId: deal.post_message_id,
                 currentStatus: deal.status,
               });
-
               const channel = await client.query(
                 'SELECT telegram_channel_id, username FROM channels WHERE id = $1',
                 [channelId]

@@ -4,6 +4,7 @@ import {JSDOM} from 'jsdom';
 import {getRandomUserAgent} from '../utils/network/useragent';
 import {formatUsername} from "../models/tg.util";
 import {withRetry} from "../utils/network/retry";
+import env from "../utils/env";
 
 dotenv.config();
 
@@ -99,10 +100,17 @@ export class TelegramService {
     return bot;
   }
 
+  static async botStillAdminInChannel(telegramChannelId: number): Promise<boolean> {
+    const channelAdmins = await TelegramService.getChannelAdmins(telegramChannelId);
+    const isChannelAdmin = channelAdmins.find((admin) => String(admin.user.username) === env.TELEGRAM_BOT_USERNAME);
+
+    return isChannelAdmin !== undefined;
+  }
+
   /**
    * Get channel administrators
    */
-  static async getChannelAdmins(channelId: number): Promise<Array<{
+  static async getChannelAdmins(telegramChannelId: number): Promise<Array<{
     user: TelegramBot.User;
     status: string;
     can_post_messages?: boolean;
@@ -110,7 +118,7 @@ export class TelegramService {
     can_delete_messages?: boolean;
   }>> {
     try {
-      const admins = await bot.getChatAdministrators(channelId);
+      const admins = await bot.getChatAdministrators(telegramChannelId);
       return admins.map((admin: ChatMember) => ({
         user: admin.user,
         status: admin.status,

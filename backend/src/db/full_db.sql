@@ -165,7 +165,7 @@ create table if not exists channel_stats
     premium_subscribers_count integer,
     statistic                 jsonb,
     stats_date                timestamp default CURRENT_TIMESTAMP,
-    created_at                timestamp default CURRENT_TIMESTAMP,
+    created_at                timestamp default CURRENT_TIMESTAMP
 );
 
 alter table channel_stats
